@@ -7,7 +7,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2 } from "lucide-react"
+import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2, Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function SignupPage() {
@@ -18,10 +18,12 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [practiceName, setPracticeName] = useState("")
   const [credentials, setCredentials] = useState("")
   const [inviteCode, setInviteCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,7 +38,8 @@ export default function SignupPage() {
 
     const supabase = createClient()
     
-    const { error: signUpError } = await supabase.auth.signUp({
+    // Sign up the user
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -45,6 +48,7 @@ export default function SignupPage() {
         data: {
           first_name: firstName,
           last_name: lastName,
+          full_name: `${firstName} ${lastName}`,
           user_type: userType,
           credentials: userType === "therapist" ? credentials : null,
           invite_code: userType === "client" ? inviteCode : null,
@@ -58,13 +62,65 @@ export default function SignupPage() {
       return
     }
 
-    // Redirect to confirmation page or dashboard
-    if (userType === "therapist") {
-      router.push("/onboarding")
-    } else {
-      router.push("/portal")
+    // If therapist, insert into therapists table
+    if (userType === "therapist" && authData.user) {
+      const { error: insertError } = await supabase
+        .from("therapists")
+        .insert({
+          id: authData.user.id,
+          full_name: `${firstName} ${lastName}`,
+          practice_name: practiceName || null,
+          email: email,
+        })
+
+      if (insertError) {
+        // Log error but don't block - the trigger may handle this
+        console.error("Error inserting therapist:", insertError)
+      }
     }
-    router.refresh()
+
+    // Show email verification message
+    setShowVerificationMessage(true)
+    setIsLoading(false)
+  }
+
+  if (showVerificationMessage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-6">
+            <Mail className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Check your email</h1>
+          <p className="text-muted-foreground mb-6">
+            We sent a verification link to <span className="font-medium text-foreground">{email}</span>. 
+            Click the link to verify your account and get started.
+          </p>
+          <div className="p-4 rounded-xl bg-muted/50 border border-border mb-6">
+            <p className="text-sm text-muted-foreground">
+              {"Didn't receive the email? Check your spam folder or "}
+              <button 
+                onClick={() => setShowVerificationMessage(false)}
+                className="text-primary hover:underline"
+              >
+                try again
+              </button>
+              .
+            </p>
+          </div>
+          <Link href="/login">
+            <Button variant="outline" className="rounded-xl">
+              Back to login
+            </Button>
+          </Link>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
@@ -172,18 +228,32 @@ export default function SignupPage() {
             </div>
 
             {userType === "therapist" && (
-              <div className="space-y-2">
-                <Label htmlFor="credentials">Credentials / License</Label>
-                <Input
-                  id="credentials"
-                  type="text"
-                  placeholder="e.g., LMFT, PhD, PsyD"
-                  className="h-12 rounded-xl"
-                  value={credentials}
-                  onChange={(e) => setCredentials(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="practiceName">Practice name (optional)</Label>
+                  <Input
+                    id="practiceName"
+                    type="text"
+                    placeholder="e.g., Mindful Therapy Associates"
+                    className="h-12 rounded-xl"
+                    value={practiceName}
+                    onChange={(e) => setPracticeName(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="credentials">Credentials / License (optional)</Label>
+                  <Input
+                    id="credentials"
+                    type="text"
+                    placeholder="e.g., LMFT, PhD, PsyD"
+                    className="h-12 rounded-xl"
+                    value={credentials}
+                    onChange={(e) => setCredentials(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </>
             )}
 
             {userType === "client" && (

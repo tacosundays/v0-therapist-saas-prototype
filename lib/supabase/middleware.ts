@@ -1,82 +1,70 @@
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  const response = NextResponse.next({
     request,
   })
 
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          )
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          )
-        },
-      },
-    },
+  // If Supabase is not configured, skip auth checks and allow all routes
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return response
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+  // Get auth token from cookie
+  const authCookie = request.cookies.get('sb-access-token')?.value
+  let user = null
+
+  if (authCookie) {
+    try {
+      const { data } = await supabase.auth.getUser(authCookie)
+      user = data.user
+    } catch {
+      // Token invalid or expired
+      user = null
+    }
+  }
+
+  // Check for session cookie as fallback
+  const sessionCookie = request.cookies.get('supabase-auth-token')?.value
+  if (!user && sessionCookie) {
+    try {
+      const session = JSON.parse(sessionCookie)
+      if (session?.access_token) {
+        const { data } = await supabase.auth.getUser(session.access_token)
+        user = data.user
+      }
+    } catch {
+      user = null
+    }
+  }
+
+  // Protected routes check
+  const protectedPaths = ['/dashboard', '/portal', '/onboarding']
+  const isProtectedPath = protectedPaths.some(path => 
+    request.nextUrl.pathname.startsWith(path)
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: If you remove getUser() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (
-    // if the user is not logged in and the protected paths are accessed, redirect to the login page
-    (request.nextUrl.pathname.startsWith('/dashboard') ||
-     request.nextUrl.pathname.startsWith('/portal') ||
-     request.nextUrl.pathname.startsWith('/onboarding')) &&
-    !user
-  ) {
-    // no user, redirect to the login page
+  if (isProtectedPath && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // if the user is logged in and tries to access login/signup pages, redirect to dashboard
-  if (
-    (request.nextUrl.pathname === '/login' ||
-     request.nextUrl.pathname === '/signup') &&
-    user
-  ) {
+  // Redirect logged-in users away from auth pages
+  const authPaths = ['/login', '/signup']
+  const isAuthPath = authPaths.includes(request.nextUrl.pathname)
+
+  if (isAuthPath && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
-
-  return supabaseResponse
+  return response
 }

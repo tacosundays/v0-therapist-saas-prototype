@@ -39,6 +39,8 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedModalities, setSelectedModalities] = useState<string[]>([])
+  const [practiceName, setPracticeName] = useState("")
+  const [clientCount, setClientCount] = useState<string | null>(null)
 
   const toggleModality = (modality: string) => {
     setSelectedModalities((prev) =>
@@ -114,6 +116,8 @@ export default function OnboardingPage() {
                       id="practiceName"
                       placeholder="e.g., Mindful Growth Therapy"
                       className="h-12 rounded-xl"
+                      value={practiceName}
+                      onChange={(e) => setPracticeName(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -122,9 +126,17 @@ export default function OnboardingPage() {
                       {["1-10", "11-25", "26+"].map((size) => (
                         <button
                           key={size}
-                          className="p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-center"
+                          type="button"
+                          onClick={() => setClientCount(size)}
+                          className={`p-4 rounded-xl border transition-all text-center ${
+                            clientCount === size
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/50 hover:bg-primary/5"
+                          }`}
                         >
-                          <Users className="w-6 h-6 text-primary mx-auto mb-2" />
+                          <Users className={`w-6 h-6 mx-auto mb-2 ${
+                            clientCount === size ? "text-primary" : "text-primary"
+                          }`} />
                           <span className="text-sm font-medium text-foreground">{size}</span>
                         </button>
                       ))}
@@ -247,7 +259,11 @@ export default function OnboardingPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <Button onClick={nextStep} className="rounded-xl">
+            <Button 
+              onClick={nextStep} 
+              className="rounded-xl"
+              disabled={currentStep === 0 && (!practiceName.trim() || !clientCount)}
+            >
               {currentStep === steps.length - 1 ? (
                 <>
                   Go to dashboard

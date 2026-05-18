@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,8 @@ import {
   Sparkles
 } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 const stats = [
   { label: "Active Clients", value: "24", icon: Users, change: "+2 this week" },
@@ -36,6 +39,28 @@ const aiSuggestions = [
 ]
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+    })
+  }, [])
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good morning"
+    if (hour < 18) return "Good afternoon"
+    return "Good evening"
+  }
+
+  // Get user display name
+  const displayName = user?.user_metadata?.first_name 
+    ? `${user.user_metadata.first_name}`
+    : user?.email?.split('@')[0] || 'there'
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -46,7 +71,7 @@ export default function DashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-2xl font-bold text-foreground"
           >
-            Good morning, Dr. Rebecca
+            {getGreeting()}, {displayName}
           </motion.h1>
           <p className="text-muted-foreground mt-1">{"Here's what's happening with your clients today"}</p>
         </div>

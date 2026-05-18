@@ -16,8 +16,9 @@ import {
   Loader2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -33,6 +34,28 @@ export function DashboardSidebar() {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    // Get initial user
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+    })
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (!session?.user) {
+        router.push("/login")
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [router])
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -41,6 +64,18 @@ export function DashboardSidebar() {
     router.push("/")
     router.refresh()
   }
+
+  // Get user display name from metadata or email
+  const displayName = user?.user_metadata?.first_name 
+    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
+    : user?.email?.split('@')[0] || 'User'
+  
+  const initials = displayName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 
   return (
     <aside
@@ -99,12 +134,12 @@ export function DashboardSidebar() {
       <div className="p-4 border-t border-sidebar-border">
         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
           <div className="w-10 h-10 rounded-full bg-sidebar-primary/20 flex items-center justify-center shrink-0">
-            <span className="text-sm font-medium text-sidebar-primary">DR</span>
+            <span className="text-sm font-medium text-sidebar-primary">{initials}</span>
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">Dr. Rebecca</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">rebecca@practice.com</p>
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{displayName}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email || ''}</p>
             </div>
           )}
         </div>

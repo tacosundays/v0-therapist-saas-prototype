@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,8 @@ import {
   Heart,
   Sparkles
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 const assignments = [
   {
@@ -63,8 +65,21 @@ const completedAssignments = [
 export default function PortalPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null)
   const [reflection, setReflection] = useState("")
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+    })
+  }, [])
 
   const currentAssignment = assignments.find(a => a.id === selectedAssignment)
+
+  // Get user display name
+  const displayName = user?.user_metadata?.first_name 
+    ? `${user.user_metadata.first_name}`
+    : user?.email?.split('@')[0] || 'there'
 
   return (
     <div className="space-y-8">
@@ -74,7 +89,7 @@ export default function PortalPage() {
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <h1 className="text-2xl font-bold text-foreground">Welcome back, Sarah</h1>
+        <h1 className="text-2xl font-bold text-foreground">Welcome back, {displayName}</h1>
         <p className="text-muted-foreground mt-1">{"You have 3 assignments waiting for you"}</p>
       </motion.div>
 

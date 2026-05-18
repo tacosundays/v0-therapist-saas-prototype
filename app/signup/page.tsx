@@ -2,15 +2,70 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Brain, Eye, EyeOff, ArrowLeft, Check } from "lucide-react"
+import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 export default function SignupPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [credentials, setCredentials] = useState("")
+  const [inviteCode, setInviteCode] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters")
+      setIsLoading(false)
+      return
+    }
+
+    const supabase = createClient()
+    
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ?? 
+          `${window.location.origin}/auth/callback`,
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          user_type: userType,
+          credentials: userType === "therapist" ? credentials : null,
+          invite_code: userType === "client" ? inviteCode : null,
+        },
+      },
+    })
+
+    if (signUpError) {
+      setError(signUpError.message)
+      setIsLoading(false)
+      return
+    }
+
+    // Redirect to confirmation page or dashboard
+    if (userType === "therapist") {
+      router.push("/onboarding")
+    } else {
+      router.push("/portal")
+    }
+    router.refresh()
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -43,6 +98,7 @@ export default function SignupPage() {
           {/* Role Toggle */}
           <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
             <button
+              type="button"
               onClick={() => setUserType("therapist")}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 userType === "therapist"
@@ -53,6 +109,7 @@ export default function SignupPage() {
               Therapist
             </button>
             <button
+              type="button"
               onClick={() => setUserType("client")}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 userType === "client"
@@ -64,7 +121,13 @@ export default function SignupPage() {
             </button>
           </div>
 
-          <form className="space-y-4">
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First name</Label>
@@ -73,6 +136,10 @@ export default function SignupPage() {
                   type="text"
                   placeholder="Jane"
                   className="h-12 rounded-xl"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -82,6 +149,10 @@ export default function SignupPage() {
                   type="text"
                   placeholder="Smith"
                   className="h-12 rounded-xl"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -93,6 +164,10 @@ export default function SignupPage() {
                 type="email"
                 placeholder="you@example.com"
                 className="h-12 rounded-xl"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
               />
             </div>
 
@@ -104,6 +179,9 @@ export default function SignupPage() {
                   type="text"
                   placeholder="e.g., LMFT, PhD, PsyD"
                   className="h-12 rounded-xl"
+                  value={credentials}
+                  onChange={(e) => setCredentials(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
             )}
@@ -116,6 +194,9 @@ export default function SignupPage() {
                   type="text"
                   placeholder="Enter your invite code"
                   className="h-12 rounded-xl"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
             )}
@@ -128,6 +209,10 @@ export default function SignupPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
                   className="h-12 rounded-xl pr-12"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -147,11 +232,16 @@ export default function SignupPage() {
             <Button
               type="submit"
               className="w-full h-12 rounded-xl text-base"
-              asChild
+              disabled={isLoading}
             >
-              <Link href={userType === "therapist" ? "/onboarding" : "/portal"}>
-                Create account
-              </Link>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Create account"
+              )}
             </Button>
           </form>
 

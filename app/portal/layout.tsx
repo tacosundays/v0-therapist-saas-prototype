@@ -1,14 +1,28 @@
 "use client"
 
 import Link from "next/link"
-import { Brain, LogOut } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { Brain, LogOut, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/client"
 
 export default function PortalLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/")
+    router.refresh()
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -27,10 +41,18 @@ export default function PortalLayout({
                 <p className="text-sm font-medium text-foreground">Sarah Mitchell</p>
                 <p className="text-xs text-muted-foreground">Client Portal</p>
               </div>
-              <Button variant="ghost" size="icon" className="rounded-xl" asChild>
-                <Link href="/">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-xl" 
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+              >
+                {isSigningOut ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
                   <LogOut className="w-5 h-5" />
-                </Link>
+                )}
               </Button>
             </div>
           </div>

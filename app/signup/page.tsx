@@ -79,9 +79,20 @@ export default function SignupPage() {
       }
     }
 
-    // Show email verification message
-    setShowVerificationMessage(true)
     setIsLoading(false)
+
+    // If session exists (email confirmation disabled), redirect to appropriate page
+    if (authData.session) {
+      if (userType === "therapist") {
+        router.push("/onboarding")
+      } else {
+        router.push("/portal")
+      }
+      return
+    }
+
+    // No session means email confirmation is required - show verification message
+    setShowVerificationMessage(true)
   }
 
   if (showVerificationMessage) {

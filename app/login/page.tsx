@@ -24,22 +24,31 @@ export default function LoginPage() {
     setError(null)
     setIsLoading(true)
 
-    const supabase = createClient()
-    
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const supabase = createClient()
+      
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (signInError) {
-      setError(signInError.message)
+      if (signInError) {
+        console.log("[v0] Login error:", signInError.message)
+        setError(signInError.message)
+        return
+      }
+
+      console.log("[v0] Login success:", data.user?.email)
+      
+      // Redirect based on user type
+      router.push(userType === "therapist" ? "/dashboard" : "/portal")
+      router.refresh()
+    } catch (err) {
+      console.log("[v0] Login exception:", err)
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    // Redirect based on user type
-    router.push(userType === "therapist" ? "/dashboard" : "/portal")
-    router.refresh()
   }
 
   return (

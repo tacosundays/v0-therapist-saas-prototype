@@ -33,18 +33,18 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        console.log("[v0] Login error:", signInError.message)
+        console.error("login error", signInError)
         setError(signInError.message)
         return
       }
 
-      console.log("[v0] Login success:", data.user?.email)
+      console.log("login success", data)
       
       // Redirect based on user type
       router.push(userType === "therapist" ? "/dashboard" : "/portal")
       router.refresh()
     } catch (err) {
-      console.log("[v0] Login exception:", err)
+      console.error("login error", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
     } finally {
       setIsLoading(false)

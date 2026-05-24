@@ -28,7 +28,7 @@ import { AddClientModal } from "@/components/dashboard/add-client-modal"
 interface Client {
   id: string
   therapist_id: string
-  name: string
+  full_name: string
   email: string | null
   created_at: string
 }
@@ -89,7 +89,7 @@ export default function ClientsPage() {
   }
 
   const filteredClients = clients.filter((client) => {
-    const matchesSearch = client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = client.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     // For now, treat all clients as active since we don't have status field yet
     const matchesFilter = filterStatus === "all" || filterStatus === "active"
@@ -198,11 +198,11 @@ export default function ClientsPage() {
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                         <span className="text-lg font-medium text-primary">
-                          {client.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                          {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                         </span>
                       </div>
                       <div>
-                        <CardTitle className="text-base">{client.name}</CardTitle>
+                        <CardTitle className="text-base">{client.full_name}</CardTitle>
                         {client.email && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Mail className="w-3 h-3" />

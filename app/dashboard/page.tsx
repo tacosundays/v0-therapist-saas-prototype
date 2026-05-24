@@ -23,7 +23,7 @@ import type { User } from "@supabase/supabase-js"
 interface Client {
   id: string
   therapist_id: string
-  name: string
+  full_name: string
   email: string | null
   created_at: string
 }
@@ -202,12 +202,12 @@ export default function DashboardPage() {
                     >
                       <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                         <span className="text-sm font-medium text-primary">
-                          {client.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                          {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
+                          <p className="text-sm font-medium text-foreground truncate">{client.full_name}</p>
                           <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-muted text-muted-foreground">
                             New
                           </span>

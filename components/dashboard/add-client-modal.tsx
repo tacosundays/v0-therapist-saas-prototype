@@ -50,7 +50,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         .from("clients")
         .insert({
           therapist_id: user.id,
-          name: name.trim(),
+          full_name: name.trim(),
           email: email.trim() || null,
         })
 

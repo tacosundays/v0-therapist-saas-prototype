@@ -13,8 +13,8 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  AlertCircle,
-  Loader2
+  Loader2,
+  FileText
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
+import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 
 interface Client {
   id: string
@@ -33,15 +34,24 @@ interface Client {
   created_at: string
 }
 
+interface Assignment {
+  id: string
+  client_id: string
+  completed: boolean
+}
+
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all")
   const [clients, setClients] = useState<Client[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
+  const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined)
 
-  const fetchClients = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
@@ -58,22 +68,33 @@ export default function ClientsPage() {
       }
 
       // Fetch clients for this therapist
-      const { data, error: fetchError } = await supabase
+      const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
         .select("*")
         .eq("therapist_id", user.id)
         .order("created_at", { ascending: false })
 
-      if (fetchError) {
-        console.error("Error fetching clients:", fetchError)
-        setError(fetchError.message)
+      if (clientsError) {
+        console.error("Error fetching clients:", clientsError)
+        setError(clientsError.message)
         return
       }
 
-      console.log("Fetched clients:", data)
-      setClients(data || [])
+      // Fetch assignments for this therapist
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from("assignments")
+        .select("id, client_id, completed")
+        .eq("therapist_id", user.id)
+
+      if (assignmentsError) {
+        console.error("Error fetching assignments:", assignmentsError)
+        // Don't fail completely, just log it
+      }
+
+      setClients(clientsData || [])
+      setAssignments(assignmentsData || [])
     } catch (err) {
-      console.error("Exception fetching clients:", err)
+      console.error("Exception fetching data:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
     } finally {
       setIsLoading(false)
@@ -81,11 +102,30 @@ export default function ClientsPage() {
   }, [])
 
   useEffect(() => {
-    fetchClients()
-  }, [fetchClients])
+    fetchData()
+  }, [fetchData])
 
   const handleClientAdded = () => {
-    fetchClients()
+    fetchData()
+  }
+
+  const handleAssignmentCreated = () => {
+    fetchData()
+  }
+
+  const openAssignModal = (clientId?: string) => {
+    setSelectedClientId(clientId)
+    setIsAssignModalOpen(true)
+  }
+
+  // Get assignment stats for a client
+  const getClientStats = (clientId: string) => {
+    const clientAssignments = assignments.filter(a => a.client_id === clientId)
+    const total = clientAssignments.length
+    const completed = clientAssignments.filter(a => a.completed).length
+    const active = total - completed
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : null
+    return { total, completed, active, completionRate }
   }
 
   const filteredClients = clients.filter((client) => {
@@ -118,10 +158,16 @@ export default function ClientsPage() {
           </motion.h1>
           <p className="text-muted-foreground mt-1">Manage your client list and assignments</p>
         </div>
-        <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Client
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="rounded-xl" onClick={() => openAssignModal()}>
+            <FileText className="w-4 h-4 mr-2" />
+            Assign Homework
+          </Button>
+          <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Client
+          </Button>
+        </div>
       </div>
 
       {/* Search and Filter */}
@@ -185,88 +231,93 @@ export default function ClientsPage() {
       {/* Clients Grid */}
       {!isLoading && !error && filteredClients.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredClients.map((client, index) => (
-            <motion.div
-              key={client.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card className="rounded-2xl hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-lg font-medium text-primary">
-                          {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+          {filteredClients.map((client, index) => {
+            const stats = getClientStats(client.id)
+            return (
+              <motion.div
+                key={client.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Card className="rounded-2xl hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                          <span className="text-lg font-medium text-primary">
+                            {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                          </span>
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">{client.full_name}</CardTitle>
+                          {client.email && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Mail className="w-3 h-3" />
+                              {client.email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuItem>View Profile</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
+                            Assign Homework
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>Send Message</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <Calendar className="w-4 h-4" />
+                          Added
+                        </span>
+                        <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Completion rate
+                        </span>
+                        <span className={`font-medium ${stats.completionRate !== null ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {stats.completionRate !== null ? `${stats.completionRate}%` : '--'}
                         </span>
                       </div>
-                      <div>
-                        <CardTitle className="text-base">{client.full_name}</CardTitle>
-                        {client.email && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Mail className="w-3 h-3" />
-                            {client.email}
-                          </p>
-                        )}
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <Clock className="w-4 h-4" />
+                          Active homework
+                        </span>
+                        <span className="text-foreground">{stats.active}</span>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-xl">
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
-                        <DropdownMenuItem>Assign Homework</DropdownMenuItem>
-                        <DropdownMenuItem>Send Message</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4" />
-                        Added
-                      </span>
-                      <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Completion rate
-                      </span>
-                      <span className="font-medium text-muted-foreground">
-                        --
-                      </span>
-                    </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-1.5">
-                        <Clock className="w-4 h-4" />
-                        Active homework
-                      </span>
-                      <span className="text-foreground">0</span>
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="outline" size="sm" className="flex-1 rounded-xl">
+                        View
+                      </Button>
+                      <Button size="sm" className="flex-1 rounded-xl" onClick={() => openAssignModal(client.id)}>
+                        Assign
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" className="flex-1 rounded-xl">
-                      View
-                    </Button>
-                    <Button size="sm" className="flex-1 rounded-xl">
-                      Assign
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )
+          })}
         </div>
       )}
 
@@ -275,6 +326,14 @@ export default function ClientsPage() {
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
         onClientAdded={handleClientAdded}
+      />
+
+      {/* Assign Homework Modal */}
+      <AssignHomeworkModal
+        open={isAssignModalOpen}
+        onOpenChange={setIsAssignModalOpen}
+        onAssignmentCreated={handleAssignmentCreated}
+        preselectedClientId={selectedClientId}
       />
     </div>
   )

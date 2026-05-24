@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,41 +12,72 @@ import {
   TrendingUp,
   Plus,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import type { User } from "@supabase/supabase-js"
 
-const stats = [
-  { label: "Active Clients", value: "24", icon: Users, change: "+2 this week" },
-  { label: "Completion Rate", value: "87%", icon: CheckCircle2, change: "+5% vs last month" },
-  { label: "Pending Reviews", value: "8", icon: Clock, change: "3 urgent" },
-  { label: "Avg. Engagement", value: "4.2", icon: TrendingUp, change: "days between sessions" },
-]
-
-const recentClients = [
-  { name: "Sarah Mitchell", status: "completed", homework: "Thought Record Worksheet", dueDate: "Today", progress: 100 },
-  { name: "James Rodriguez", status: "in-progress", homework: "Values Clarification Exercise", dueDate: "Tomorrow", progress: 60 },
-  { name: "Emily Chen", status: "assigned", homework: "Mindfulness Journal", dueDate: "In 3 days", progress: 0 },
-  { name: "Michael Brown", status: "overdue", homework: "Behavioral Activation Log", dueDate: "2 days ago", progress: 25 },
-  { name: "Lisa Thompson", status: "completed", homework: "Cognitive Restructuring", dueDate: "Yesterday", progress: 100 },
-]
+interface Client {
+  id: string
+  therapist_id: string
+  name: string
+  email: string | null
+  created_at: string
+}
 
 const aiSuggestions = [
-  { client: "James R.", suggestion: "Try adding a relaxation exercise based on recent anxiety scores", type: "Anxiety" },
-  { client: "Emily C.", suggestion: "Values-based activity scheduling might reinforce recent progress", type: "Depression" },
+  { client: "New Client", suggestion: "Try adding a relaxation exercise based on recent anxiety scores", type: "Anxiety" },
+  { client: "Active Client", suggestion: "Values-based activity scheduling might reinforce recent progress", type: "Depression" },
 ]
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+
+  const fetchClients = useCallback(async (userId: string) => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("therapist_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+      if (error) {
+        console.error("Error fetching clients:", error)
+        return
+      }
+
+      console.log("Dashboard fetched clients:", data)
+      setClients(data || [])
+    } catch (err) {
+      console.error("Exception fetching clients:", err)
+    }
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user)
+      if (user) {
+        fetchClients(user.id).finally(() => setIsLoading(false))
+      } else {
+        setIsLoading(false)
+      }
     })
-  }, [])
+  }, [fetchClients])
+
+  const handleClientAdded = () => {
+    if (user) {
+      fetchClients(user.id)
+    }
+  }
 
   // Get greeting based on time of day
   const getGreeting = () => {
@@ -60,6 +91,22 @@ export default function DashboardPage() {
   const displayName = user?.user_metadata?.first_name 
     ? `${user.user_metadata.first_name}`
     : user?.email?.split('@')[0] || 'there'
+
+  // Calculate stats from real data
+  const stats = [
+    { label: "Active Clients", value: clients.length.toString(), icon: Users, change: "Total clients" },
+    { label: "Completion Rate", value: "--", icon: CheckCircle2, change: "No assignments yet" },
+    { label: "Pending Reviews", value: "0", icon: Clock, change: "All caught up" },
+    { label: "Avg. Engagement", value: "--", icon: TrendingUp, change: "days between sessions" },
+  ]
+
+  // Calculate days since created
+  const getDaysSinceCreated = (createdAt: string) => {
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
+    if (days === 0) return "Today"
+    if (days === 1) return "Yesterday"
+    return `${days} days ago`
+  }
 
   return (
     <div className="space-y-8">
@@ -75,11 +122,9 @@ export default function DashboardPage() {
           </motion.h1>
           <p className="text-muted-foreground mt-1">{"Here's what's happening with your clients today"}</p>
         </div>
-        <Button className="rounded-xl" asChild>
-          <Link href="/dashboard/clients">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Client
-          </Link>
+        <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Client
         </Button>
       </div>
 
@@ -120,7 +165,7 @@ export default function DashboardPage() {
         >
           <Card className="rounded-2xl">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Recent Client Activity</CardTitle>
+              <CardTitle className="text-lg">Recent Clients</CardTitle>
               <Button variant="ghost" size="sm" className="rounded-xl" asChild>
                 <Link href="/dashboard/clients">
                   View all
@@ -129,41 +174,60 @@ export default function DashboardPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentClients.map((client) => (
-                  <div
-                    key={client.name}
-                    className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-medium text-primary">
-                        {client.name.split(" ").map((n) => n[0]).join("")}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
-                        <StatusBadge status={client.status} />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{client.homework}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-muted-foreground">{client.dueDate}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              client.status === "overdue" ? "bg-destructive" : "bg-primary"
-                            }`}
-                            style={{ width: `${client.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{client.progress}%</span>
-                      </div>
-                    </div>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : clients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <Users className="w-6 h-6 text-muted-foreground" />
                   </div>
-                ))}
-              </div>
+                  <p className="text-muted-foreground text-sm mb-3">No clients yet</p>
+                  <Button 
+                    size="sm" 
+                    className="rounded-xl"
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Client
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {clients.map((client) => (
+                    <div
+                      key={client.id}
+                      className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          {client.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-muted text-muted-foreground">
+                            New
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {client.email || "No email provided"}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-muted-foreground">Added {getDaysSinceCreated(client.created_at)}</p>
+                        <Button variant="outline" size="sm" className="mt-2 rounded-lg text-xs" asChild>
+                          <Link href="/dashboard/clients">
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -211,23 +275,13 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Add Client Modal */}
+      <AddClientModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onClientAdded={handleClientAdded}
+      />
     </div>
-  )
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; className: string }> = {
-    completed: { label: "Completed", className: "bg-primary/10 text-primary" },
-    "in-progress": { label: "In Progress", className: "bg-chart-4/10 text-chart-4" },
-    assigned: { label: "Assigned", className: "bg-muted text-muted-foreground" },
-    overdue: { label: "Overdue", className: "bg-destructive/10 text-destructive" },
-  }
-
-  const { label, className } = config[status] || config.assigned
-
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${className}`}>
-      {label}
-    </span>
   )
 }

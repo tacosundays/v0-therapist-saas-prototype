@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,8 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -21,26 +22,87 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { createClient } from "@/lib/supabase/client"
+import { AddClientModal } from "@/components/dashboard/add-client-modal"
 
-const clients = [
-  { id: 1, name: "Sarah Mitchell", email: "sarah.m@email.com", status: "active", lastSession: "2 days ago", completionRate: 92, assignedHomework: 3, pendingReview: 1 },
-  { id: 2, name: "James Rodriguez", email: "james.r@email.com", status: "active", lastSession: "5 days ago", completionRate: 78, assignedHomework: 2, pendingReview: 0 },
-  { id: 3, name: "Emily Chen", email: "emily.c@email.com", status: "active", lastSession: "1 day ago", completionRate: 95, assignedHomework: 4, pendingReview: 2 },
-  { id: 4, name: "Michael Brown", email: "michael.b@email.com", status: "inactive", lastSession: "2 weeks ago", completionRate: 45, assignedHomework: 1, pendingReview: 0 },
-  { id: 5, name: "Lisa Thompson", email: "lisa.t@email.com", status: "active", lastSession: "3 days ago", completionRate: 88, assignedHomework: 2, pendingReview: 1 },
-  { id: 6, name: "David Wilson", email: "david.w@email.com", status: "active", lastSession: "Today", completionRate: 100, assignedHomework: 3, pendingReview: 0 },
-]
+interface Client {
+  id: string
+  therapist_id: string
+  name: string
+  email: string | null
+  created_at: string
+}
 
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all")
+  const [clients, setClients] = useState<Client[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+
+  const fetchClients = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const supabase = createClient()
+      
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        setError("You must be logged in to view clients")
+        setIsLoading(false)
+        return
+      }
+
+      // Fetch clients for this therapist
+      const { data, error: fetchError } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("therapist_id", user.id)
+        .order("created_at", { ascending: false })
+
+      if (fetchError) {
+        console.error("Error fetching clients:", fetchError)
+        setError(fetchError.message)
+        return
+      }
+
+      console.log("Fetched clients:", data)
+      setClients(data || [])
+    } catch (err) {
+      console.error("Exception fetching clients:", err)
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchClients()
+  }, [fetchClients])
+
+  const handleClientAdded = () => {
+    fetchClients()
+  }
 
   const filteredClients = clients.filter((client) => {
     const matchesSearch = client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          client.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesFilter = filterStatus === "all" || client.status === filterStatus
+                          (client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    // For now, treat all clients as active since we don't have status field yet
+    const matchesFilter = filterStatus === "all" || filterStatus === "active"
     return matchesSearch && matchesFilter
   })
+
+  // Calculate days since created
+  const getDaysSinceCreated = (createdAt: string) => {
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
+    if (days === 0) return "Today"
+    if (days === 1) return "Yesterday"
+    return `${days} days ago`
+  }
 
   return (
     <div className="space-y-8">
@@ -56,7 +118,7 @@ export default function ClientsPage() {
           </motion.h1>
           <p className="text-muted-foreground mt-1">Manage your client list and assignments</p>
         </div>
-        <Button className="rounded-xl">
+        <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Client
         </Button>
@@ -87,101 +149,133 @@ export default function ClientsPage() {
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="p-4 bg-destructive/10 text-destructive rounded-xl">
+          {error}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && clients.length === 0 && (
+        <Card className="rounded-2xl">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Plus className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-2">No clients yet</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              Get started by adding your first client
+            </p>
+            <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Client
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Clients Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredClients.map((client, index) => (
-          <motion.div
-            key={client.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <Card className="rounded-2xl hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-lg font-medium text-primary">
-                        {client.name.split(" ").map((n) => n[0]).join("")}
+      {!isLoading && !error && filteredClients.length > 0 && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredClients.map((client, index) => (
+            <motion.div
+              key={client.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <Card className="rounded-2xl hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-lg font-medium text-primary">
+                          {client.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{client.name}</CardTitle>
+                        {client.email && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Mail className="w-3 h-3" />
+                            {client.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuItem>View Profile</DropdownMenuItem>
+                        <DropdownMenuItem>Assign Homework</DropdownMenuItem>
+                        <DropdownMenuItem>Send Message</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="w-4 h-4" />
+                        Added
+                      </span>
+                      <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Completion rate
+                      </span>
+                      <span className="font-medium text-muted-foreground">
+                        --
                       </span>
                     </div>
-                    <div>
-                      <CardTitle className="text-base">{client.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3 h-3" />
-                        {client.email}
-                      </p>
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-xl">
-                      <DropdownMenuItem>View Profile</DropdownMenuItem>
-                      <DropdownMenuItem>Assign Homework</DropdownMenuItem>
-                      <DropdownMenuItem>Send Message</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4" />
-                      Last session
-                    </span>
-                    <span className="text-foreground">{client.lastSession}</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Completion rate
-                    </span>
-                    <span className={`font-medium ${
-                      client.completionRate >= 80 ? "text-primary" :
-                      client.completionRate >= 50 ? "text-chart-4" : "text-destructive"
-                    }`}>
-                      {client.completionRate}%
-                    </span>
-                  </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <Clock className="w-4 h-4" />
-                      Active homework
-                    </span>
-                    <span className="text-foreground">{client.assignedHomework}</span>
-                  </div>
-
-                  {client.pendingReview > 0 && (
-                    <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-primary" />
-                      <span className="text-xs text-primary font-medium">
-                        {client.pendingReview} submission{client.pendingReview > 1 ? "s" : ""} to review
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Clock className="w-4 h-4" />
+                        Active homework
                       </span>
+                      <span className="text-foreground">0</span>
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" className="flex-1 rounded-xl">
-                    View
-                  </Button>
-                  <Button size="sm" className="flex-1 rounded-xl">
-                    Assign
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+                  <div className="flex gap-2 mt-4">
+                    <Button variant="outline" size="sm" className="flex-1 rounded-xl">
+                      View
+                    </Button>
+                    <Button size="sm" className="flex-1 rounded-xl">
+                      Assign
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Client Modal */}
+      <AddClientModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onClientAdded={handleClientAdded}
+      />
     </div>
   )
 }

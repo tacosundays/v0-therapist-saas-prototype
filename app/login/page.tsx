@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
+
+const supabase = getClient()
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,14 +21,37 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Check if user is already logged in on page load
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        console.log("login page: user already logged in, redirecting")
+        window.location.href = "/dashboard"
+      }
+    }
+    checkSession()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("login page: auth state changed", event)
+      if (event === "SIGNED_IN" && session) {
+        console.log("login page: signed in, redirecting to dashboard")
+        window.location.href = "/dashboard"
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
-      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -40,9 +65,9 @@ export default function LoginPage() {
 
       console.log("login success", data)
       
-      // Redirect based on user type
-      router.push(userType === "therapist" ? "/dashboard" : "/portal")
-      router.refresh()
+      // Redirect based on user type using window.location for reliable redirect
+      const redirectUrl = userType === "therapist" ? "/dashboard" : "/portal"
+      window.location.href = redirectUrl
     } catch (err) {
       console.error("login error", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")

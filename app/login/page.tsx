@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,39 +9,37 @@ import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
 
-const supabase = getClient()
-
 export default function LoginPage() {
-  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
 
-  // Check if user is already logged in on page load
+  // Check session once on mount - if already logged in, redirect
   useEffect(() => {
+    let isMounted = true
+    
     const checkSession = async () => {
+      const supabase = getClient()
       const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!isMounted) return
+      
       if (session) {
-        console.log("login page: user already logged in, redirecting")
         window.location.href = "/dashboard"
+        return
       }
+      
+      setIsCheckingSession(false)
     }
+    
     checkSession()
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("login page: auth state changed", event)
-      if (event === "SIGNED_IN" && session) {
-        console.log("login page: signed in, redirecting to dashboard")
-        window.location.href = "/dashboard"
-      }
-    })
-
+    
     return () => {
-      subscription.unsubscribe()
+      isMounted = false
     }
   }, [])
 
@@ -52,6 +49,8 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
+      const supabase = getClient()
+      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -65,7 +64,7 @@ export default function LoginPage() {
 
       console.log("login success", data)
       
-      // Redirect based on user type using window.location for reliable redirect
+      // Redirect based on user type
       const redirectUrl = userType === "therapist" ? "/dashboard" : "/portal"
       window.location.href = redirectUrl
     } catch (err) {
@@ -74,6 +73,18 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show loading screen while checking session
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

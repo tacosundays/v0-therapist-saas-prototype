@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { 
   Brain, 
   LayoutDashboard, 
@@ -31,7 +31,6 @@ const navItems = [
 
 export function DashboardSidebar() {
   const pathname = usePathname()
-  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -40,29 +39,33 @@ export function DashboardSidebar() {
     const supabase = createClient()
 
     // Get initial user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        window.location.href = "/login"
+        return
+      }
+      setUser(session.user)
     })
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (!session?.user) {
-        router.push("/login")
+    // Listen for auth state changes (sign out only)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        window.location.href = "/login"
+        return
       }
+      setUser(session?.user ?? null)
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [])
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
+    window.location.href = "/"
   }
 
   // Get user display name from metadata or email

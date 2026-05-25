@@ -29,7 +29,13 @@ export default function LoginPage() {
       if (!isMounted) return
       
       if (session) {
-        window.location.href = "/dashboard"
+        // Check user role from metadata
+        const userRole = session.user?.user_metadata?.role
+        if (userRole === "client") {
+          window.location.href = "/portal"
+        } else {
+          window.location.href = "/dashboard"
+        }
         return
       }
       
@@ -64,9 +70,16 @@ export default function LoginPage() {
 
       console.log("login success", data)
       
-      // Redirect based on user type
-      const redirectUrl = userType === "therapist" ? "/dashboard" : "/portal"
-      window.location.href = redirectUrl
+      // Check user role from metadata to determine redirect
+      const userRole = data.user?.user_metadata?.role
+      
+      if (userRole === "client") {
+        // Client - redirect to portal
+        window.location.href = "/portal"
+      } else {
+        // Therapist (default) - redirect to dashboard
+        window.location.href = "/dashboard"
+      }
     } catch (err) {
       console.error("login error", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")

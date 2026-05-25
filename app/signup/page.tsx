@@ -49,7 +49,7 @@ export default function SignupPage() {
           first_name: firstName,
           last_name: lastName,
           full_name: `${firstName} ${lastName}`,
-          user_type: userType,
+          role: userType,
           credentials: userType === "therapist" ? credentials : null,
           invite_code: userType === "client" ? inviteCode : null,
         },

@@ -61,39 +61,41 @@ export default function PortalPage() {
         return
       }
       setUser(authUser)
+      console.log("[v0] Authenticated user email:", authUser.email)
 
-      // Find client record by email (therapist-created clients have email saved)
-      const { data: clientsData, error: clientError } = await supabase
+      // Find client record by email (case-insensitive)
+      const { data: client, error: clientError } = await supabase
         .from("clients")
         .select("*")
-        .eq("email", authUser.email)
-        .limit(1)
+        .ilike("email", authUser.email || "")
+        .maybeSingle()
+
+      console.log("[v0] Client query result:", { client, clientError })
 
       if (clientError) {
-        console.error("Error fetching client:", clientError)
+        console.error("[v0] Error fetching client:", clientError)
         setError("Error loading your account. Please try again.")
         setIsLoading(false)
         return
       }
 
-      if (!clientsData || clientsData.length === 0) {
+      if (!client) {
         setError("No client record found. Please contact your therapist to set up your account.")
         setIsLoading(false)
         return
       }
 
-      const foundClient = clientsData[0]
-      setClientRecord(foundClient)
+      setClientRecord(client)
 
       // Fetch assignments for this client
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
         .select("*")
-        .eq("client_id", foundClient.id)
+        .eq("client_id", client.id)
         .order("created_at", { ascending: false })
 
       if (assignmentsError) {
-        console.error("Error fetching assignments:", assignmentsError)
+        console.error("[v0] Error fetching assignments:", assignmentsError)
       }
 
       setAssignments(assignmentsData || [])

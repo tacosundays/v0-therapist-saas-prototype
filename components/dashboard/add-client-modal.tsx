@@ -46,21 +46,25 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       }
 
       // Insert client
-      const { error: insertError } = await supabase
+      const insertData = {
+        therapist_id: user.id,
+        full_name: name.trim(),
+        email: email.trim() || null,
+      }
+      console.log("[v0] Inserting client:", insertData)
+      
+      const { data: insertedData, error: insertError } = await supabase
         .from("clients")
-        .insert({
-          therapist_id: user.id,
-          full_name: name.trim(),
-          email: email.trim() || null,
-        })
+        .insert(insertData)
+        .select()
 
       if (insertError) {
-        console.error("Error adding client:", insertError)
+        console.error("[v0] Error adding client:", insertError)
         setError(insertError.message)
         return
       }
 
-      console.log("Client added successfully")
+      console.log("[v0] Client added successfully:", insertedData)
       setSuccess(true)
       
       // Reset form

@@ -67,6 +67,8 @@ export default function ClientsPage() {
         return
       }
 
+      console.log("[v0] Fetching clients for therapist:", user.id)
+
       // Fetch clients for this therapist
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
@@ -75,10 +77,12 @@ export default function ClientsPage() {
         .order("created_at", { ascending: false })
 
       if (clientsError) {
-        console.error("Error fetching clients:", clientsError)
+        console.error("[v0] Error fetching clients:", clientsError)
         setError(clientsError.message)
         return
       }
+
+      console.log("[v0] Clients fetched:", clientsData?.length, clientsData)
 
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase

@@ -55,6 +55,8 @@ export default function DashboardPage() {
     try {
       const supabase = createClient()
       
+      console.log("[v0] Fetching clients for therapist:", userId)
+      
       // Fetch clients
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
@@ -64,8 +66,9 @@ export default function DashboardPage() {
         .limit(5)
 
       if (clientsError) {
-        console.error("Error fetching clients:", clientsError)
+        console.error("[v0] Error fetching clients:", clientsError)
       } else {
+        console.log("[v0] Clients fetched:", clientsData?.length, clientsData)
         setClients(clientsData || [])
       }
 

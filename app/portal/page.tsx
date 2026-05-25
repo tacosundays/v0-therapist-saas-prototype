@@ -62,49 +62,41 @@ export default function PortalPage() {
       }
       setUser(authUser)
 
-      // Find client record linked to this user
-      const { data: clientData, error: clientError } = await supabase
+      // Find client record by email (therapist-created clients have email saved)
+      const { data: clientsData, error: clientError } = await supabase
         .from("clients")
         .select("*")
-        .eq("user_id", authUser.id)
-        .single()
+        .eq("email", authUser.email)
+        .limit(1)
 
-      if (clientError || !clientData) {
-        // Try to find by email as fallback
-        const { data: clientByEmail, error: emailError } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("email", authUser.email)
-          .single()
-
-        if (emailError || !clientByEmail) {
-          setError("No client record found. Please contact your therapist.")
-          setIsLoading(false)
-          return
-        }
-        setClientRecord(clientByEmail)
-
-        // Fetch assignments for this client
-        const { data: assignmentsData } = await supabase
-          .from("assignments")
-          .select("*")
-          .eq("client_id", clientByEmail.id)
-          .order("created_at", { ascending: false })
-
-        setAssignments(assignmentsData || [])
-      } else {
-        setClientRecord(clientData)
-
-        // Fetch assignments for this client
-        const { data: assignmentsData } = await supabase
-          .from("assignments")
-          .select("*")
-          .eq("client_id", clientData.id)
-          .order("created_at", { ascending: false })
-
-        setAssignments(assignmentsData || [])
+      if (clientError) {
+        console.error("Error fetching client:", clientError)
+        setError("Error loading your account. Please try again.")
+        setIsLoading(false)
+        return
       }
 
+      if (!clientsData || clientsData.length === 0) {
+        setError("No client record found. Please contact your therapist to set up your account.")
+        setIsLoading(false)
+        return
+      }
+
+      const foundClient = clientsData[0]
+      setClientRecord(foundClient)
+
+      // Fetch assignments for this client
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from("assignments")
+        .select("*")
+        .eq("client_id", foundClient.id)
+        .order("created_at", { ascending: false })
+
+      if (assignmentsError) {
+        console.error("Error fetching assignments:", assignmentsError)
+      }
+
+      setAssignments(assignmentsData || [])
       setIsLoading(false)
     }
 

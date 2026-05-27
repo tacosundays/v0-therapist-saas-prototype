@@ -24,11 +24,36 @@ export default function DashboardLayout({
         return
       }
 
-      // Check if user is a therapist (not a client)
+      // Check user role from metadata
       const userRole = user.user_metadata?.role
       if (userRole === "client") {
         // Clients should not access the dashboard
         window.location.href = "/client-portal"
+        return
+      }
+
+      // Verify user exists in therapists table
+      const { data: therapist, error: therapistError } = await supabase
+        .from("therapists")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (therapistError || !therapist) {
+        // User is not a valid therapist, check if they're a client
+        const { data: client } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("auth_user_id", user.id)
+          .maybeSingle()
+
+        if (client) {
+          window.location.href = "/client-portal"
+          return
+        }
+
+        // Unknown user type, redirect to login
+        window.location.href = "/login"
         return
       }
 

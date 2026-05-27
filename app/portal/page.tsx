@@ -17,7 +17,6 @@ import {
   AlertCircle
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
 
 interface Assignment {
   id: string
@@ -42,7 +41,6 @@ interface ClientRecord {
 export default function PortalPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
   const [reflection, setReflection] = useState("")
-  const [user, setUser] = useState<User | null>(null)
   const [clientRecord, setClientRecord] = useState<ClientRecord | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -54,26 +52,49 @@ export default function PortalPage() {
     const fetchData = async () => {
       const supabase = createClient()
       
-      // Get current user
+      // Get current user - require authentication
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) {
-        setIsLoading(false)
+        // Not authenticated, redirect to login
+        window.location.href = "/login"
         return
       }
-      setUser(authUser)
       
-      // Normalize email for lookup
-      const normalizedEmail = authUser.email?.trim().toLowerCase() || ""
+      // Check user role - if therapist, redirect to dashboard
+      const userRole = authUser.user_metadata?.role
+      if (userRole === "therapist") {
+        window.location.href = "/dashboard"
+        return
+      }
 
-      // Find client record by email
-      const { data: client, error: clientError } = await supabase
+      // Look up client record by auth_user_id first, then by email
+      let client = null
+      let clientError = null
+
+      // Try to find by auth_user_id
+      const { data: clientByAuth, error: authLookupError } = await supabase
         .from("clients")
         .select("*")
-        .eq("email", normalizedEmail)
+        .eq("auth_user_id", authUser.id)
         .maybeSingle()
 
+      if (clientByAuth) {
+        client = clientByAuth
+      } else {
+        // Fallback to email lookup
+        const normalizedEmail = authUser.email?.trim().toLowerCase() || ""
+        const { data: clientByEmail, error: emailLookupError } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("email", normalizedEmail)
+          .maybeSingle()
+        
+        client = clientByEmail
+        clientError = emailLookupError
+      }
+
       if (clientError) {
-        console.error("[v0] Error fetching client:", clientError)
+        console.error("Error fetching client:", clientError)
         setError("Error loading your account. Please try again.")
         setIsLoading(false)
         return
@@ -150,10 +171,7 @@ export default function PortalPage() {
   const completedAssignments = assignments.filter(a => a.completed)
 
   // Get user display name
-  const displayName = clientRecord?.full_name?.split(" ")[0]
-    || user?.user_metadata?.first_name 
-    || user?.email?.split('@')[0] 
-    || 'there'
+  const displayName = clientRecord?.full_name?.split(" ")[0] || 'there'
 
   // Format due date
   const formatDueDate = (dateStr: string | null) => {

@@ -58,21 +58,58 @@ function ClientPortalContent() {
     const fetchData = async () => {
       const supabase = createClient()
       
-      // For MVP: prioritize email param from portal link
-      if (!emailParam) {
-        setError("Please use the portal link sent by your therapist.")
+      // Check for authenticated user first
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      let client = null
+      let clientError = null
+
+      if (user) {
+        // If authenticated, check role - therapists should go to dashboard
+        const userRole = user.user_metadata?.role
+        if (userRole === "therapist") {
+          window.location.href = "/dashboard"
+          return
+        }
+
+        // Look up client by auth_user_id first
+        const { data: clientByAuth, error: authError } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("auth_user_id", user.id)
+          .maybeSingle()
+
+        if (clientByAuth) {
+          client = clientByAuth
+        } else {
+          // Fallback to email lookup
+          const normalizedEmail = user.email?.trim().toLowerCase() || ""
+          const { data: clientByEmail, error: emailError } = await supabase
+            .from("clients")
+            .select("*")
+            .eq("email", normalizedEmail)
+            .maybeSingle()
+          
+          client = clientByEmail
+          clientError = emailError
+        }
+      } else if (emailParam) {
+        // Not authenticated but have email param - MVP portal link access
+        const normalizedEmail = emailParam.trim().toLowerCase()
+        
+        const { data: clientByEmail, error: emailError } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("email", normalizedEmail)
+          .maybeSingle()
+        
+        client = clientByEmail
+        clientError = emailError
+      } else {
+        setError("Please use the portal link sent by your therapist or log in.")
         setIsLoading(false)
         return
       }
-
-      // Look up client by email
-      const normalizedEmail = emailParam.trim().toLowerCase()
-      
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("email", normalizedEmail)
-        .maybeSingle()
 
       if (clientError) {
         console.error("Error fetching client:", clientError)

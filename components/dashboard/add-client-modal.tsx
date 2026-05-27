@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 
 interface AddClientModalProps {
@@ -35,7 +35,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
+      const supabase = getClient()
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()

@@ -18,7 +18,7 @@ import {
   Loader2,
   FileText
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 
 interface ContentItem {
@@ -75,7 +75,7 @@ export default function LibraryPage() {
     setError(null)
     
     try {
-      const supabase = createClient()
+      const supabase = getClient()
       
       const { data, error: fetchError } = await supabase
         .from("content_library")

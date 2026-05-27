@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2, Mail } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -32,7 +32,7 @@ export default function SignupPage() {
     const checkSession = async () => {
       if (isRedirecting.current) return
       
-      const supabase = createClient()
+      const supabase = getClient()
       const { data: { session } } = await supabase.auth.getSession()
       
       if (session && !isRedirecting.current) {
@@ -63,7 +63,7 @@ export default function SignupPage() {
       return
     }
 
-    const supabase = createClient()
+    const supabase = getClient()
     
     // For clients, validate invite code first before creating account
     let therapistId: string | null = null

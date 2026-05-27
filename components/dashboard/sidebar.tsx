@@ -17,8 +17,8 @@ import {
   CreditCard
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect, useRef } from "react"
+import { getClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
 const navItems = [
@@ -36,25 +36,29 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const isRedirecting = useRef(false)
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = getClient()
 
-    // Get initial user
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+      if (!session && !isRedirecting.current) {
+        isRedirecting.current = true
         window.location.href = "/login"
         return
       }
-      setUser(session.user)
+      setUser(session?.user ?? null)
     })
 
-    // Listen for auth state changes (sign out only)
+    // Listen for sign out events only
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
+      if (event === "SIGNED_OUT" && !isRedirecting.current) {
+        isRedirecting.current = true
         window.location.href = "/login"
         return
       }
+      // Only update user state, no redirects
       setUser(session?.user ?? null)
     })
 
@@ -65,7 +69,7 @@ export function DashboardSidebar() {
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
-    const supabase = createClient()
+    const supabase = getClient()
     await supabase.auth.signOut()
     window.location.href = "/"
   }

@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 
@@ -68,7 +68,7 @@ export default function ClientsPage() {
     setError(null)
 
     try {
-      const supabase = createClient()
+      const supabase = getClient()
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()

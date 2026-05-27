@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 
 export default function DashboardLayout({
@@ -13,34 +13,47 @@ export default function DashboardLayout({
 }) {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
+  const isRedirecting = useRef(false)
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      if (isRedirecting.current) return
+      
+      const supabase = getClient()
+      const { data: { session } } = await supabase.auth.getSession()
 
-      if (!user) {
-        window.location.href = "/login"
+      if (!session) {
+        if (!isRedirecting.current) {
+          isRedirecting.current = true
+          window.location.href = "/login"
+        }
         return
       }
+
+      const user = session.user
 
       // Check user role from metadata
       const userRole = user.user_metadata?.role
       if (userRole === "client") {
         // Clients should not access the dashboard
-        window.location.href = "/portal"
+        if (!isRedirecting.current) {
+          isRedirecting.current = true
+          window.location.href = "/portal"
+        }
         return
       }
 
-      // Verify user exists in therapists table
-      const { data: therapist, error: therapistError } = await supabase
+      // For therapists, check if they exist in the therapists table
+      // If not found, they might be a new signup - allow access anyway
+      // The therapist record may not exist yet due to race condition
+      const { data: therapist } = await supabase
         .from("therapists")
         .select("id")
         .eq("id", user.id)
         .maybeSingle()
 
-      if (therapistError || !therapist) {
-        // User is not a valid therapist, check if they're a client
+      if (!therapist) {
+        // Check if user is actually a client
         const { data: client } = await supabase
           .from("clients")
           .select("id")
@@ -48,12 +61,26 @@ export default function DashboardLayout({
           .maybeSingle()
 
         if (client) {
-          window.location.href = "/portal"
+          if (!isRedirecting.current) {
+            isRedirecting.current = true
+            window.location.href = "/portal"
+          }
+          return
+        }
+
+        // If role is therapist but no record exists yet, allow access
+        // This handles the race condition after signup
+        if (userRole === "therapist") {
+          setIsAuthorized(true)
+          setIsChecking(false)
           return
         }
 
         // Unknown user type, redirect to login
-        window.location.href = "/login"
+        if (!isRedirecting.current) {
+          isRedirecting.current = true
+          window.location.href = "/login"
+        }
         return
       }
 

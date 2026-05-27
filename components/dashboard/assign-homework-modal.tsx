@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import { Loader2, Calendar } from "lucide-react"
 
 interface Client {
@@ -74,7 +74,7 @@ export function AssignHomeworkModal({
   const fetchClients = async () => {
     setIsLoadingClients(true)
     try {
-      const supabase = createClient()
+      const supabase = getClient()
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) return
@@ -105,7 +105,7 @@ export function AssignHomeworkModal({
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
+      const supabase = getClient()
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()

@@ -16,7 +16,7 @@ import {
   MessageSquare
 } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import type { User } from "@supabase/supabase-js"
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async (userId: string) => {
     try {
-      const supabase = createClient()
+      const supabase = getClient()
       
       // Fetch clients
       const { data: clientsData, error: clientsError } = await supabase
@@ -82,7 +82,7 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = getClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user)
       if (user) {

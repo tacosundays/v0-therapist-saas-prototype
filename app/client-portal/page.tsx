@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,7 +18,7 @@ import {
   AlertCircle,
   ArrowLeft
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import Link from "next/link"
 
 interface Assignment {
@@ -44,6 +44,7 @@ interface ClientRecord {
 function ClientPortalContent() {
   const searchParams = useSearchParams()
   const emailParam = searchParams.get("email")
+  const isRedirecting = useRef(false)
   
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
   const [reflection, setReflection] = useState("")
@@ -56,19 +57,24 @@ function ClientPortalContent() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const supabase = createClient()
+      if (isRedirecting.current) return
+      
+      const supabase = getClient()
       
       // Check for authenticated user first
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
       
       let client = null
       let clientError = null
 
-      if (user) {
+      if (session) {
         // If authenticated, check role - therapists should go to dashboard
-        const userRole = user.user_metadata?.role
+        const userRole = session.user.user_metadata?.role
         if (userRole === "therapist") {
-          window.location.href = "/dashboard"
+          if (!isRedirecting.current) {
+            isRedirecting.current = true
+            window.location.href = "/dashboard"
+          }
           return
         }
 
@@ -76,7 +82,7 @@ function ClientPortalContent() {
         const { data: clientData, error: lookupError } = await supabase
           .from("clients")
           .select("*")
-          .eq("id", user.id)
+          .eq("id", session.user.id)
           .maybeSingle()
 
         client = clientData
@@ -138,7 +144,7 @@ function ClientPortalContent() {
     setIsSubmitting(true)
     setSubmitSuccess(false)
 
-    const supabase = createClient()
+    const supabase = getClient()
 
     const { error: updateError } = await supabase
       .from("assignments")

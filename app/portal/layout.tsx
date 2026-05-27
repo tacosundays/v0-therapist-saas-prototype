@@ -1,10 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Brain, LogOut, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
 export default function PortalLayout({
@@ -14,25 +14,31 @@ export default function PortalLayout({
 }) {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const isRedirecting = useRef(false)
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = getClient()
 
-    // Get initial user
+    // Get initial session once
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+      if (!session && !isRedirecting.current) {
+        isRedirecting.current = true
         window.location.href = "/login"
         return
       }
-      setUser(session.user)
+      setUser(session?.user ?? null)
+      setIsCheckingSession(false)
     })
 
-    // Listen for auth state changes (sign out only)
+    // Listen for sign out events only (not for redirects)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
+      if (event === "SIGNED_OUT" && !isRedirecting.current) {
+        isRedirecting.current = true
         window.location.href = "/login"
         return
       }
+      // Only update user state, no redirects
       setUser(session?.user ?? null)
     })
 
@@ -43,7 +49,7 @@ export default function PortalLayout({
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
-    const supabase = createClient()
+    const supabase = getClient()
     await supabase.auth.signOut()
     window.location.href = "/"
   }
@@ -52,6 +58,15 @@ export default function PortalLayout({
   const displayName = user?.user_metadata?.first_name 
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
     : user?.email?.split('@')[0] || 'User'
+
+  // Show loading while checking session
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">

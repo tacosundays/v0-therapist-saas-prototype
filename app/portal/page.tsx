@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,7 @@ import {
   Loader2,
   AlertCircle
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getClient } from "@/lib/supabase/client"
 
 interface Assignment {
   id: string
@@ -39,6 +39,7 @@ interface ClientRecord {
 }
 
 export default function PortalPage() {
+  const isRedirecting = useRef(false)
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
   const [reflection, setReflection] = useState("")
   const [clientRecord, setClientRecord] = useState<ClientRecord | null>(null)
@@ -50,20 +51,30 @@ export default function PortalPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const supabase = createClient()
+      if (isRedirecting.current) return
+      
+      const supabase = getClient()
       
       // Get current user - require authentication
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
         // Not authenticated, redirect to login
-        window.location.href = "/login"
+        if (!isRedirecting.current) {
+          isRedirecting.current = true
+          window.location.href = "/login"
+        }
         return
       }
+      
+      const user = session.user
       
       // Check user role - if therapist, redirect to dashboard
       const userRole = user.user_metadata?.role
       if (userRole === "therapist") {
-        window.location.href = "/dashboard"
+        if (!isRedirecting.current) {
+          isRedirecting.current = true
+          window.location.href = "/dashboard"
+        }
         return
       }
 
@@ -113,7 +124,7 @@ export default function PortalPage() {
     setIsSubmitting(true)
     setSubmitSuccess(false)
 
-    const supabase = createClient()
+    const supabase = getClient()
 
     const { error: updateError } = await supabase
       .from("assignments")

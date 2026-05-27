@@ -57,33 +57,24 @@ function ClientPortalContent() {
     const fetchData = async () => {
       const supabase = createClient()
       
-      // First check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      let clientQuery
-
-      if (user) {
-        // If authenticated, look up client by auth_user_id
-        clientQuery = supabase
-          .from("clients")
-          .select("*")
-          .eq("auth_user_id", user.id)
-          .maybeSingle()
-      } else if (emailParam) {
-        // If not authenticated but have email param, look up by email
-        const normalizedEmail = emailParam.trim().toLowerCase()
-        clientQuery = supabase
-          .from("clients")
-          .select("*")
-          .eq("email", normalizedEmail)
-          .maybeSingle()
-      } else {
-        setError("Please log in or use the portal link sent by your therapist.")
+      // For MVP: prioritize email param from portal link
+      if (!emailParam) {
+        setError("Please use the portal link sent by your therapist.")
         setIsLoading(false)
         return
       }
 
-      const { data: client, error: clientError } = await clientQuery
+      // Look up client by email
+      const normalizedEmail = emailParam.trim().toLowerCase()
+      console.log("[v0] Looking up client by email:", normalizedEmail)
+      
+      const { data: client, error: clientError } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("email", normalizedEmail)
+        .maybeSingle()
+
+      console.log("[v0] Client lookup result:", { client, clientError })
 
       if (clientError) {
         console.error("Error fetching client:", clientError)
@@ -93,7 +84,7 @@ function ClientPortalContent() {
       }
 
       if (!client) {
-        setError("No client record found. Please contact your therapist to set up your account.")
+        setError("No client record found for this email. Please contact your therapist.")
         setIsLoading(false)
         return
       }

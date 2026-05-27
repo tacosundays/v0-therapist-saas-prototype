@@ -5,80 +5,91 @@ import { PRODUCTS } from '../../lib/products'
 import { createClient } from '../../lib/supabase/server'
 
 export async function startSubscriptionCheckout(productId: string) {
-  const product = PRODUCTS.find((p) => p.id === productId)
-  if (!product) {
-    throw new Error(`Product with id "${productId}" not found`)
-  }
+  try {
+    const product = PRODUCTS.find((p) => p.id === productId)
+    if (!product) {
+      return { error: `Product with id "${productId}" not found` }
+    }
 
-  if (product.isEnterprise) {
-    throw new Error('Please contact sales for Enterprise pricing')
-  }
+    if (product.isEnterprise) {
+      return { error: 'Please contact sales for Enterprise pricing' }
+    }
 
-  // Get current user
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    throw new Error('You must be logged in to subscribe')
-  }
+    // Get current user
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return { error: 'You must be logged in to subscribe' }
+    }
 
-  // Check if user already has a Stripe customer ID
-  const { data: therapist } = await supabase
-    .from('therapists')
-    .select('stripe_customer_id')
-    .eq('id', user.id)
-    .single()
+    // Check if user already has a Stripe customer ID
+    const { data: therapist } = await supabase
+      .from('therapists')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single()
 
-  let customerId = therapist?.stripe_customer_id
+    let customerId = therapist?.stripe_customer_id
 
-  // Create a Stripe customer if one doesn't exist
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email,
-      metadata: {
-        therapist_id: user.id,
+    // Create a Stripe customer if one doesn't exist
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          therapist_id: user.id,
+        },
+      })
+      customerId = customer.id
+
+      // Save customer ID to therapist record
+      await supabase
+        .from('therapists')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', user.id)
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    // Create redirect-based checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: product.name,
+              description: product.description,
+            },
+            unit_amount: product.priceInCents,
+            recurring: {
+              interval: product.interval,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${baseUrl}/dashboard/billing?success=true`,
+      cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
+      subscription_data: {
+        metadata: {
+          therapist_id: user.id,
+          product_id: productId,
+        },
       },
     })
-    customerId = customer.id
 
-    // Save customer ID to therapist record
-    await supabase
-      .from('therapists')
-      .update({ stripe_customer_id: customerId })
-      .eq('id', user.id)
+    if (!session.url) {
+      return { error: 'Failed to create checkout session' }
+    }
+
+    return { url: session.url }
+  } catch (error) {
+    console.error('Stripe checkout error:', error)
+    return { error: error instanceof Error ? error.message : 'Failed to start checkout' }
   }
-
-  // Create subscription checkout session
-  const session = await stripe.checkout.sessions.create({
-    ui_mode: 'embedded',
-    redirect_on_completion: 'never',
-    customer: customerId,
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: product.name,
-            description: product.description,
-          },
-          unit_amount: product.priceInCents,
-          recurring: {
-            interval: product.interval,
-          },
-        },
-        quantity: 1,
-      },
-    ],
-    mode: 'subscription',
-    subscription_data: {
-      metadata: {
-        therapist_id: user.id,
-        product_id: productId,
-      },
-    },
-  })
-
-  return session.client_secret
 }
 
 export async function getSubscriptionStatus() {

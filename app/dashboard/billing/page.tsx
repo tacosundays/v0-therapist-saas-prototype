@@ -14,14 +14,7 @@ import {
   ExternalLink
 } from "lucide-react"
 import { PRODUCTS, type Product } from "@/lib/products"
-import { getSubscriptionStatus, createCustomerPortalSession } from "@/app/actions/stripe"
-import { Checkout } from "@/components/checkout"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout } from "@/app/actions/stripe"
 
 interface SubscriptionData {
   status: string
@@ -36,8 +29,8 @@ interface SubscriptionData {
 export default function BillingPage() {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isPortalLoading, setIsPortalLoading] = useState(false)
 
   const fetchSubscription = useCallback(async () => {
@@ -55,9 +48,27 @@ export default function BillingPage() {
     fetchSubscription()
   }, [fetchSubscription])
 
-  const handleSelectPlan = (planId: string) => {
-    setSelectedPlan(planId)
-    setIsCheckoutOpen(true)
+  const handleSelectPlan = async (planId: string) => {
+    setCheckoutLoading(planId)
+    setCheckoutError(null)
+    
+    try {
+      const result = await startSubscriptionCheckout(planId)
+      
+      if (result.error) {
+        setCheckoutError(result.error)
+        setCheckoutLoading(null)
+        return
+      }
+      
+      if (result.url) {
+        window.location.href = result.url
+      }
+    } catch (error) {
+      console.error("Checkout error:", error)
+      setCheckoutError(error instanceof Error ? error.message : "Failed to start checkout")
+      setCheckoutLoading(null)
+    }
   }
 
   const handleManageSubscription = async () => {
@@ -70,12 +81,6 @@ export default function BillingPage() {
     } finally {
       setIsPortalLoading(false)
     }
-  }
-
-  const handleCheckoutComplete = () => {
-    setIsCheckoutOpen(false)
-    setSelectedPlan(null)
-    fetchSubscription()
   }
 
   const isActive = subscriptionData?.status === "active"
@@ -97,6 +102,29 @@ export default function BillingPage() {
         <h1 className="text-3xl font-bold text-foreground">Billing</h1>
         <p className="text-muted-foreground mt-1">Manage your subscription and billing</p>
       </div>
+
+      {/* Checkout Error Alert */}
+      {checkoutError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl flex items-start gap-3"
+        >
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-destructive">Checkout Error</p>
+            <p className="text-sm text-destructive/80">{checkoutError}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="ml-auto"
+            onClick={() => setCheckoutError(null)}
+          >
+            Dismiss
+          </Button>
+        </motion.div>
+      )}
 
       {/* Current Subscription Status */}
       <motion.div
@@ -179,29 +207,13 @@ export default function BillingPage() {
               key={product.id}
               product={product}
               isCurrentPlan={currentPlan === product.id}
+              isLoading={checkoutLoading === product.id}
               onSelect={() => handleSelectPlan(product.id)}
               delay={index * 0.1}
             />
           ))}
         </div>
       </div>
-
-      {/* Checkout Dialog */}
-      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              Subscribe to {PRODUCTS.find(p => p.id === selectedPlan)?.name}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedPlan && (
-            <Checkout 
-              productId={selectedPlan} 
-              onComplete={handleCheckoutComplete}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -209,11 +221,12 @@ export default function BillingPage() {
 interface PlanCardProps {
   product: Product
   isCurrentPlan: boolean
+  isLoading: boolean
   onSelect: () => void
   delay: number
 }
 
-function PlanCard({ product, isCurrentPlan, onSelect, delay }: PlanCardProps) {
+function PlanCard({ product, isCurrentPlan, isLoading, onSelect, delay }: PlanCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -263,8 +276,16 @@ function PlanCard({ product, isCurrentPlan, onSelect, delay }: PlanCardProps) {
                 className="w-full rounded-xl" 
                 variant={product.isPopular ? "default" : "outline"}
                 onClick={onSelect}
+                disabled={isLoading}
               >
-                {isCurrentPlan ? "Current Plan" : "Get Started"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Get Started"
+                )}
               </Button>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -40,7 +40,7 @@ interface ClientRecord {
   email: string | null
 }
 
-export default function ClientPortalPage() {
+function ClientPortalContent() {
   const searchParams = useSearchParams()
   const emailParam = searchParams.get("email")
   
@@ -491,5 +491,21 @@ export default function ClientPortalPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+function ClientPortalLoading() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  )
+}
+
+export default function ClientPortalPage() {
+  return (
+    <Suspense fallback={<ClientPortalLoading />}>
+      <ClientPortalContent />
+    </Suspense>
   )
 }

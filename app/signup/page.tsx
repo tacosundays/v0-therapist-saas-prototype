@@ -38,6 +38,38 @@ export default function SignupPage() {
 
     const supabase = createClient()
     
+    // For clients, validate invite code first before creating account
+    let therapistId: string | null = null
+    if (userType === "client") {
+      if (!inviteCode.trim()) {
+        setError("Invite code is required for client signup")
+        setIsLoading(false)
+        return
+      }
+
+      // Look up invite code to get therapist_id
+      const { data: inviteData, error: inviteError } = await supabase
+        .from("invite_codes")
+        .select("therapist_id")
+        .eq("code", inviteCode.trim())
+        .maybeSingle()
+
+      if (inviteError) {
+        console.error("Error validating invite code:", inviteError)
+        setError("Error validating invite code. Please try again.")
+        setIsLoading(false)
+        return
+      }
+
+      if (!inviteData) {
+        setError("Invalid invite code. Please check with your therapist.")
+        setIsLoading(false)
+        return
+      }
+
+      therapistId = inviteData.therapist_id
+    }
+    
     // Sign up the user
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -79,6 +111,31 @@ export default function SignupPage() {
       }
     }
 
+    // If client, insert into clients table with therapist_id from invite code
+    if (userType === "client" && authData.user && therapistId) {
+      const normalizedEmail = email.trim().toLowerCase()
+      const { error: clientInsertError } = await supabase
+        .from("clients")
+        .insert({
+          id: authData.user.id,
+          therapist_id: therapistId,
+          full_name: `${firstName} ${lastName}`,
+          email: normalizedEmail,
+        })
+
+      if (clientInsertError) {
+        console.error("Error inserting client:", clientInsertError)
+        // Check for duplicate
+        if (clientInsertError.code === "23505") {
+          setError("A client account with this email already exists.")
+        } else {
+          setError("Error creating client profile. Please contact your therapist.")
+        }
+        setIsLoading(false)
+        return
+      }
+    }
+
     setIsLoading(false)
 
     // If session exists (email confirmation disabled), redirect to appropriate page
@@ -86,7 +143,9 @@ export default function SignupPage() {
       if (userType === "therapist") {
         router.push("/onboarding")
       } else {
-        router.push("/portal")
+        // Redirect client to their portal with email
+        const portalUrl = `/client-portal?email=${encodeURIComponent(email.trim().toLowerCase())}`
+        window.location.href = portalUrl
       }
       return
     }

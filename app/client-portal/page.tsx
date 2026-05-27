@@ -66,15 +66,12 @@ function ClientPortalContent() {
 
       // Look up client by email
       const normalizedEmail = emailParam.trim().toLowerCase()
-      console.log("[v0] Looking up client by email:", normalizedEmail)
       
       const { data: client, error: clientError } = await supabase
         .from("clients")
         .select("*")
         .eq("email", normalizedEmail)
         .maybeSingle()
-
-      console.log("[v0] Client lookup result:", { client, clientError })
 
       if (clientError) {
         console.error("Error fetching client:", clientError)

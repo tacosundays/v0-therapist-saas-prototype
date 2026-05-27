@@ -73,8 +73,6 @@ export default function ClientsPage() {
         return
       }
 
-      console.log("[v0] Fetching clients for therapist:", user.id)
-
       // Fetch clients for this therapist
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
@@ -83,12 +81,9 @@ export default function ClientsPage() {
         .order("created_at", { ascending: false })
 
       if (clientsError) {
-        console.error("[v0] Error fetching clients:", clientsError)
         setError(clientsError.message)
         return
       }
-
-      console.log("[v0] Clients fetched:", clientsData?.length, clientsData)
 
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -362,26 +357,6 @@ export default function ClientsPage() {
                     </div>
 
                     <div className="flex gap-2 mt-4">
-                      {client.invite_code && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1 rounded-xl"
-                          onClick={() => copyInviteCode(client.invite_code!, client.id)}
-                        >
-                          {copiedClientId === client.id && copiedType === "code" ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Key className="w-4 h-4 mr-1" />
-                              Code
-                            </>
-                          )}
-                        </Button>
-                      )}
                       {client.email && (
                         <Button 
                           variant="outline" 
@@ -392,12 +367,12 @@ export default function ClientsPage() {
                           {copiedClientId === client.id && copiedType === "link" ? (
                             <>
                               <CheckCircle2 className="w-4 h-4 mr-1" />
-                              Copied
+                              Portal link copied
                             </>
                           ) : (
                             <>
                               <LinkIcon className="w-4 h-4 mr-1" />
-                              Link
+                              Copy Portal Link
                             </>
                           )}
                         </Button>

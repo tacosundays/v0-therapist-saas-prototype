@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { PRODUCTS, type Product } from "@/lib/products"
 import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout } from "@/app/actions/stripe"
+import { getClient } from "@/lib/supabase/client"
 
 interface SubscriptionData {
   status: string
@@ -26,34 +27,62 @@ interface SubscriptionData {
   } | null
 }
 
+interface UserData {
+  id: string
+  email: string
+}
+
 export default function BillingPage() {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isPortalLoading, setIsPortalLoading] = useState(false)
+  const [userData, setUserData] = useState<UserData | null>(null)
+
+  // Get current user on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = getClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user?.id && user?.email) {
+        setUserData({ id: user.id, email: user.email })
+      }
+    }
+    fetchUser()
+  }, [])
 
   const fetchSubscription = useCallback(async () => {
+    if (!userData) return
+    
     try {
-      const data = await getSubscriptionStatus()
+      const data = await getSubscriptionStatus(userData)
       setSubscriptionData(data)
     } catch (error) {
       console.error("Error fetching subscription:", error)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [userData])
 
   useEffect(() => {
-    fetchSubscription()
-  }, [fetchSubscription])
+    if (userData) {
+      fetchSubscription()
+    }
+  }, [userData, fetchSubscription])
 
   const handleSelectPlan = async (planId: string) => {
+    if (!userData) {
+      setCheckoutError("You must be logged in to subscribe")
+      return
+    }
+    
     setCheckoutLoading(planId)
     setCheckoutError(null)
     
     try {
-      const result = await startSubscriptionCheckout(planId)
+      const result = await startSubscriptionCheckout(planId, userData)
       
       if (result.error) {
         setCheckoutError(result.error)
@@ -72,9 +101,11 @@ export default function BillingPage() {
   }
 
   const handleManageSubscription = async () => {
+    if (!userData) return
+    
     setIsPortalLoading(true)
     try {
-      const url = await createCustomerPortalSession()
+      const url = await createCustomerPortalSession(userData)
       window.location.href = url
     } catch (error) {
       console.error("Error creating portal session:", error)

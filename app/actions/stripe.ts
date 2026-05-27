@@ -2,9 +2,21 @@
 
 import { stripe } from '../../lib/stripe'
 import { PRODUCTS } from '../../lib/products'
-import { createClient } from '../../lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
-export async function startSubscriptionCheckout(productId: string) {
+// Create admin client for server-side operations (doesn't rely on cookies)
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createAdminClient(supabaseUrl, supabaseServiceKey)
+}
+
+interface UserData {
+  id: string
+  email: string
+}
+
+export async function startSubscriptionCheckout(productId: string, userData: UserData) {
   try {
     const product = PRODUCTS.find((p) => p.id === productId)
     if (!product) {
@@ -15,29 +27,32 @@ export async function startSubscriptionCheckout(productId: string) {
       return { error: 'Please contact sales for Enterprise pricing' }
     }
 
-    // Get current user
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+    // Validate user data
+    if (!userData?.id || !userData?.email) {
       return { error: 'You must be logged in to subscribe' }
     }
 
-    // Check if user already has a Stripe customer ID
-    const { data: therapist } = await supabase
+    const supabase = getSupabaseAdmin()
+
+    // Verify user exists in therapists table
+    const { data: therapist, error: therapistError } = await supabase
       .from('therapists')
       .select('stripe_customer_id')
-      .eq('id', user.id)
+      .eq('id', userData.id)
       .single()
+
+    if (therapistError || !therapist) {
+      return { error: 'Therapist account not found. Please complete your profile first.' }
+    }
 
     let customerId = therapist?.stripe_customer_id
 
     // Create a Stripe customer if one doesn't exist
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: user.email,
+        email: userData.email,
         metadata: {
-          therapist_id: user.id,
+          therapist_id: userData.id,
         },
       })
       customerId = customer.id
@@ -46,7 +61,7 @@ export async function startSubscriptionCheckout(productId: string) {
       await supabase
         .from('therapists')
         .update({ stripe_customer_id: customerId })
-        .eq('id', user.id)
+        .eq('id', userData.id)
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -75,7 +90,7 @@ export async function startSubscriptionCheckout(productId: string) {
       cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
       subscription_data: {
         metadata: {
-          therapist_id: user.id,
+          therapist_id: userData.id,
           product_id: productId,
         },
       },
@@ -92,18 +107,16 @@ export async function startSubscriptionCheckout(productId: string) {
   }
 }
 
-export async function getSubscriptionStatus() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+export async function getSubscriptionStatus(userData?: UserData) {
+  if (!userData?.id) {
     return { status: 'unauthenticated', subscription: null }
   }
 
+  const supabase = getSupabaseAdmin()
   const { data: therapist } = await supabase
     .from('therapists')
     .select('subscription_status, subscription_plan, subscription_end_date, trial_end_date')
-    .eq('id', user.id)
+    .eq('id', userData.id)
     .single()
 
   if (!therapist) {
@@ -126,18 +139,16 @@ export async function getSubscriptionStatus() {
   }
 }
 
-export async function createCustomerPortalSession() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+export async function createCustomerPortalSession(userData: UserData) {
+  if (!userData?.id) {
     throw new Error('You must be logged in')
   }
 
+  const supabase = getSupabaseAdmin()
   const { data: therapist } = await supabase
     .from('therapists')
     .select('stripe_customer_id')
-    .eq('id', user.id)
+    .eq('id', userData.id)
     .single()
 
   if (!therapist?.stripe_customer_id) {

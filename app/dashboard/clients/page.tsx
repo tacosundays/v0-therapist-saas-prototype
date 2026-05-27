@@ -16,7 +16,8 @@ import {
   Loader2,
   FileText,
   Link as LinkIcon,
-  Copy
+  Copy,
+  Key
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ interface Client {
   therapist_id: string
   full_name: string
   email: string | null
+  invite_code: string | null
   created_at: string
 }
 
@@ -53,6 +55,7 @@ export default function ClientsPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined)
   const [copiedClientId, setCopiedClientId] = useState<string | null>(null)
+  const [copiedType, setCopiedType] = useState<"link" | "code" | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
@@ -130,7 +133,21 @@ export default function ClientsPage() {
     const portalUrl = `${baseUrl}/client-portal?email=${encodeURIComponent(clientEmail)}`
     navigator.clipboard.writeText(portalUrl)
     setCopiedClientId(clientId)
-    setTimeout(() => setCopiedClientId(null), 2000)
+    setCopiedType("link")
+    setTimeout(() => {
+      setCopiedClientId(null)
+      setCopiedType(null)
+    }, 2000)
+  }
+
+  const copyInviteCode = (inviteCode: string, clientId: string) => {
+    navigator.clipboard.writeText(inviteCode)
+    setCopiedClientId(clientId)
+    setCopiedType("code")
+    setTimeout(() => {
+      setCopiedClientId(null)
+      setCopiedType(null)
+    }, 2000)
   }
 
   // Get assignment stats for a client
@@ -285,10 +302,16 @@ export default function ClientsPage() {
                           <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
                             Assign Homework
                           </DropdownMenuItem>
+                          {client.invite_code && (
+                            <DropdownMenuItem onClick={() => copyInviteCode(client.invite_code!, client.id)}>
+                              <Key className="w-4 h-4 mr-2" />
+                              {copiedClientId === client.id && copiedType === "code" ? "Copied!" : `Copy Invite Code (${client.invite_code})`}
+                            </DropdownMenuItem>
+                          )}
                           {client.email && (
                             <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
                               <LinkIcon className="w-4 h-4 mr-2" />
-                              {copiedClientId === client.id ? "Copied!" : "Copy Portal Link"}
+                              {copiedClientId === client.id && copiedType === "link" ? "Copied!" : "Copy Portal Link"}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem>Send Message</DropdownMenuItem>
@@ -324,9 +347,41 @@ export default function ClientsPage() {
                         </span>
                         <span className="text-foreground">{stats.active}</span>
                       </div>
+
+                      {client.invite_code && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground flex items-center gap-1.5">
+                            <Key className="w-4 h-4" />
+                            Invite code
+                          </span>
+                          <span className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">
+                            {client.invite_code}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2 mt-4">
+                      {client.invite_code && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 rounded-xl"
+                          onClick={() => copyInviteCode(client.invite_code!, client.id)}
+                        >
+                          {copiedClientId === client.id && copiedType === "code" ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Key className="w-4 h-4 mr-1" />
+                              Code
+                            </>
+                          )}
+                        </Button>
+                      )}
                       {client.email && (
                         <Button 
                           variant="outline" 
@@ -334,14 +389,14 @@ export default function ClientsPage() {
                           className="flex-1 rounded-xl"
                           onClick={() => copyPortalLink(client.email!, client.id)}
                         >
-                          {copiedClientId === client.id ? (
+                          {copiedClientId === client.id && copiedType === "link" ? (
                             <>
                               <CheckCircle2 className="w-4 h-4 mr-1" />
                               Copied
                             </>
                           ) : (
                             <>
-                              <Copy className="w-4 h-4 mr-1" />
+                              <LinkIcon className="w-4 h-4 mr-1" />
                               Link
                             </>
                           )}

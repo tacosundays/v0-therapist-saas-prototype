@@ -47,10 +47,15 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
 
       // Insert client - normalize email to lowercase for consistent lookups
       const normalizedEmail = email.trim().toLowerCase() || null
+      
+      // Generate a short invite code (6 alphanumeric characters)
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      
       const insertData = {
         therapist_id: user.id,
         full_name: name.trim(),
         email: normalizedEmail,
+        invite_code: inviteCode,
       }
       console.log("[v0] Inserting client:", insertData)
       

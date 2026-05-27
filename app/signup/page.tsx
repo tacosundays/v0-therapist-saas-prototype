@@ -40,6 +40,7 @@ export default function SignupPage() {
     
     // For clients, validate invite code first before creating account
     let therapistId: string | null = null
+    let existingClientId: string | null = null
     if (userType === "client") {
       if (!inviteCode.trim()) {
         setError("Invite code is required for client signup")
@@ -47,27 +48,28 @@ export default function SignupPage() {
         return
       }
 
-      // Look up invite code to get therapist_id
-      const { data: inviteData, error: inviteError } = await supabase
-        .from("invite_codes")
-        .select("therapist_id")
-        .eq("code", inviteCode.trim())
+      // Look up invite code in clients table to get therapist_id and client_id
+      const { data: clientData, error: clientLookupError } = await supabase
+        .from("clients")
+        .select("id, therapist_id, email")
+        .eq("invite_code", inviteCode.trim().toUpperCase())
         .maybeSingle()
 
-      if (inviteError) {
-        console.error("Error validating invite code:", inviteError)
+      if (clientLookupError) {
+        console.error("Error validating invite code:", clientLookupError)
         setError("Error validating invite code. Please try again.")
         setIsLoading(false)
         return
       }
 
-      if (!inviteData) {
+      if (!clientData) {
         setError("Invalid invite code. Please check with your therapist.")
         setIsLoading(false)
         return
       }
 
-      therapistId = inviteData.therapist_id
+      therapistId = clientData.therapist_id
+      existingClientId = clientData.id
     }
     
     // Sign up the user
@@ -111,28 +113,20 @@ export default function SignupPage() {
       }
     }
 
-    // If client, insert into clients table with therapist_id from invite code
-    if (userType === "client" && authData.user && therapistId) {
+    // If client, update the existing client record with auth user info
+    if (userType === "client" && authData.user && existingClientId) {
       const normalizedEmail = email.trim().toLowerCase()
-      const { error: clientInsertError } = await supabase
+      const { error: clientUpdateError } = await supabase
         .from("clients")
-        .insert({
-          id: authData.user.id,
-          therapist_id: therapistId,
-          full_name: `${firstName} ${lastName}`,
+        .update({
+          auth_user_id: authData.user.id,
           email: normalizedEmail,
         })
+        .eq("id", existingClientId)
 
-      if (clientInsertError) {
-        console.error("Error inserting client:", clientInsertError)
-        // Check for duplicate
-        if (clientInsertError.code === "23505") {
-          setError("A client account with this email already exists.")
-        } else {
-          setError("Error creating client profile. Please contact your therapist.")
-        }
-        setIsLoading(false)
-        return
+      if (clientUpdateError) {
+        console.error("Error updating client:", clientUpdateError)
+        // Don't block signup, the client was already validated
       }
     }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client"
 
 export default function SignupPage() {
   const router = useRouter()
+  const isRedirecting = useRef(false)
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
   const [firstName, setFirstName] = useState("")
@@ -24,6 +25,32 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showVerificationMessage, setShowVerificationMessage] = useState(false)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
+
+  // Check for existing session on page load - redirect once if already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      if (isRedirecting.current) return
+      
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session && !isRedirecting.current) {
+        isRedirecting.current = true
+        const userRole = session.user?.user_metadata?.role
+        if (userRole === "client") {
+          window.location.href = "/portal"
+        } else {
+          window.location.href = "/dashboard"
+        }
+        return
+      }
+      
+      setIsCheckingSession(false)
+    }
+
+    checkSession()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,10 +175,11 @@ export default function SignupPage() {
 
     setIsLoading(false)
 
-    // If session exists (email confirmation disabled), redirect to appropriate page
-    if (authData.session) {
+    // If session exists (email confirmation disabled), redirect to appropriate page ONCE
+    if (authData.session && !isRedirecting.current) {
+      isRedirecting.current = true
       if (userType === "therapist") {
-        router.push("/onboarding")
+        window.location.href = "/onboarding"
       } else {
         // Redirect client to their authenticated portal
         window.location.href = "/portal"
@@ -161,6 +189,15 @@ export default function SignupPage() {
 
     // No session means email confirmation is required - show verification message
     setShowVerificationMessage(true)
+  }
+
+  // Show loading while checking session
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (showVerificationMessage) {

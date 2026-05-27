@@ -13,7 +13,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  CreditCard
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/dashboard/library", label: "Content Library", icon: BookOpen },
   { href: "/dashboard/ai-suggestions", label: "AI Suggestions", icon: Sparkles },
   { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
+  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 

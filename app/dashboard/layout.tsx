@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 
@@ -53,11 +54,12 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <main className="pl-64 transition-all duration-300">
-        <div className="p-8">
+      <div className="pl-64 transition-all duration-300">
+        <SubscriptionBanner />
+        <main className="p-8">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

@@ -96,8 +96,11 @@ export default function SignupPage() {
       return
     }
 
-    // If therapist, insert into therapists table
+    // If therapist, insert into therapists table with 14-day free trial
     if (userType === "therapist" && authData.user) {
+      const trialEndDate = new Date()
+      trialEndDate.setDate(trialEndDate.getDate() + 14) // 14-day trial
+      
       const { error: insertError } = await supabase
         .from("therapists")
         .insert({
@@ -105,6 +108,8 @@ export default function SignupPage() {
           full_name: `${firstName} ${lastName}`,
           practice_name: practiceName || null,
           email: email,
+          trial_end_date: trialEndDate.toISOString(),
+          subscription_status: 'trialing',
         })
 
       if (insertError) {

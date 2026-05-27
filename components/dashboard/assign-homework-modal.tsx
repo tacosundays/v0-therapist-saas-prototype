@@ -33,18 +33,22 @@ interface AssignHomeworkModalProps {
   onOpenChange: (open: boolean) => void
   onAssignmentCreated: () => void
   preselectedClientId?: string
+  prefilledTitle?: string
+  prefilledDescription?: string
 }
 
 export function AssignHomeworkModal({ 
   open, 
   onOpenChange, 
   onAssignmentCreated,
-  preselectedClientId 
+  preselectedClientId,
+  prefilledTitle,
+  prefilledDescription
 }: AssignHomeworkModalProps) {
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>(preselectedClientId || "")
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(prefilledTitle || "")
+  const [description, setDescription] = useState(prefilledDescription || "")
   const [dueDate, setDueDate] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingClients, setIsLoadingClients] = useState(false)
@@ -58,8 +62,14 @@ export function AssignHomeworkModal({
       if (preselectedClientId) {
         setSelectedClientId(preselectedClientId)
       }
+      if (prefilledTitle) {
+        setTitle(prefilledTitle)
+      }
+      if (prefilledDescription) {
+        setDescription(prefilledDescription)
+      }
     }
-  }, [open, preselectedClientId])
+  }, [open, preselectedClientId, prefilledTitle, prefilledDescription])
 
   const fetchClients = async () => {
     setIsLoadingClients(true)
@@ -128,8 +138,8 @@ export function AssignHomeworkModal({
       
       // Reset form
       setSelectedClientId(preselectedClientId || "")
-      setTitle("")
-      setDescription("")
+      setTitle(prefilledTitle || "")
+      setDescription(prefilledDescription || "")
       setDueDate("")
       
       // Notify parent and close modal after brief delay
@@ -150,8 +160,8 @@ export function AssignHomeworkModal({
   const handleClose = () => {
     if (!isLoading) {
       setSelectedClientId(preselectedClientId || "")
-      setTitle("")
-      setDescription("")
+      setTitle(prefilledTitle || "")
+      setDescription(prefilledDescription || "")
       setDueDate("")
       setError(null)
       setSuccess(false)

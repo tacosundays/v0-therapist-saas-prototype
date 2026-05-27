@@ -108,25 +108,24 @@ export default function SignupPage() {
         })
 
       if (insertError) {
-        // Log error but don't block - the trigger may handle this
         console.error("Error inserting therapist:", insertError)
       }
     }
 
-    // If client, update the existing client record with auth user info
+    // If client, update the existing client record to link auth user
     if (userType === "client" && authData.user && existingClientId) {
       const normalizedEmail = email.trim().toLowerCase()
       const { error: clientUpdateError } = await supabase
         .from("clients")
         .update({
           auth_user_id: authData.user.id,
+          full_name: `${firstName} ${lastName}`,
           email: normalizedEmail,
         })
         .eq("id", existingClientId)
 
       if (clientUpdateError) {
         console.error("Error updating client:", clientUpdateError)
-        // Don't block signup, the client was already validated
       }
     }
 
@@ -137,9 +136,8 @@ export default function SignupPage() {
       if (userType === "therapist") {
         router.push("/onboarding")
       } else {
-        // Redirect client to their portal with email
-        const portalUrl = `/client-portal?email=${encodeURIComponent(email.trim().toLowerCase())}`
-        window.location.href = portalUrl
+        // Redirect client to their portal
+        window.location.href = "/client-portal"
       }
       return
     }

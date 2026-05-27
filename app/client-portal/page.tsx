@@ -55,23 +55,35 @@ function ClientPortalContent() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!emailParam) {
-        setError("No email provided. Please use the link sent by your therapist.")
+      const supabase = createClient()
+      
+      // First check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      let clientQuery
+
+      if (user) {
+        // If authenticated, look up client by auth_user_id
+        clientQuery = supabase
+          .from("clients")
+          .select("*")
+          .eq("auth_user_id", user.id)
+          .maybeSingle()
+      } else if (emailParam) {
+        // If not authenticated but have email param, look up by email
+        const normalizedEmail = emailParam.trim().toLowerCase()
+        clientQuery = supabase
+          .from("clients")
+          .select("*")
+          .eq("email", normalizedEmail)
+          .maybeSingle()
+      } else {
+        setError("Please log in or use the portal link sent by your therapist.")
         setIsLoading(false)
         return
       }
 
-      const supabase = createClient()
-      
-      // Normalize email for lookup
-      const normalizedEmail = emailParam.trim().toLowerCase()
-
-      // Find client record by email
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("email", normalizedEmail)
-        .maybeSingle()
+      const { data: client, error: clientError } = await clientQuery
 
       if (clientError) {
         console.error("Error fetching client:", clientError)
@@ -81,7 +93,7 @@ function ClientPortalContent() {
       }
 
       if (!client) {
-        setError("No client record found for this email. Please contact your therapist.")
+        setError("No client record found. Please contact your therapist to set up your account.")
         setIsLoading(false)
         return
       }

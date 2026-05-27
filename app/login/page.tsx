@@ -32,8 +32,7 @@ export default function LoginPage() {
         // Check user role from metadata
         const userRole = session.user?.user_metadata?.role
         if (userRole === "client") {
-          const clientEmail = session.user?.email || ""
-          window.location.href = `/client-portal?email=${encodeURIComponent(clientEmail)}`
+          window.location.href = "/client-portal"
         } else {
           window.location.href = "/dashboard"
         }
@@ -75,9 +74,8 @@ export default function LoginPage() {
       const userRole = data.user?.user_metadata?.role
       
       if (userRole === "client") {
-        // Client - redirect to portal with email
-        const clientEmail = data.user?.email || email
-        window.location.href = `/client-portal?email=${encodeURIComponent(clientEmail)}`
+        // Client - redirect to portal (will look up by auth_user_id)
+        window.location.href = "/client-portal"
       } else {
         // Therapist (default) - redirect to dashboard
         window.location.href = "/dashboard"

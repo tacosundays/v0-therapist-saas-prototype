@@ -45,11 +45,12 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         return
       }
 
-      // Insert client
+      // Insert client - normalize email to lowercase for consistent lookups
+      const normalizedEmail = email.trim().toLowerCase() || null
       const insertData = {
         therapist_id: user.id,
         full_name: name.trim(),
-        email: email.trim() || null,
+        email: normalizedEmail,
       }
       console.log("[v0] Inserting client:", insertData)
       

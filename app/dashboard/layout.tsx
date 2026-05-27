@@ -28,7 +28,7 @@ export default function DashboardLayout({
       const userRole = user.user_metadata?.role
       if (userRole === "client") {
         // Clients should not access the dashboard
-        window.location.href = "/client-portal"
+        window.location.href = "/portal"
         return
       }
 
@@ -44,11 +44,11 @@ export default function DashboardLayout({
         const { data: client } = await supabase
           .from("clients")
           .select("id")
-          .eq("auth_user_id", user.id)
+          .eq("id", user.id)
           .maybeSingle()
 
         if (client) {
-          window.location.href = "/client-portal"
+          window.location.href = "/portal"
           return
         }
 

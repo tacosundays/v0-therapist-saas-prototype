@@ -72,27 +72,15 @@ function ClientPortalContent() {
           return
         }
 
-        // Look up client by auth_user_id first
-        const { data: clientByAuth, error: authError } = await supabase
+        // Look up client by id = auth.uid()
+        const { data: clientData, error: lookupError } = await supabase
           .from("clients")
           .select("*")
-          .eq("auth_user_id", user.id)
+          .eq("id", user.id)
           .maybeSingle()
 
-        if (clientByAuth) {
-          client = clientByAuth
-        } else {
-          // Fallback to email lookup
-          const normalizedEmail = user.email?.trim().toLowerCase() || ""
-          const { data: clientByEmail, error: emailError } = await supabase
-            .from("clients")
-            .select("*")
-            .eq("email", normalizedEmail)
-            .maybeSingle()
-          
-          client = clientByEmail
-          clientError = emailError
-        }
+        client = clientData
+        clientError = lookupError
       } else if (emailParam) {
         // Not authenticated but have email param - MVP portal link access
         const normalizedEmail = emailParam.trim().toLowerCase()

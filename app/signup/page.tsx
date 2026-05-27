@@ -117,20 +117,32 @@ export default function SignupPage() {
       }
     }
 
-    // If client, update the existing client record to link auth user
-    if (userType === "client" && authData.user && existingClientId) {
+    // If client, delete old client record and insert new one with id = auth.uid()
+    if (userType === "client" && authData.user && existingClientId && therapistId) {
       const normalizedEmail = email.trim().toLowerCase()
-      const { error: clientUpdateError } = await supabase
+      
+      // First, delete the old client record (created by therapist with invite code)
+      const { error: deleteError } = await supabase
         .from("clients")
-        .update({
-          auth_user_id: authData.user.id,
+        .delete()
+        .eq("id", existingClientId)
+
+      if (deleteError) {
+        console.error("Error deleting old client record:", deleteError)
+      }
+
+      // Insert new client record with id = auth.uid()
+      const { error: clientInsertError } = await supabase
+        .from("clients")
+        .insert({
+          id: authData.user.id,
+          therapist_id: therapistId,
           full_name: `${firstName} ${lastName}`,
           email: normalizedEmail,
         })
-        .eq("id", existingClientId)
 
-      if (clientUpdateError) {
-        console.error("Error updating client:", clientUpdateError)
+      if (clientInsertError) {
+        console.error("Error inserting client:", clientInsertError)
       }
     }
 
@@ -141,8 +153,8 @@ export default function SignupPage() {
       if (userType === "therapist") {
         router.push("/onboarding")
       } else {
-        // Redirect client to their portal
-        window.location.href = "/client-portal"
+        // Redirect client to their authenticated portal
+        window.location.href = "/portal"
       }
       return
     }

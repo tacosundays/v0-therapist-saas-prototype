@@ -53,45 +53,26 @@ export default function PortalPage() {
       const supabase = createClient()
       
       // Get current user - require authentication
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
         // Not authenticated, redirect to login
         window.location.href = "/login"
         return
       }
       
       // Check user role - if therapist, redirect to dashboard
-      const userRole = authUser.user_metadata?.role
+      const userRole = user.user_metadata?.role
       if (userRole === "therapist") {
         window.location.href = "/dashboard"
         return
       }
 
-      // Look up client record by auth_user_id first, then by email
-      let client = null
-      let clientError = null
-
-      // Try to find by auth_user_id
-      const { data: clientByAuth, error: authLookupError } = await supabase
+      // Look up client by id = auth.uid()
+      const { data: client, error: clientError } = await supabase
         .from("clients")
         .select("*")
-        .eq("auth_user_id", authUser.id)
+        .eq("id", user.id)
         .maybeSingle()
-
-      if (clientByAuth) {
-        client = clientByAuth
-      } else {
-        // Fallback to email lookup
-        const normalizedEmail = authUser.email?.trim().toLowerCase() || ""
-        const { data: clientByEmail, error: emailLookupError } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("email", normalizedEmail)
-          .maybeSingle()
-        
-        client = clientByEmail
-        clientError = emailLookupError
-      }
 
       if (clientError) {
         console.error("Error fetching client:", clientError)

@@ -32,7 +32,7 @@ export default function LoginPage() {
         // Check user role from metadata
         const userRole = session.user?.user_metadata?.role
         if (userRole === "client") {
-          window.location.href = "/client-portal"
+          window.location.href = "/portal"
         } else {
           window.location.href = "/dashboard"
         }
@@ -74,8 +74,8 @@ export default function LoginPage() {
       const userRole = data.user?.user_metadata?.role
       
       if (userRole === "client") {
-        // Client - redirect to portal (will look up by auth_user_id)
-        window.location.href = "/client-portal"
+        // Client - redirect to portal (will look up by id = auth.uid())
+        window.location.href = "/portal"
       } else {
         // Therapist (default) - redirect to dashboard
         window.location.href = "/dashboard"

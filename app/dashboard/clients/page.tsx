@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
-  FileText
+  FileText,
+  Link as LinkIcon,
+  Copy
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -50,6 +52,7 @@ export default function ClientsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined)
+  const [copiedClientId, setCopiedClientId] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
@@ -120,6 +123,14 @@ export default function ClientsPage() {
   const openAssignModal = (clientId?: string) => {
     setSelectedClientId(clientId)
     setIsAssignModalOpen(true)
+  }
+
+  const copyPortalLink = (clientEmail: string, clientId: string) => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
+    const portalUrl = `${baseUrl}/client-portal?email=${encodeURIComponent(clientEmail)}`
+    navigator.clipboard.writeText(portalUrl)
+    setCopiedClientId(clientId)
+    setTimeout(() => setCopiedClientId(null), 2000)
   }
 
   // Get assignment stats for a client
@@ -274,6 +285,12 @@ export default function ClientsPage() {
                           <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
                             Assign Homework
                           </DropdownMenuItem>
+                          {client.email && (
+                            <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
+                              <LinkIcon className="w-4 h-4 mr-2" />
+                              {copiedClientId === client.id ? "Copied!" : "Copy Portal Link"}
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem>Send Message</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -310,9 +327,26 @@ export default function ClientsPage() {
                     </div>
 
                     <div className="flex gap-2 mt-4">
-                      <Button variant="outline" size="sm" className="flex-1 rounded-xl">
-                        View
-                      </Button>
+                      {client.email && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 rounded-xl"
+                          onClick={() => copyPortalLink(client.email!, client.id)}
+                        >
+                          {copiedClientId === client.id ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4 mr-1" />
+                              Link
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <Button size="sm" className="flex-1 rounded-xl" onClick={() => openAssignModal(client.id)}>
                         Assign
                       </Button>

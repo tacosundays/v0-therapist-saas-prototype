@@ -30,6 +30,7 @@ interface Assignment {
   due_date: string | null
   completed: boolean
   reflection: string | null
+  completed_at: string | null
   created_at: string
 }
 
@@ -119,6 +120,7 @@ function ClientPortalContent() {
       .update({
         completed: true,
         reflection: reflection.trim() || null,
+        completed_at: new Date().toISOString(),
       })
       .eq("id", selectedAssignment)
 
@@ -131,7 +133,7 @@ function ClientPortalContent() {
     // Update local state
     setAssignments(prev => prev.map(a => 
       a.id === selectedAssignment 
-        ? { ...a, completed: true, reflection: reflection.trim() || null }
+        ? { ...a, completed: true, reflection: reflection.trim() || null, completed_at: new Date().toISOString() }
         : a
     ))
 

@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { 
   Users, 
   CheckCircle2, 
@@ -12,9 +11,9 @@ import {
   TrendingUp,
   Plus,
   ArrowRight,
-  Sparkles,
   Loader2,
-  FileText
+  FileText,
+  MessageSquare
 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -36,12 +35,9 @@ interface Assignment {
   title: string
   completed: boolean
   due_date: string | null
+  reflection: string | null
+  completed_at: string | null
 }
-
-const aiSuggestions = [
-  { client: "New Client", suggestion: "Try adding a relaxation exercise based on recent anxiety scores", type: "Anxiety" },
-  { client: "Active Client", suggestion: "Values-based activity scheduling might reinforce recent progress", type: "Depression" },
-]
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -55,8 +51,6 @@ export default function DashboardPage() {
     try {
       const supabase = createClient()
       
-      console.log("[v0] Fetching clients for therapist:", userId)
-      
       // Fetch clients
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
@@ -66,16 +60,15 @@ export default function DashboardPage() {
         .limit(5)
 
       if (clientsError) {
-        console.error("[v0] Error fetching clients:", clientsError)
+        console.error("Error fetching clients:", clientsError)
       } else {
-        console.log("[v0] Clients fetched:", clientsData?.length, clientsData)
         setClients(clientsData || [])
       }
 
       // Fetch assignments
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
-        .select("id, client_id, title, completed, due_date")
+        .select("id, client_id, title, completed, due_date, reflection, completed_at")
         .eq("therapist_id", userId)
 
       if (assignmentsError) {
@@ -142,11 +135,23 @@ export default function DashboardPage() {
     return diffDays >= 0 && diffDays <= 7
   }).length
 
+  // Count overdue assignments
+  const overdueAssignments = assignments.filter(a => {
+    if (!a.due_date || a.completed) return false
+    return new Date(a.due_date) < new Date()
+  }).length
+
+  // Get latest reflections
+  const latestReflections = assignments
+    .filter(a => a.reflection && a.completed_at)
+    .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
+    .slice(0, 3)
+
   const stats = [
     { label: "Active Clients", value: clients.length.toString(), icon: Users, change: "Total clients" },
     { label: "Completion Rate", value: completionRate !== null ? `${completionRate}%` : "--", icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No assignments yet" },
-    { label: "Due This Week", value: assignmentsDueSoon.toString(), icon: Clock, change: pendingAssignments > 0 ? `${pendingAssignments} pending total` : "All caught up" },
-    { label: "Avg. Engagement", value: "--", icon: TrendingUp, change: "days between sessions" },
+    { label: "Due This Week", value: assignmentsDueSoon.toString(), icon: Clock, change: overdueAssignments > 0 ? `${overdueAssignments} overdue` : "All on track" },
+    { label: "Pending", value: pendingAssignments.toString(), icon: TrendingUp, change: pendingAssignments > 0 ? "awaiting completion" : "All caught up" },
   ]
 
   // Calculate days since created
@@ -302,36 +307,45 @@ export default function DashboardPage() {
           <Card className="rounded-2xl">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary" />
-                AI Suggestions
+                <MessageSquare className="w-5 h-5 text-primary" />
+                Latest Reflections
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {aiSuggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    className="p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border border-primary/10"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-foreground">{suggestion.client}</span>
-                      <Badge variant="secondary" className="text-xs rounded-lg">
-                        {suggestion.type}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{suggestion.suggestion}</p>
-                    <Button variant="outline" size="sm" className="mt-3 w-full rounded-xl">
-                      View Recommendation
-                    </Button>
+              {latestReflections.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                    <MessageSquare className="w-5 h-5 text-muted-foreground" />
                   </div>
-                ))}
-                <Button variant="ghost" className="w-full rounded-xl" asChild>
-                  <Link href="/dashboard/ai-suggestions">
-                    See all suggestions
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </Link>
-                </Button>
-              </div>
+                  <p className="text-sm text-muted-foreground">No reflections yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Reflections will appear when clients complete assignments</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {latestReflections.map((assignment) => {
+                    const client = clients.find(c => c.id === assignment.client_id)
+                    return (
+                      <div
+                        key={assignment.id}
+                        className="p-4 bg-muted/30 rounded-xl"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                            <span className="text-xs font-medium text-primary">
+                              {client?.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?"}
+                            </span>
+                          </div>
+                          <span className="text-sm font-medium text-foreground">{client?.full_name || "Unknown"}</span>
+                        </div>
+                        <p className="text-sm text-foreground line-clamp-3 mb-2">{assignment.reflection}</p>
+                        <p className="text-xs text-muted-foreground">
+                          on &quot;{assignment.title}&quot; · {assignment.completed_at ? new Date(assignment.completed_at).toLocaleDateString() : ""}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

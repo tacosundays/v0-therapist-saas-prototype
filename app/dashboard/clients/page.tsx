@@ -17,7 +17,9 @@ import {
   FileText,
   Link as LinkIcon,
   Copy,
-  Key
+  Key,
+  AlertTriangle,
+  MessageSquare
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -41,7 +43,11 @@ interface Client {
 interface Assignment {
   id: string
   client_id: string
+  title: string
   completed: boolean
+  due_date: string | null
+  reflection: string | null
+  completed_at: string | null
 }
 
 export default function ClientsPage() {
@@ -88,7 +94,7 @@ export default function ClientsPage() {
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
-        .select("id, client_id, completed")
+        .select("id, client_id, title, completed, due_date, reflection, completed_at")
         .eq("therapist_id", user.id)
 
       if (assignmentsError) {
@@ -152,7 +158,21 @@ export default function ClientsPage() {
     const completed = clientAssignments.filter(a => a.completed).length
     const active = total - completed
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : null
-    return { total, completed, active, completionRate }
+    
+    // Check for overdue assignments
+    const now = new Date()
+    const overdue = clientAssignments.filter(a => {
+      if (a.completed || !a.due_date) return false
+      return new Date(a.due_date) < now
+    }).length
+    
+    // Get latest reflection
+    const assignmentsWithReflections = clientAssignments
+      .filter(a => a.reflection && a.completed_at)
+      .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
+    const latestReflection = assignmentsWithReflections[0] || null
+    
+    return { total, completed, active, completionRate, overdue, latestReflection }
   }
 
   const filteredClients = clients.filter((client) => {
@@ -317,6 +337,44 @@ export default function ClientsPage() {
                   </CardHeader>
                   <CardContent className="pt-4">
                     <div className="space-y-3">
+                      {/* Progress Bar */}
+                      {stats.total > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Progress</span>
+                            <span className="font-medium text-foreground">{stats.completed}/{stats.total}</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full transition-all duration-300"
+                              style={{ width: `${stats.completionRate || 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Status Badges */}
+                      <div className="flex flex-wrap gap-2">
+                        {stats.completed > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {stats.completed} completed
+                          </span>
+                        )}
+                        {stats.active > 0 && stats.overdue === 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600">
+                            <Clock className="w-3 h-3" />
+                            {stats.active} pending
+                          </span>
+                        )}
+                        {stats.overdue > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-destructive/10 text-destructive">
+                            <AlertTriangle className="w-3 h-3" />
+                            {stats.overdue} overdue
+                          </span>
+                        )}
+                      </div>
+
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1.5">
                           <Calendar className="w-4 h-4" />
@@ -324,34 +382,20 @@ export default function ClientsPage() {
                         </span>
                         <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
                       </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Completion rate
-                        </span>
-                        <span className={`font-medium ${stats.completionRate !== null ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {stats.completionRate !== null ? `${stats.completionRate}%` : '--'}
-                        </span>
-                      </div>
 
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <Clock className="w-4 h-4" />
-                          Active homework
-                        </span>
-                        <span className="text-foreground">{stats.active}</span>
-                      </div>
-
-                      {client.invite_code && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1.5">
-                            <Key className="w-4 h-4" />
-                            Invite code
-                          </span>
-                          <span className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">
-                            {client.invite_code}
-                          </span>
+                      {/* Latest Reflection */}
+                      {stats.latestReflection && (
+                        <div className="p-3 bg-muted/30 rounded-xl space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MessageSquare className="w-3 h-3" />
+                            Latest reflection
+                          </div>
+                          <p className="text-xs text-foreground line-clamp-2">
+                            {stats.latestReflection.reflection}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            on {stats.latestReflection.title}
+                          </p>
                         </div>
                       )}
                     </div>

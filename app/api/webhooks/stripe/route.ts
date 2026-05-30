@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         
+        console.log('[v0] Webhook: checkout.session.completed', {
+          sessionId: session.id,
+          customerId: session.customer,
+          subscriptionId: session.subscription,
+          mode: session.mode
+        })
+        
         if (session.mode === 'subscription' && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             session.subscription as string
@@ -43,16 +50,48 @@ export async function POST(req: NextRequest) {
           const therapistId = subscription.metadata.therapist_id
           const productId = subscription.metadata.product_id
 
+          console.log('[v0] Webhook: Subscription details', {
+            subscriptionId: subscription.id,
+            status: subscription.status,
+            therapistId,
+            productId,
+            trialEnd: subscription.trial_end
+          })
+
           if (therapistId) {
-            await supabaseAdmin
+            // Determine status based on subscription state
+            let subscriptionStatus = 'active'
+            if (subscription.status === 'trialing') {
+              subscriptionStatus = 'trialing'
+            } else if (subscription.status === 'active') {
+              subscriptionStatus = 'active'
+            }
+
+            const updateData = {
+              subscription_status: subscriptionStatus,
+              subscription_plan: productId || null,
+              stripe_subscription_id: subscription.id,
+              stripe_customer_id: session.customer as string,
+              subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
+              trial_end_date: subscription.trial_end 
+                ? new Date(subscription.trial_end * 1000).toISOString() 
+                : null,
+            }
+
+            console.log('[v0] Webhook: Updating therapist', { therapistId, updateData })
+
+            const { error } = await supabaseAdmin
               .from('therapists')
-              .update({
-                subscription_status: 'active',
-                subscription_plan: productId,
-                stripe_subscription_id: subscription.id,
-                subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
-              })
+              .update(updateData)
               .eq('id', therapistId)
+
+            if (error) {
+              console.error('[v0] Webhook: Failed to update therapist', error)
+            } else {
+              console.log('[v0] Webhook: Therapist updated successfully')
+            }
+          } else {
+            console.error('[v0] Webhook: No therapist_id in subscription metadata')
           }
         }
         break

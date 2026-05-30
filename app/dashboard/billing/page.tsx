@@ -71,25 +71,28 @@ export default function BillingPage() {
       const success = searchParams.get('success')
       const sessionId = searchParams.get('session_id')
       
+      console.log('[v0] Billing: Checking checkout params', { success, sessionId, hasUserData: !!userData })
+      
       if (success === 'true' && sessionId && userData && !hasVerified.current) {
         hasVerified.current = true
         
+        console.log('[v0] Billing: Verifying subscription with session', sessionId)
         const result = await verifyAndActivateSubscription(sessionId, userData)
+        console.log('[v0] Billing: Verification result', result)
         
         if (result.success) {
           setSuccessMessage("Your subscription has been activated successfully!")
-          // Refresh subscription data
-          const data = await getSubscriptionStatus(userData)
-          setSubscriptionData(data)
-          setIsLoading(false)
         } else {
-          // Even if verification fails, the webhook should handle it
-          // Just show a message and refresh
-          setSuccessMessage("Payment successful! Your subscription will be activated shortly.")
-          const data = await getSubscriptionStatus(userData)
-          setSubscriptionData(data)
-          setIsLoading(false)
+          // Show the actual error for debugging
+          console.error('[v0] Billing: Verification failed', result.error)
+          setSuccessMessage(`Payment received! ${result.error || 'Processing subscription...'}`)
         }
+        
+        // Refresh subscription data regardless of result
+        const data = await getSubscriptionStatus(userData)
+        console.log('[v0] Billing: Subscription status after verify', data)
+        setSubscriptionData(data)
+        setIsLoading(false)
         
         // Clear URL params after processing
         window.history.replaceState({}, '', '/dashboard/billing')

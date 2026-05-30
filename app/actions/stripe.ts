@@ -185,51 +185,89 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
   try {
     // Retrieve the checkout session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['subscription']
+      expand: ['subscription', 'subscription.default_payment_method']
     })
 
-    if (session.payment_status !== 'paid') {
-      return { success: false, error: 'Payment not completed' }
+    console.log('[v0] Checkout session:', {
+      id: session.id,
+      payment_status: session.payment_status,
+      status: session.status,
+      subscription: session.subscription,
+      customer: session.customer
+    })
+
+    // For subscriptions, check session status instead of payment_status
+    // payment_status can be 'no_payment_required' for trials
+    if (session.status !== 'complete') {
+      return { success: false, error: `Checkout not complete. Status: ${session.status}` }
     }
 
     if (!session.subscription) {
-      return { success: false, error: 'No subscription found' }
+      return { success: false, error: 'No subscription found in session' }
     }
 
     const subscription = typeof session.subscription === 'string' 
       ? await stripe.subscriptions.retrieve(session.subscription)
       : session.subscription
 
+    console.log('[v0] Subscription details:', {
+      id: subscription.id,
+      status: subscription.status,
+      metadata: subscription.metadata,
+      current_period_end: subscription.current_period_end,
+      trial_end: subscription.trial_end
+    })
+
     const productId = subscription.metadata.product_id
     const therapistId = subscription.metadata.therapist_id
 
-    // Verify the therapist ID matches
-    if (therapistId !== userData.id) {
+    console.log('[v0] Extracted IDs:', { productId, therapistId, userId: userData.id })
+
+    // Verify the therapist ID matches (if present in metadata)
+    if (therapistId && therapistId !== userData.id) {
       return { success: false, error: 'Subscription does not belong to this user' }
     }
 
     const supabase = getSupabaseAdmin()
 
+    // Determine subscription status based on Stripe subscription status
+    let subscriptionStatus = 'active'
+    if (subscription.status === 'trialing') {
+      subscriptionStatus = 'trialing'
+    } else if (subscription.status === 'active') {
+      subscriptionStatus = 'active'
+    } else {
+      subscriptionStatus = subscription.status
+    }
+
     // Update the therapist record with subscription info
+    const updateData = {
+      subscription_status: subscriptionStatus,
+      subscription_plan: productId || null,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: session.customer as string,
+      subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
+      trial_end_date: subscription.trial_end 
+        ? new Date(subscription.trial_end * 1000).toISOString() 
+        : null,
+    }
+
+    console.log('[v0] Updating therapist with:', updateData)
+
     const { error: updateError } = await supabase
       .from('therapists')
-      .update({
-        subscription_status: 'active',
-        subscription_plan: productId,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id: session.customer as string,
-        subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
-      })
+      .update(updateData)
       .eq('id', userData.id)
 
     if (updateError) {
-      console.error('Failed to update subscription:', updateError)
-      return { success: false, error: 'Failed to activate subscription' }
+      console.error('[v0] Failed to update subscription:', updateError)
+      return { success: false, error: `Failed to activate subscription: ${updateError.message}` }
     }
 
+    console.log('[v0] Subscription activated successfully')
     return { success: true }
   } catch (error) {
-    console.error('Verify subscription error:', error)
+    console.error('[v0] Verify subscription error:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Verification failed' }
   }
 }

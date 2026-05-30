@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,10 +12,11 @@ import {
   CreditCard,
   Calendar,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2
 } from "lucide-react"
 import { PRODUCTS, type Product } from "@/lib/products"
-import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout } from "@/app/actions/stripe"
+import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout, verifyAndActivateSubscription } from "@/app/actions/stripe"
 import { getClient } from "@/lib/supabase/client"
 
 interface SubscriptionData {
@@ -35,12 +37,15 @@ interface UserData {
 }
 
 export default function BillingPage() {
+  const searchParams = useSearchParams()
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isPortalLoading, setIsPortalLoading] = useState(false)
   const [userData, setUserData] = useState<UserData | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const hasVerified = useRef(false)
 
   // Get current user on mount
   useEffect(() => {
@@ -60,8 +65,47 @@ export default function BillingPage() {
     fetchUser()
   }, [])
 
+  // Verify subscription after returning from Stripe checkout
+  useEffect(() => {
+    const verifyCheckout = async () => {
+      const success = searchParams.get('success')
+      const sessionId = searchParams.get('session_id')
+      
+      if (success === 'true' && sessionId && userData && !hasVerified.current) {
+        hasVerified.current = true
+        
+        const result = await verifyAndActivateSubscription(sessionId, userData)
+        
+        if (result.success) {
+          setSuccessMessage("Your subscription has been activated successfully!")
+          // Refresh subscription data
+          const data = await getSubscriptionStatus(userData)
+          setSubscriptionData(data)
+          setIsLoading(false)
+        } else {
+          // Even if verification fails, the webhook should handle it
+          // Just show a message and refresh
+          setSuccessMessage("Payment successful! Your subscription will be activated shortly.")
+          const data = await getSubscriptionStatus(userData)
+          setSubscriptionData(data)
+          setIsLoading(false)
+        }
+        
+        // Clear URL params after processing
+        window.history.replaceState({}, '', '/dashboard/billing')
+      }
+    }
+    
+    if (userData) {
+      verifyCheckout()
+    }
+  }, [searchParams, userData])
+
   const fetchSubscription = useCallback(async () => {
     if (!userData) return
+    
+    // Skip if we just verified from checkout (already fetched)
+    if (hasVerified.current) return
     
     try {
       const data = await getSubscriptionStatus(userData)
@@ -140,6 +184,29 @@ export default function BillingPage() {
         <h1 className="text-3xl font-bold text-foreground">Billing</h1>
         <p className="text-muted-foreground mt-1">Manage your subscription and billing</p>
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-primary/10 border border-primary/20 rounded-xl flex items-start gap-3"
+        >
+          <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-primary">Success</p>
+            <p className="text-sm text-primary/80">{successMessage}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="ml-auto"
+            onClick={() => setSuccessMessage(null)}
+          >
+            Dismiss
+          </Button>
+        </motion.div>
+      )}
 
       {/* Checkout Error Alert */}
       {checkoutError && (

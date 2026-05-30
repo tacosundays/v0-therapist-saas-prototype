@@ -98,7 +98,7 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
         },
       ],
       mode: 'subscription',
-      success_url: `${baseUrl}/dashboard/billing?success=true`,
+      success_url: `${baseUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
       subscription_data: {
         metadata: {
@@ -173,4 +173,63 @@ export async function createCustomerPortalSession(userData: UserData) {
   })
 
   return session.url
+}
+
+// Verify and activate subscription after successful checkout
+// This is a fallback in case the webhook is delayed or not configured
+export async function verifyAndActivateSubscription(sessionId: string, userData: UserData) {
+  if (!userData?.id || !sessionId) {
+    return { success: false, error: 'Missing required data' }
+  }
+
+  try {
+    // Retrieve the checkout session from Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['subscription']
+    })
+
+    if (session.payment_status !== 'paid') {
+      return { success: false, error: 'Payment not completed' }
+    }
+
+    if (!session.subscription) {
+      return { success: false, error: 'No subscription found' }
+    }
+
+    const subscription = typeof session.subscription === 'string' 
+      ? await stripe.subscriptions.retrieve(session.subscription)
+      : session.subscription
+
+    const productId = subscription.metadata.product_id
+    const therapistId = subscription.metadata.therapist_id
+
+    // Verify the therapist ID matches
+    if (therapistId !== userData.id) {
+      return { success: false, error: 'Subscription does not belong to this user' }
+    }
+
+    const supabase = getSupabaseAdmin()
+
+    // Update the therapist record with subscription info
+    const { error: updateError } = await supabase
+      .from('therapists')
+      .update({
+        subscription_status: 'active',
+        subscription_plan: productId,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: session.customer as string,
+        subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
+      })
+      .eq('id', userData.id)
+
+    if (updateError) {
+      console.error('Failed to update subscription:', updateError)
+      return { success: false, error: 'Failed to activate subscription' }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Verify subscription error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Verification failed' }
+  }
 }

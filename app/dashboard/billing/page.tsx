@@ -166,8 +166,10 @@ export default function BillingPage() {
   }
 
   const isActive = subscriptionData?.status === "active"
-  const isTrialing = subscriptionData?.subscription?.isInTrial
+  const isTrialing = subscriptionData?.status === "trialing" || subscriptionData?.subscription?.isInTrial
   const currentPlan = subscriptionData?.subscription?.plan
+  const currentPlanName = currentPlan ? PRODUCTS.find(p => p.id === currentPlan)?.name : null
+  const hasSubscription = isActive || (isTrialing && currentPlan)
 
   if (isLoading) {
     return (
@@ -246,11 +248,13 @@ export default function BillingPage() {
           <CardContent>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-lg font-semibold">
-                    {currentPlan 
-                      ? PRODUCTS.find(p => p.id === currentPlan)?.name || "Unknown Plan"
-                      : isTrialing 
+                    {currentPlanName 
+                      ? isTrialing 
+                        ? `${currentPlanName} — Free Trial`
+                        : currentPlanName
+                      : isTrialing
                         ? "Free Trial"
                         : "No Active Plan"
                     }
@@ -258,7 +262,7 @@ export default function BillingPage() {
                   {isActive && (
                     <Badge className="bg-primary/10 text-primary">Active</Badge>
                   )}
-                  {isTrialing && (
+                  {isTrialing && !isActive && (
                     <Badge variant="secondary">Trial</Badge>
                   )}
                   {!isActive && !isTrialing && (
@@ -281,7 +285,7 @@ export default function BillingPage() {
                 )}
               </div>
 
-              {isActive && (
+              {hasSubscription && (
                 <Button 
                   variant="outline" 
                   className="rounded-xl"

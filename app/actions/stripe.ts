@@ -14,6 +14,8 @@ function getSupabaseAdmin() {
 interface UserData {
   id: string
   email: string
+  fullName?: string
+  practiceName?: string
 }
 
 export async function startSubscriptionCheckout(productId: string, userData: UserData) {
@@ -34,15 +36,24 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
 
     const supabase = getSupabaseAdmin()
 
-    // Verify user exists in therapists table
-    const { data: therapist, error: therapistError } = await supabase
+    // Upsert therapist row - create if doesn't exist, update if it does
+    const { data: therapist, error: upsertError } = await supabase
       .from('therapists')
+      .upsert({
+        id: userData.id,
+        email: userData.email,
+        full_name: userData.fullName || null,
+        practice_name: userData.practiceName || null,
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      })
       .select('stripe_customer_id')
-      .eq('id', userData.id)
       .single()
 
-    if (therapistError || !therapist) {
-      return { error: 'Therapist account not found. Please complete your profile first.' }
+    if (upsertError) {
+      console.error('Therapist upsert error:', upsertError)
+      return { error: 'Failed to create therapist profile' }
     }
 
     let customerId = therapist?.stripe_customer_id

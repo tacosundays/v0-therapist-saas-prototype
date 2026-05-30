@@ -30,6 +30,8 @@ interface SubscriptionData {
 interface UserData {
   id: string
   email: string
+  fullName?: string
+  practiceName?: string
 }
 
 export default function BillingPage() {
@@ -47,7 +49,12 @@ export default function BillingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user?.id && user?.email) {
-        setUserData({ id: user.id, email: user.email })
+        setUserData({ 
+          id: user.id, 
+          email: user.email,
+          fullName: user.user_metadata?.full_name || `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || undefined,
+          practiceName: user.user_metadata?.practice_name || undefined
+        })
       }
     }
     fetchUser()

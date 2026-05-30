@@ -37,13 +37,14 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
     const supabase = getSupabaseAdmin()
 
     // Upsert therapist row - create if doesn't exist, update if it does
+    // Only use columns that exist: id, full_name, practice_name, email
     const { data: therapist, error: upsertError } = await supabase
       .from('therapists')
       .upsert({
         id: userData.id,
+        full_name: userData.fullName || userData.email,
+        practice_name: userData.practiceName || 'My Practice',
         email: userData.email,
-        full_name: userData.fullName || null,
-        practice_name: userData.practiceName || null,
       }, {
         onConflict: 'id',
         ignoreDuplicates: false
@@ -53,7 +54,7 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
 
     if (upsertError) {
       console.error('Therapist upsert error:', upsertError)
-      return { error: 'Failed to create therapist profile' }
+      return { error: `Failed to create therapist profile: ${upsertError.message}` }
     }
 
     let customerId = therapist?.stripe_customer_id

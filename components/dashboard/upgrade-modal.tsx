@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -9,8 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowRight, Users, Sparkles } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { ArrowRight, Users, Sparkles, Loader2 } from "lucide-react"
+import { startSubscriptionCheckout } from "@/app/actions/stripe"
+import { getClient } from "@/lib/supabase/client"
 
 interface UpgradeModalProps {
   open: boolean
@@ -19,12 +21,63 @@ interface UpgradeModalProps {
   currentCount: number
 }
 
-export function UpgradeModal({ open, onOpenChange, currentLimit, currentCount }: UpgradeModalProps) {
-  const router = useRouter()
+interface UserData {
+  id: string
+  email: string
+  fullName?: string
+  practiceName?: string
+}
 
-  const handleUpgrade = () => {
-    onOpenChange(false)
-    router.push('/dashboard/billing')
+export function UpgradeModal({ open, onOpenChange, currentLimit, currentCount }: UpgradeModalProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [userData, setUserData] = useState<UserData | null>(null)
+
+  // Fetch user data when modal opens
+  useEffect(() => {
+    if (open && !userData) {
+      const fetchUser = async () => {
+        const supabase = getClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user?.id && user?.email) {
+          setUserData({
+            id: user.id,
+            email: user.email,
+            fullName: user.user_metadata?.full_name || undefined,
+            practiceName: user.user_metadata?.practice_name || undefined,
+          })
+        }
+      }
+      fetchUser()
+    }
+  }, [open, userData])
+
+  const handleUpgrade = async () => {
+    if (!userData) {
+      setError("Please log in to upgrade")
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const result = await startSubscriptionCheckout("group-practice", userData)
+      
+      if (result.error) {
+        setError(result.error)
+        setIsLoading(false)
+        return
+      }
+
+      if (result.url) {
+        window.location.href = result.url
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start checkout")
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -61,17 +114,31 @@ export function UpgradeModal({ open, onOpenChange, currentLimit, currentCount }:
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-col">
+          {error && (
+            <p className="text-sm text-destructive text-center">{error}</p>
+          )}
           <Button
             onClick={handleUpgrade}
             className="w-full rounded-xl"
+            disabled={isLoading || !userData}
           >
-            Upgrade to Group Practice
-            <ArrowRight className="w-4 h-4 ml-2" />
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Starting checkout...
+              </>
+            ) : (
+              <>
+                Upgrade to Group Practice
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </>
+            )}
           </Button>
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
             className="w-full rounded-xl"
+            disabled={isLoading}
           >
             Maybe Later
           </Button>

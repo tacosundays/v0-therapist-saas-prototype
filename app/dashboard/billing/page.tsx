@@ -13,11 +13,13 @@ import {
   Calendar,
   AlertCircle,
   ExternalLink,
-  CheckCircle2
+  CheckCircle2,
+  Users
 } from "lucide-react"
 import { PRODUCTS, type Product } from "@/lib/products"
 import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout, verifyAndActivateSubscription } from "@/app/actions/stripe"
 import { getClient } from "@/lib/supabase/client"
+import { getClientLimitDisplay, getPlanLimits } from "@/lib/plan-limits"
 
 interface SubscriptionData {
   status: string
@@ -45,6 +47,7 @@ export default function BillingPage() {
   const [isPortalLoading, setIsPortalLoading] = useState(false)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [clientCount, setClientCount] = useState<number>(0)
   const hasVerified = useRef(false)
 
   // Get current user on mount
@@ -60,6 +63,14 @@ export default function BillingPage() {
           fullName: user.user_metadata?.full_name || `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || undefined,
           practiceName: user.user_metadata?.practice_name || undefined
         })
+
+        // Fetch client count
+        const { count } = await supabase
+          .from("clients")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", user.id)
+        
+        setClientCount(count || 0)
       }
     }
     fetchUser()
@@ -173,6 +184,8 @@ export default function BillingPage() {
   const currentPlan = subscriptionData?.subscription?.plan
   const currentPlanName = currentPlan ? PRODUCTS.find(p => p.id === currentPlan)?.name : null
   const hasSubscription = isActive || (isTrialing && currentPlan)
+  const planLimits = getPlanLimits(currentPlan)
+  const clientLimitDisplay = getClientLimitDisplay(currentPlan)
 
   if (isLoading) {
     return (
@@ -240,58 +253,108 @@ export default function BillingPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="grid gap-6 md:grid-cols-2"
       >
+        {/* Usage Card */}
         <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Current Subscription
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="w-5 h-5" />
+              Usage
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-lg font-semibold">
-                    {currentPlanName 
-                      ? isTrialing 
-                        ? `${currentPlanName} — Free Trial`
-                        : currentPlanName
-                      : isTrialing
-                        ? "Free Trial"
-                        : "No Active Plan"
-                    }
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="text-sm text-muted-foreground">Clients</span>
+                  <span className="text-sm font-medium">
+                    {clientCount} / {clientLimitDisplay}
                   </span>
-                  {isActive && (
-                    <Badge className="bg-primary/10 text-primary">Active</Badge>
-                  )}
-                  {isTrialing && !isActive && (
-                    <Badge variant="secondary">Trial</Badge>
-                  )}
-                  {!isActive && !isTrialing && (
-                    <Badge variant="destructive">Inactive</Badge>
-                  )}
                 </div>
-                
-                {subscriptionData?.subscription?.endDate && isActive && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4" />
-                    Renews on {new Date(subscriptionData.subscription.endDate).toLocaleDateString()}
-                  </p>
+                {planLimits.clientLimit !== null && (
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all ${
+                        clientCount >= planLimits.clientLimit 
+                          ? "bg-destructive" 
+                          : clientCount >= planLimits.clientLimit * 0.8 
+                            ? "bg-amber-500" 
+                            : "bg-primary"
+                      }`}
+                      style={{ width: `${Math.min((clientCount / planLimits.clientLimit) * 100, 100)}%` }}
+                    />
+                  </div>
                 )}
-                
-                {isTrialing && subscriptionData?.subscription?.trialEndDate && (
-                  <p className="text-sm text-amber-600 flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4" />
-                    Trial ends {new Date(subscriptionData.subscription.trialEndDate).toLocaleDateString()}
-                  </p>
+                {planLimits.clientLimit === null && (
+                  <div className="h-2 bg-primary/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full w-1/4" />
+                  </div>
                 )}
               </div>
+              {planLimits.clientLimit !== null && clientCount >= planLimits.clientLimit * 0.8 && (
+                <p className="text-xs text-amber-600">
+                  {clientCount >= planLimits.clientLimit 
+                    ? "You've reached your client limit. Upgrade for more."
+                    : "You're approaching your client limit."
+                  }
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Subscription Card */}
+        <Card className="rounded-2xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CreditCard className="w-5 h-5" />
+              Current Plan
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-lg font-semibold">
+                  {currentPlanName 
+                    ? isTrialing 
+                      ? `${currentPlanName} — Free Trial`
+                      : currentPlanName
+                    : isTrialing
+                      ? "Free Trial"
+                      : "No Active Plan"
+                  }
+                </span>
+                {isActive && (
+                  <Badge className="bg-primary/10 text-primary">Active</Badge>
+                )}
+                {isTrialing && !isActive && (
+                  <Badge variant="secondary">Trial</Badge>
+                )}
+                {!isActive && !isTrialing && (
+                  <Badge variant="destructive">Inactive</Badge>
+                )}
+              </div>
+              
+              {subscriptionData?.subscription?.endDate && isActive && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4" />
+                  Renews {new Date(subscriptionData.subscription.endDate).toLocaleDateString()}
+                </p>
+              )}
+              
+              {isTrialing && subscriptionData?.subscription?.trialEndDate && (
+                <p className="text-sm text-amber-600 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" />
+                  Trial ends {new Date(subscriptionData.subscription.trialEndDate).toLocaleDateString()}
+                </p>
+              )}
 
               {hasSubscription && (
                 <Button 
                   variant="outline" 
-                  className="rounded-xl"
+                  size="sm"
+                  className="rounded-xl mt-2"
                   onClick={handleManageSubscription}
                   disabled={isPortalLoading}
                 >
@@ -300,7 +363,7 @@ export default function BillingPage() {
                   ) : (
                     <ExternalLink className="w-4 h-4 mr-2" />
                   )}
-                  Manage Subscription
+                  Manage
                 </Button>
               )}
             </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog"
 import { getClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
+import { UpgradeModal } from "./upgrade-modal"
+import { canAddClient, getPlanLimits } from "@/lib/plan-limits"
 
 interface AddClientModalProps {
   open: boolean
@@ -27,6 +29,59 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [clientCount, setClientCount] = useState(0)
+  const [planId, setPlanId] = useState<string | null>(null)
+  const [isCheckingLimits, setIsCheckingLimits] = useState(true)
+
+  // Check plan limits when modal opens
+  useEffect(() => {
+    if (open) {
+      checkPlanLimits()
+    }
+  }, [open])
+
+  const checkPlanLimits = async () => {
+    setIsCheckingLimits(true)
+    try {
+      const supabase = getClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        setIsCheckingLimits(false)
+        return
+      }
+
+      // Get therapist subscription info
+      const { data: therapist } = await supabase
+        .from("therapists")
+        .select("subscription_plan")
+        .eq("id", user.id)
+        .single()
+
+      // Get current client count
+      const { count } = await supabase
+        .from("clients")
+        .select("*", { count: "exact", head: true })
+        .eq("therapist_id", user.id)
+
+      const currentPlan = therapist?.subscription_plan || null
+      const currentCount = count || 0
+      
+      setPlanId(currentPlan)
+      setClientCount(currentCount)
+
+      // Check if at limit
+      if (!canAddClient(currentPlan, currentCount)) {
+        onOpenChange(false)
+        setShowUpgradeModal(true)
+      }
+    } catch (err) {
+      console.error("Error checking plan limits:", err)
+    } finally {
+      setIsCheckingLimits(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,15 +157,24 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
     }
   }
 
+  const limits = getPlanLimits(planId)
+
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle>Add New Client</DialogTitle>
-          <DialogDescription>
-            Add a new client to your practice. You can assign homework after creating them.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          {isCheckingLimits ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Add New Client</DialogTitle>
+                <DialogDescription>
+                  Add a new client to your practice. You can assign homework after creating them.
+                </DialogDescription>
+              </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -180,7 +244,17 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        currentLimit={limits.clientLimit || 20}
+        currentCount={clientCount}
+      />
+    </>
   )
 }

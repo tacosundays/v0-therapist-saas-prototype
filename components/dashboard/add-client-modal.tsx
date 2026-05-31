@@ -103,16 +103,12 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       // Insert client - normalize email to lowercase for consistent lookups
       const normalizedEmail = email.trim().toLowerCase() || null
       
-      // Generate a short invite code (6 alphanumeric characters)
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-      
       const { error: insertError } = await supabase
         .from("clients")
         .insert({
           therapist_id: user.id,
           full_name: name.trim(),
           email: normalizedEmail,
-          invite_code: inviteCode,
         })
 
       if (insertError) {

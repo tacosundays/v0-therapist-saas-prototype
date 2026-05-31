@@ -21,7 +21,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [practiceName, setPracticeName] = useState("")
   const [credentials, setCredentials] = useState("")
-  const [inviteCode, setInviteCode] = useState("")
+  const [therapistEmail, setTherapistEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showVerificationMessage, setShowVerificationMessage] = useState(false)
@@ -65,32 +65,28 @@ export default function SignupPage() {
 
     const supabase = getClient()
     
-    // For clients, validate invite code first before creating account
+    // For clients, validate by checking if they exist in clients table by email
     let therapistId: string | null = null
     let existingClientId: string | null = null
     if (userType === "client") {
-      if (!inviteCode.trim()) {
-        setError("Invite code is required for client signup")
-        setIsLoading(false)
-        return
-      }
+      const normalizedEmail = email.trim().toLowerCase()
 
-      // Look up invite code in clients table to get therapist_id and client_id
+      // Look up client by email to get therapist_id and client_id
       const { data: clientData, error: clientLookupError } = await supabase
         .from("clients")
         .select("id, therapist_id, email")
-        .eq("invite_code", inviteCode.trim().toUpperCase())
+        .eq("email", normalizedEmail)
         .maybeSingle()
 
       if (clientLookupError) {
-        console.error("Error validating invite code:", clientLookupError)
-        setError("Error validating invite code. Please try again.")
+        console.error("Error validating client:", clientLookupError)
+        setError("Error validating client. Please try again.")
         setIsLoading(false)
         return
       }
 
       if (!clientData) {
-        setError("Invalid invite code. Please check with your therapist.")
+        setError("No client record found with this email. Please ask your therapist to add you first.")
         setIsLoading(false)
         return
       }
@@ -112,7 +108,6 @@ export default function SignupPage() {
           full_name: `${firstName} ${lastName}`,
           role: userType,
           credentials: userType === "therapist" ? credentials : null,
-          invite_code: userType === "client" ? inviteCode : null,
         },
       },
     })
@@ -374,16 +369,9 @@ export default function SignupPage() {
 
             {userType === "client" && (
               <div className="space-y-2">
-                <Label htmlFor="inviteCode">Invite code (from your therapist)</Label>
-                <Input
-                  id="inviteCode"
-                  type="text"
-                  placeholder="Enter your invite code"
-                  className="h-12 rounded-xl"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  disabled={isLoading}
-                />
+                <p className="text-sm text-muted-foreground">
+                  Your therapist must add you as a client first using your email address.
+                </p>
               </div>
             )}
 

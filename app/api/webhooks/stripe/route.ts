@@ -30,6 +30,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
+  // Safely convert Unix timestamps to ISO strings
+  const safeToISOString = (unixSeconds: number | null | undefined): string | null => {
+    if (!unixSeconds || typeof unixSeconds !== 'number') {
+      return null
+    }
+    try {
+      const date = new Date(unixSeconds * 1000)
+      if (isNaN(date.getTime())) {
+        return null
+      }
+      return date.toISOString()
+    } catch {
+      return null
+    }
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -59,23 +75,15 @@ export async function POST(req: NextRequest) {
           })
 
           if (therapistId) {
-            // Determine status based on subscription state
-            let subscriptionStatus = 'active'
-            if (subscription.status === 'trialing') {
-              subscriptionStatus = 'trialing'
-            } else if (subscription.status === 'active') {
-              subscriptionStatus = 'active'
-            }
+            const subscriptionStatus = subscription.status || 'active'
 
             const updateData = {
               subscription_status: subscriptionStatus,
               subscription_plan: productId || null,
               stripe_subscription_id: subscription.id,
               stripe_customer_id: session.customer as string,
-              subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
-              trial_end_date: subscription.trial_end 
-                ? new Date(subscription.trial_end * 1000).toISOString() 
-                : null,
+              subscription_end_date: safeToISOString(subscription.current_period_end),
+              trial_end_date: safeToISOString(subscription.trial_end),
             }
 
             console.log('[v0] Webhook: Updating therapist', { therapistId, updateData })
@@ -105,8 +113,8 @@ export async function POST(req: NextRequest) {
           await supabaseAdmin
             .from('therapists')
             .update({
-              subscription_status: subscription.status === 'active' ? 'active' : subscription.status,
-              subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
+              subscription_status: subscription.status || 'active',
+              subscription_end_date: safeToISOString(subscription.current_period_end),
             })
             .eq('id', therapistId)
         }

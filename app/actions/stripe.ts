@@ -231,13 +231,22 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
     const supabase = getSupabaseAdmin()
 
     // Determine subscription status based on Stripe subscription status
-    let subscriptionStatus = 'active'
-    if (subscription.status === 'trialing') {
-      subscriptionStatus = 'trialing'
-    } else if (subscription.status === 'active') {
-      subscriptionStatus = 'active'
-    } else {
-      subscriptionStatus = subscription.status
+    const subscriptionStatus = subscription.status || 'active'
+
+    // Safely convert Unix timestamps to ISO strings
+    const safeToISOString = (unixSeconds: number | null | undefined): string | null => {
+      if (!unixSeconds || typeof unixSeconds !== 'number') {
+        return null
+      }
+      try {
+        const date = new Date(unixSeconds * 1000)
+        if (isNaN(date.getTime())) {
+          return null
+        }
+        return date.toISOString()
+      } catch {
+        return null
+      }
     }
 
     // Update the therapist record with subscription info
@@ -246,10 +255,8 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
       subscription_plan: productId || null,
       stripe_subscription_id: subscription.id,
       stripe_customer_id: session.customer as string,
-      subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
-      trial_end_date: subscription.trial_end 
-        ? new Date(subscription.trial_end * 1000).toISOString() 
-        : null,
+      subscription_end_date: safeToISOString(subscription.current_period_end),
+      trial_end_date: safeToISOString(subscription.trial_end),
     }
 
     console.log('[v0] Updating therapist with:', updateData)

@@ -106,26 +106,19 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       // Generate a short invite code (6 alphanumeric characters)
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       
-      const insertData = {
-        therapist_id: user.id,
-        full_name: name.trim(),
-        email: normalizedEmail,
-        invite_code: inviteCode,
-      }
-      console.log("[v0] Inserting client:", insertData)
-      
-      const { data: insertedData, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("clients")
-        .insert(insertData)
-        .select()
+        .insert({
+          therapist_id: user.id,
+          full_name: name.trim(),
+          email: normalizedEmail,
+          invite_code: inviteCode,
+        })
 
       if (insertError) {
-        console.error("[v0] Error adding client:", insertError)
         setError(insertError.message)
         return
       }
-
-      console.log("[v0] Client added successfully:", insertedData)
       setSuccess(true)
       
       // Reset form

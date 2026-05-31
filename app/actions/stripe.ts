@@ -210,18 +210,8 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
       ? await stripe.subscriptions.retrieve(session.subscription)
       : session.subscription
 
-    console.log('[v0] Subscription details:', {
-      id: subscription.id,
-      status: subscription.status,
-      metadata: subscription.metadata,
-      current_period_end: subscription.current_period_end,
-      trial_end: subscription.trial_end
-    })
-
     const productId = subscription.metadata.product_id
     const therapistId = subscription.metadata.therapist_id
-
-    console.log('[v0] Extracted IDs:', { productId, therapistId, userId: userData.id })
 
     // Verify the therapist ID matches (if present in metadata)
     if (therapistId && therapistId !== userData.id) {
@@ -233,21 +223,31 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
     // Determine subscription status based on Stripe subscription status
     const subscriptionStatus = subscription.status || 'active'
 
-    // Safely convert Unix timestamps to ISO strings
-    const safeToISOString = (unixSeconds: number | null | undefined): string | null => {
-      if (!unixSeconds || typeof unixSeconds !== 'number') {
+    // Convert Unix timestamp (seconds) to ISO string, returns null if invalid
+    const convertUnixToISO = (unixSeconds: number | null | undefined): string | null => {
+      if (unixSeconds === null || unixSeconds === undefined) {
         return null
       }
-      try {
-        const date = new Date(unixSeconds * 1000)
-        if (isNaN(date.getTime())) {
-          return null
-        }
-        return date.toISOString()
-      } catch {
+      if (typeof unixSeconds !== 'number' || unixSeconds <= 0) {
         return null
       }
+      const date = new Date(unixSeconds * 1000)
+      if (isNaN(date.getTime())) {
+        return null
+      }
+      return date.toISOString()
     }
+
+    // Get dates from subscription
+    const subscriptionEndDate = convertUnixToISO(subscription.current_period_end)
+    const trialEndDate = convertUnixToISO(subscription.trial_end)
+
+    console.log('[v0] Date conversion:', {
+      raw_current_period_end: subscription.current_period_end,
+      raw_trial_end: subscription.trial_end,
+      converted_subscription_end_date: subscriptionEndDate,
+      converted_trial_end_date: trialEndDate,
+    })
 
     // Update the therapist record with subscription info
     const updateData = {
@@ -255,8 +255,8 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
       subscription_plan: productId || null,
       stripe_subscription_id: subscription.id,
       stripe_customer_id: session.customer as string,
-      subscription_end_date: safeToISOString(subscription.current_period_end),
-      trial_end_date: safeToISOString(subscription.trial_end),
+      subscription_end_date: subscriptionEndDate,
+      trial_end_date: trialEndDate,
     }
 
     console.log('[v0] Updating therapist with:', updateData)

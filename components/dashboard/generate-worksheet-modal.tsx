@@ -167,6 +167,7 @@ export function GenerateWorksheetModal({
           description: `AI-generated worksheet: ${topic}`,
           content: editedContent,
           category: category,
+          worksheet_type: "ai_generated",
         })
 
       if (insertError) {
@@ -231,6 +232,7 @@ export function GenerateWorksheetModal({
           description: `AI-generated worksheet: ${topic}`,
           content: editedContent,
           category: category,
+          worksheet_type: "ai_generated",
         })
         .select()
         .single()

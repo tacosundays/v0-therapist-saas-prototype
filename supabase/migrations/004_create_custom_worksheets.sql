@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS custom_worksheets (
   content text,
   file_url text,
   category text DEFAULT 'custom',
+  worksheet_type text DEFAULT 'ai_generated',
   created_at timestamptz DEFAULT now()
 );
 

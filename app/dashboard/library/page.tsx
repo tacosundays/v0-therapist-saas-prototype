@@ -6,6 +6,12 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { 
   Search,
   BookOpen,
@@ -16,10 +22,15 @@ import {
   Zap,
   Plus,
   Loader2,
-  FileText
+  FileText,
+  Sparkles,
+  ChevronDown,
+  Upload,
+  User
 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
+import { GenerateWorksheetModal } from "@/components/dashboard/generate-worksheet-modal"
 
 interface ContentItem {
   id: string
@@ -29,6 +40,7 @@ interface ContentItem {
   description: string | null
   content: string | null
   created_at: string
+  isCustom?: boolean
 }
 
 const categories = [
@@ -65,6 +77,7 @@ export default function LibraryPage() {
   // Modal state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
 
   useEffect(() => {
     fetchContent()
@@ -76,8 +89,10 @@ export default function LibraryPage() {
     
     try {
       const supabase = getClient()
+      const { data: { user } } = await supabase.auth.getUser()
       
-      const { data, error: fetchError } = await supabase
+      // Fetch built-in content
+      const { data: builtInContent, error: fetchError } = await supabase
         .from("content_library")
         .select("*")
         .order("created_at", { ascending: false })
@@ -87,7 +102,30 @@ export default function LibraryPage() {
         return
       }
 
-      setContentItems(data || [])
+      // Fetch custom worksheets if user is logged in
+      let customContent: ContentItem[] = []
+      if (user) {
+        const { data: customData } = await supabase
+          .from("custom_worksheets")
+          .select("*")
+          .eq("therapist_id", user.id)
+          .order("created_at", { ascending: false })
+
+        if (customData) {
+          customContent = customData.map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category || "custom",
+            type: "worksheet",
+            description: item.description,
+            content: item.content,
+            created_at: item.created_at,
+            isCustom: true,
+          }))
+        }
+      }
+
+      setContentItems([...customContent, ...(builtInContent || [])])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load content")
     } finally {
@@ -126,10 +164,25 @@ export default function LibraryPage() {
             }
           </p>
         </div>
-        <Button className="rounded-xl">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Custom
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="rounded-xl">
+              <Plus className="w-4 h-4 mr-2" />
+              Create
+              <ChevronDown className="w-4 h-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem onClick={() => setIsGenerateModalOpen(true)}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              Generate with AI
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Worksheet
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Search and Filter */}
@@ -196,12 +249,20 @@ export default function LibraryPage() {
                       <Badge className={`rounded-lg ${categoryColors[item.category.toLowerCase()] || "bg-muted text-muted-foreground"} border-0`}>
                         {item.category.toUpperCase()}
                       </Badge>
-                      {item.type && (
-                        <Badge variant="secondary" className="rounded-lg border-0">
-                          <TypeIcon className="w-3 h-3 mr-1" />
-                          {item.type}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {item.isCustom && (
+                          <Badge variant="outline" className="rounded-lg border-0 bg-primary/10 text-primary">
+                            <User className="w-3 h-3 mr-1" />
+                            Custom
+                          </Badge>
+                        )}
+                        {item.type && !item.isCustom && (
+                          <Badge variant="secondary" className="rounded-lg border-0">
+                            <TypeIcon className="w-3 h-3 mr-1" />
+                            {item.type}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
@@ -251,6 +312,13 @@ export default function LibraryPage() {
         onAssignmentCreated={fetchContent}
         prefilledTitle={selectedContent?.title}
         prefilledDescription={selectedContent?.description || undefined}
+      />
+
+      {/* Generate Worksheet Modal */}
+      <GenerateWorksheetModal
+        open={isGenerateModalOpen}
+        onOpenChange={setIsGenerateModalOpen}
+        onWorksheetSaved={fetchContent}
       />
     </div>
   )

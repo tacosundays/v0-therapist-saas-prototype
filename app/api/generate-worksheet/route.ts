@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     const result = await generateText({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'openai/gpt-4o-mini',
       output: Output.object({
         schema: worksheetSchema,
       }),

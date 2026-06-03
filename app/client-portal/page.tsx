@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useRef } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +24,7 @@ import {
 import { getClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { WorksheetForm } from "@/components/client-portal/worksheet-form"
+import { checkUserRole } from "@/lib/auth/check-user-role"
 
 interface Assignment {
   id: string
@@ -62,8 +63,6 @@ interface ClientRecord {
 
 function ClientPortalContent() {
   const searchParams = useSearchParams()
-  const emailParam = searchParams.get("email")
-  const isRedirecting = useRef(false)
   
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
   const [selectedWorksheetAssignment, setSelectedWorksheetAssignment] = useState<string | null>(null)
@@ -78,67 +77,26 @@ function ClientPortalContent() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (isRedirecting.current) return
-      
       const supabase = getClient()
       
-      // Check for authenticated user first
-      const { data: { session } } = await supabase.auth.getSession()
+      // Use the auth utility to get the client record
+      const roleResult = await checkUserRole()
       
-      let client = null
-      let clientError = null
-
-      if (session) {
-        // If authenticated, check role - therapists should go to dashboard
-        const userRole = session.user.user_metadata?.role
-        if (userRole === "therapist") {
-          if (!isRedirecting.current) {
-            isRedirecting.current = true
-            window.location.href = "/dashboard"
-          }
-          return
-        }
-
-        // Look up client by id = auth.uid()
-        const { data: clientData, error: lookupError } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("id", session.user.id)
-          .maybeSingle()
-
-        client = clientData
-        clientError = lookupError
-      } else if (emailParam) {
-        // Not authenticated but have email param - MVP portal link access
-        const normalizedEmail = emailParam.trim().toLowerCase()
-        
-        const { data: clientByEmail, error: emailError } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("email", normalizedEmail)
-          .maybeSingle()
-        
-        client = clientByEmail
-        clientError = emailError
-      } else {
-        setError("Please use the portal link sent by your therapist or log in.")
+      if (!roleResult.isAuthenticated) {
+        // Layout should handle redirect
+        setError("Please log in to access your portal.")
+        setIsLoading(false)
+        return
+      }
+      
+      if (roleResult.role !== "client" || !roleResult.clientRecord) {
+        // Layout should handle redirect for therapists
+        setError("Unable to find your client record.")
         setIsLoading(false)
         return
       }
 
-      if (clientError) {
-        console.error("Error fetching client:", clientError)
-        setError("Error loading your account. Please try again.")
-        setIsLoading(false)
-        return
-      }
-
-      if (!client) {
-        setError("No client record found for this email. Please contact your therapist.")
-        setIsLoading(false)
-        return
-      }
-
+      const client = roleResult.clientRecord
       setClientRecord(client)
 
       // Fetch assignments for this client
@@ -149,7 +107,7 @@ function ClientPortalContent() {
         .order("created_at", { ascending: false })
 
       if (assignmentsError) {
-        console.error("Error fetching assignments:", assignmentsError)
+        console.error("[v0] Error fetching assignments:", assignmentsError)
       }
 
       setAssignments(assignmentsData || [])
@@ -168,7 +126,7 @@ function ClientPortalContent() {
         .order("created_at", { ascending: false })
 
       if (worksheetError) {
-        console.error("Error fetching worksheet assignments:", worksheetError)
+        console.error("[v0] Error fetching worksheet assignments:", worksheetError)
       }
 
       setWorksheetAssignments(worksheetAssignmentsData || [])
@@ -176,7 +134,7 @@ function ClientPortalContent() {
     }
 
     fetchData()
-  }, [emailParam])
+  }, [])
 
   const handleMarkComplete = async () => {
     if (!selectedAssignment) return

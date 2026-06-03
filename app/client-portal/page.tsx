@@ -675,7 +675,8 @@ function ClientPortalContent() {
                           </CardContent>
                         </Card>
                       </motion.div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </motion.div>

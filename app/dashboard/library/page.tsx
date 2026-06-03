@@ -33,6 +33,7 @@ import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-moda
 import { GenerateWorksheetModal } from "@/components/dashboard/generate-worksheet-modal"
 import { CreateWorksheetModal } from "@/components/dashboard/create-worksheet-modal"
 import { AssignWorksheetModal } from "@/components/dashboard/assign-worksheet-modal"
+import { ViewWorksheetModal } from "@/components/dashboard/view-worksheet-modal"
 
 interface ContentItem {
   id: string
@@ -83,6 +84,7 @@ export default function LibraryPage() {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
   const [isCreateWorksheetOpen, setIsCreateWorksheetOpen] = useState(false)
   const [isAssignWorksheetOpen, setIsAssignWorksheetOpen] = useState(false)
+  const [isViewWorksheetOpen, setIsViewWorksheetOpen] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -161,7 +163,8 @@ export default function LibraryPage() {
     }
   }
 
-  const handleAssignClick = (item: ContentItem) => {
+  const handleAssignClick = (item: ContentItem, e?: React.MouseEvent) => {
+    e?.stopPropagation()
     if (item.isInteractive) {
       setSelectedTemplateId(item.id)
       setIsAssignWorksheetOpen(true)
@@ -169,6 +172,14 @@ export default function LibraryPage() {
       setSelectedContent(item)
       setIsAssignModalOpen(true)
     }
+  }
+
+  const handleCardClick = (item: ContentItem) => {
+    if (item.isInteractive) {
+      setSelectedTemplateId(item.id)
+      setIsViewWorksheetOpen(true)
+    }
+    // For non-interactive items, clicking does nothing (could add a detail view later)
   }
 
   const filteredContent = contentItems.filter((item) => {
@@ -280,7 +291,10 @@ export default function LibraryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="rounded-2xl h-full hover:shadow-lg transition-shadow group">
+                <Card 
+                  className={`rounded-2xl h-full hover:shadow-lg transition-shadow group ${item.isInteractive ? "cursor-pointer" : ""}`}
+                  onClick={() => handleCardClick(item)}
+                >
                   <CardContent className="p-6 flex flex-col h-full">
                     <div className="flex items-start justify-between mb-3">
                       <Badge className={`rounded-lg ${categoryColors[item.category.toLowerCase()] || "bg-muted text-muted-foreground"} border-0`}>
@@ -308,7 +322,9 @@ export default function LibraryPage() {
                       </div>
                     </div>
 
-                    <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                    <h3 
+                      className={`text-lg font-semibold text-foreground mb-2 group-hover:text-primary transition-colors ${item.isInteractive ? "cursor-pointer" : ""}`}
+                    >
                       {item.title}
                     </h3>
                     <p className="text-sm text-muted-foreground flex-1 line-clamp-3">
@@ -319,7 +335,7 @@ export default function LibraryPage() {
                       <Button 
                         size="sm" 
                         className="rounded-lg"
-                        onClick={() => handleAssignClick(item)}
+                        onClick={(e) => handleAssignClick(item, e)}
                       >
                         Assign
                       </Button>
@@ -376,6 +392,19 @@ export default function LibraryPage() {
         open={isAssignWorksheetOpen}
         onOpenChange={setIsAssignWorksheetOpen}
         onAssigned={fetchContent}
+        preselectedTemplateId={selectedTemplateId || undefined}
+      />
+
+      {/* View Worksheet Modal */}
+      <ViewWorksheetModal
+        open={isViewWorksheetOpen}
+        onOpenChange={setIsViewWorksheetOpen}
+        worksheetId={selectedTemplateId}
+        onAssign={() => {
+          setIsViewWorksheetOpen(false)
+          setIsAssignWorksheetOpen(true)
+        }}
+        onDeleted={fetchContent}
       />
     </div>
   )

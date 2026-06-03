@@ -26,6 +26,7 @@ interface AssignWorksheetModalProps {
   onOpenChange: (open: boolean) => void
   onAssigned: () => void
   preselectedClientId?: string
+  preselectedTemplateId?: string
 }
 
 interface Client {
@@ -45,7 +46,8 @@ export function AssignWorksheetModal({
   open, 
   onOpenChange, 
   onAssigned,
-  preselectedClientId 
+  preselectedClientId,
+  preselectedTemplateId 
 }: AssignWorksheetModalProps) {
   const [clients, setClients] = useState<Client[]>([])
   const [templates, setTemplates] = useState<WorksheetTemplate[]>([])
@@ -62,8 +64,11 @@ export function AssignWorksheetModal({
       if (preselectedClientId) {
         setSelectedClient(preselectedClientId)
       }
+      if (preselectedTemplateId) {
+        setSelectedTemplate(preselectedTemplateId)
+      }
     }
-  }, [open, preselectedClientId])
+  }, [open, preselectedClientId, preselectedTemplateId])
 
   const fetchData = async () => {
     setIsFetching(true)
@@ -130,7 +135,7 @@ export function AssignWorksheetModal({
 
       // Reset form
       setSelectedClient(preselectedClientId || "")
-      setSelectedTemplate("")
+      setSelectedTemplate(preselectedTemplateId || "")
       setDueDate("")
       onAssigned()
       onOpenChange(false)
@@ -144,7 +149,7 @@ export function AssignWorksheetModal({
   const handleClose = () => {
     if (!isLoading) {
       setSelectedClient(preselectedClientId || "")
-      setSelectedTemplate("")
+      setSelectedTemplate(preselectedTemplateId || "")
       setDueDate("")
       setError(null)
       onOpenChange(false)

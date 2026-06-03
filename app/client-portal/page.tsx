@@ -16,10 +16,12 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
 import Link from "next/link"
+import { WorksheetForm } from "@/components/client-portal/worksheet-form"
 
 interface Assignment {
   id: string
@@ -32,6 +34,21 @@ interface Assignment {
   reflection: string | null
   completed_at: string | null
   created_at: string
+}
+
+interface WorksheetAssignment {
+  id: string
+  therapist_id: string
+  client_id: string
+  worksheet_template_id: string
+  status: string
+  due_date: string | null
+  completed_at: string | null
+  created_at: string
+  worksheet_templates: {
+    title: string
+    description: string | null
+  }
 }
 
 interface ClientRecord {
@@ -47,9 +64,11 @@ function ClientPortalContent() {
   const isRedirecting = useRef(false)
   
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
+  const [selectedWorksheetAssignment, setSelectedWorksheetAssignment] = useState<string | null>(null)
   const [reflection, setReflection] = useState("")
   const [clientRecord, setClientRecord] = useState<ClientRecord | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -132,6 +151,25 @@ function ClientPortalContent() {
       }
 
       setAssignments(assignmentsData || [])
+
+      // Fetch worksheet assignments (interactive forms)
+      const { data: worksheetAssignmentsData, error: worksheetError } = await supabase
+        .from("worksheet_assignments")
+        .select(`
+          *,
+          worksheet_templates (
+            title,
+            description
+          )
+        `)
+        .eq("client_id", client.id)
+        .order("created_at", { ascending: false })
+
+      if (worksheetError) {
+        console.error("Error fetching worksheet assignments:", worksheetError)
+      }
+
+      setWorksheetAssignments(worksheetAssignmentsData || [])
       setIsLoading(false)
     }
 
@@ -183,6 +221,15 @@ function ClientPortalContent() {
   const pendingAssignments = assignments.filter(a => !a.completed)
   const completedAssignments = assignments.filter(a => a.completed)
 
+  // Worksheet assignments
+  const pendingWorksheetAssignments = worksheetAssignments.filter(a => a.status !== "completed")
+  const completedWorksheetAssignments = worksheetAssignments.filter(a => a.status === "completed")
+
+  // Combined counts for progress
+  const totalPending = pendingAssignments.length + pendingWorksheetAssignments.length
+  const totalCompleted = completedAssignments.length + completedWorksheetAssignments.length
+  const totalAll = totalPending + totalCompleted
+
   // Get client display name
   const displayName = clientRecord?.full_name?.split(" ")[0] || "there"
 
@@ -207,8 +254,8 @@ function ClientPortalContent() {
   }
 
   // Calculate progress
-  const totalAssignments = assignments.length
-  const completedCount = completedAssignments.length
+  const totalAssignments = totalAll
+  const completedCount = totalCompleted
   const progressPercent = totalAssignments > 0 ? Math.round((completedCount / totalAssignments) * 100) : 0
 
   if (isLoading) {
@@ -269,9 +316,9 @@ function ClientPortalContent() {
           >
             <h1 className="text-2xl font-bold text-foreground">Welcome, {displayName}</h1>
             <p className="text-muted-foreground mt-1">
-              {pendingAssignments.length === 0 
+              {totalPending === 0 
                 ? "You're all caught up!" 
-                : `You have ${pendingAssignments.length} assignment${pendingAssignments.length === 1 ? '' : 's'} waiting for you`}
+                : `You have ${totalPending} assignment${totalPending === 1 ? '' : 's'} waiting for you`}
             </p>
           </motion.div>
 
@@ -309,7 +356,18 @@ function ClientPortalContent() {
             </Card>
           </motion.div>
 
-          {selectedAssignment && currentAssignment ? (
+          {selectedWorksheetAssignment ? (
+            /* Interactive Worksheet Form View */
+            <WorksheetForm
+              assignmentId={selectedWorksheetAssignment}
+              onComplete={() => {
+                setSelectedWorksheetAssignment(null)
+                // Refresh assignments
+                window.location.reload()
+              }}
+              onBack={() => setSelectedWorksheetAssignment(null)}
+            />
+          ) : selectedAssignment && currentAssignment ? (
             /* Assignment Detail View */
             <motion.div
               initial={{ opacity: 0 }}
@@ -429,7 +487,7 @@ function ClientPortalContent() {
                   <BookOpen className="w-5 h-5 text-primary" />
                   Your Assignments
                 </h2>
-                {pendingAssignments.length === 0 ? (
+                {pendingAssignments.length === 0 && pendingWorksheetAssignments.length === 0 ? (
                   <Card className="rounded-2xl">
                     <CardContent className="p-8 text-center">
                       <CheckCircle2 className="w-12 h-12 text-primary mx-auto mb-4" />
@@ -441,6 +499,48 @@ function ClientPortalContent() {
                   </Card>
                 ) : (
                   <div className="space-y-4">
+                    {/* Interactive Worksheet Assignments */}
+                    {pendingWorksheetAssignments.map((assignment, index) => (
+                      <motion.div
+                        key={assignment.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 + index * 0.1 }}
+                      >
+                        <Card
+                          className="rounded-2xl cursor-pointer hover:shadow-lg transition-all hover:border-primary/30 border-chart-3/30"
+                          onClick={() => setSelectedWorksheetAssignment(assignment.id)}
+                        >
+                          <CardContent className="p-5">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-chart-3/20 flex items-center justify-center shrink-0">
+                                <FileText className="w-6 h-6 text-chart-3" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium text-foreground truncate">{assignment.worksheet_templates?.title}</h3>
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-chart-3/10 text-chart-3 shrink-0">
+                                    Interactive
+                                  </span>
+                                </div>
+                                {assignment.worksheet_templates?.description && (
+                                  <p className="text-sm text-muted-foreground truncate">{assignment.worksheet_templates.description}</p>
+                                )}
+                                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    Due {formatDueDate(assignment.due_date)}
+                                  </span>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+
+                    {/* Regular Assignments */}
                     {pendingAssignments.map((assignment, index) => (
                       <motion.div
                         key={assignment.id}
@@ -480,7 +580,7 @@ function ClientPortalContent() {
               </motion.div>
 
               {/* Completed Assignments */}
-              {completedAssignments.length > 0 && (
+              {(completedAssignments.length > 0 || completedWorksheetAssignments.length > 0) && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -491,6 +591,34 @@ function ClientPortalContent() {
                     Completed
                   </h2>
                   <div className="space-y-3">
+                    {/* Completed Interactive Worksheets */}
+                    {completedWorksheetAssignments.map((assignment) => (
+                      <Card 
+                        key={assignment.id} 
+                        className="rounded-2xl bg-muted/30"
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-chart-3/20 flex items-center justify-center">
+                              <CheckCircle2 className="w-5 h-5 text-chart-3" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-foreground">{assignment.worksheet_templates?.title}</p>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-chart-3/10 text-chart-3">
+                                  Interactive
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Completed {assignment.completed_at ? new Date(assignment.completed_at).toLocaleDateString() : ""}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+
+                    {/* Completed Regular Assignments */}
                     {completedAssignments.map((assignment) => (
                       <Card 
                         key={assignment.id} 

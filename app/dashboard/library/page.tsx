@@ -31,6 +31,8 @@ import {
 import { getClient } from "@/lib/supabase/client"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { GenerateWorksheetModal } from "@/components/dashboard/generate-worksheet-modal"
+import { CreateWorksheetModal } from "@/components/dashboard/create-worksheet-modal"
+import { AssignWorksheetModal } from "@/components/dashboard/assign-worksheet-modal"
 
 interface ContentItem {
   id: string
@@ -41,6 +43,7 @@ interface ContentItem {
   content: string | null
   created_at: string
   isCustom?: boolean
+  isInteractive?: boolean
 }
 
 const categories = [
@@ -78,6 +81,9 @@ export default function LibraryPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+  const [isCreateWorksheetOpen, setIsCreateWorksheetOpen] = useState(false)
+  const [isAssignWorksheetOpen, setIsAssignWorksheetOpen] = useState(false)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchContent()
@@ -123,6 +129,28 @@ export default function LibraryPage() {
             isCustom: true,
           }))
         }
+
+        // Fetch interactive worksheet templates
+        const { data: templatesData } = await supabase
+          .from("worksheet_templates")
+          .select("*")
+          .eq("therapist_id", user.id)
+          .order("created_at", { ascending: false })
+
+        if (templatesData) {
+          const templateItems: ContentItem[] = templatesData.map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category || "custom",
+            type: "interactive",
+            description: item.description,
+            content: null,
+            created_at: item.created_at,
+            isCustom: true,
+            isInteractive: true,
+          }))
+          customContent = [...templateItems, ...customContent]
+        }
       }
 
       setContentItems([...customContent, ...(builtInContent || [])])
@@ -134,8 +162,13 @@ export default function LibraryPage() {
   }
 
   const handleAssignClick = (item: ContentItem) => {
-    setSelectedContent(item)
-    setIsAssignModalOpen(true)
+    if (item.isInteractive) {
+      setSelectedTemplateId(item.id)
+      setIsAssignWorksheetOpen(true)
+    } else {
+      setSelectedContent(item)
+      setIsAssignModalOpen(true)
+    }
   }
 
   const filteredContent = contentItems.filter((item) => {
@@ -173,13 +206,17 @@ export default function LibraryPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem onClick={() => setIsCreateWorksheetOpen(true)}>
+              <FileText className="w-4 h-4 mr-2" />
+              Create Online Worksheet
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsGenerateModalOpen(true)}>
               <Sparkles className="w-4 h-4 mr-2" />
               Generate with AI
             </DropdownMenuItem>
             <DropdownMenuItem disabled>
               <Upload className="w-4 h-4 mr-2" />
-              Upload Worksheet
+              Upload PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -250,7 +287,13 @@ export default function LibraryPage() {
                         {item.category.toUpperCase()}
                       </Badge>
                       <div className="flex items-center gap-1">
-                        {item.isCustom && (
+                        {item.isInteractive && (
+                          <Badge variant="outline" className="rounded-lg border-0 bg-chart-3/10 text-chart-3">
+                            <FileText className="w-3 h-3 mr-1" />
+                            Interactive
+                          </Badge>
+                        )}
+                        {item.isCustom && !item.isInteractive && (
                           <Badge variant="outline" className="rounded-lg border-0 bg-primary/10 text-primary">
                             <User className="w-3 h-3 mr-1" />
                             Custom
@@ -319,6 +362,20 @@ export default function LibraryPage() {
         open={isGenerateModalOpen}
         onOpenChange={setIsGenerateModalOpen}
         onWorksheetSaved={fetchContent}
+      />
+
+      {/* Create Online Worksheet Modal */}
+      <CreateWorksheetModal
+        open={isCreateWorksheetOpen}
+        onOpenChange={setIsCreateWorksheetOpen}
+        onWorksheetCreated={fetchContent}
+      />
+
+      {/* Assign Interactive Worksheet Modal */}
+      <AssignWorksheetModal
+        open={isAssignWorksheetOpen}
+        onOpenChange={setIsAssignWorksheetOpen}
+        onAssigned={fetchContent}
       />
     </div>
   )

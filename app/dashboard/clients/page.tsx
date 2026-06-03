@@ -28,6 +28,8 @@ import {
 import { getClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
+import { AssignWorksheetModal } from "@/components/dashboard/assign-worksheet-modal"
+import { ViewResponsesModal } from "@/components/dashboard/view-responses-modal"
 
 interface Client {
   id: string
@@ -48,6 +50,16 @@ interface Assignment {
   completed_at: string | null
 }
 
+interface WorksheetAssignment {
+  id: string
+  client_id: string
+  status: string
+  completed_at: string | null
+  worksheet_templates: {
+    title: string
+  }
+}
+
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all")
@@ -57,8 +69,12 @@ export default function ClientsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
+  const [isAssignWorksheetOpen, setIsAssignWorksheetOpen] = useState(false)
+  const [isViewResponsesOpen, setIsViewResponsesOpen] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined)
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [copiedClientId, setCopiedClientId] = useState<string | null>(null)
+  const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
@@ -99,8 +115,23 @@ export default function ClientsPage() {
         // Don't fail completely, just log it
       }
 
+      // Fetch worksheet assignments
+      const { data: worksheetAssignmentsData } = await supabase
+        .from("worksheet_assignments")
+        .select(`
+          id,
+          client_id,
+          status,
+          completed_at,
+          worksheet_templates (
+            title
+          )
+        `)
+        .eq("therapist_id", user.id)
+
       setClients(clientsData || [])
       setAssignments(assignmentsData || [])
+      setWorksheetAssignments(worksheetAssignmentsData || [])
     } catch (err) {
       console.error("Exception fetching data:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
@@ -126,6 +157,16 @@ export default function ClientsPage() {
     setIsAssignModalOpen(true)
   }
 
+  const openAssignWorksheetModal = (clientId?: string) => {
+    setSelectedClientId(clientId)
+    setIsAssignWorksheetOpen(true)
+  }
+
+  const viewWorksheetResponses = (assignmentId: string) => {
+    setSelectedAssignmentId(assignmentId)
+    setIsViewResponsesOpen(true)
+  }
+
   const copyPortalLink = (clientEmail: string, clientId: string) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
     const portalUrl = `${baseUrl}/client-portal?email=${encodeURIComponent(clientEmail)}`
@@ -139,8 +180,11 @@ export default function ClientsPage() {
   // Get assignment stats for a client
   const getClientStats = (clientId: string) => {
     const clientAssignments = assignments.filter(a => a.client_id === clientId)
-    const total = clientAssignments.length
-    const completed = clientAssignments.filter(a => a.completed).length
+    const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === clientId)
+    
+    const total = clientAssignments.length + clientWorksheetAssignments.length
+    const completed = clientAssignments.filter(a => a.completed).length + 
+                      clientWorksheetAssignments.filter(a => a.status === "completed").length
     const active = total - completed
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : null
     
@@ -156,8 +200,11 @@ export default function ClientsPage() {
       .filter(a => a.reflection && a.completed_at)
       .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     const latestReflection = assignmentsWithReflections[0] || null
+
+    // Get completed worksheet assignments for this client
+    const completedWorksheets = clientWorksheetAssignments.filter(a => a.status === "completed")
     
-    return { total, completed, active, completionRate, overdue, latestReflection }
+    return { total, completed, active, completionRate, overdue, latestReflection, completedWorksheets }
   }
 
   const filteredClients = clients.filter((client) => {
@@ -302,6 +349,9 @@ export default function ClientsPage() {
                           <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
                             Assign Homework
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openAssignWorksheetModal(client.id)}>
+                            Assign Online Worksheet
+                          </DropdownMenuItem>
                           {client.email && (
                             <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
                               <LinkIcon className="w-4 h-4 mr-2" />
@@ -373,11 +423,33 @@ export default function ClientsPage() {
                             {stats.latestReflection.reflection}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            on {stats.latestReflection.title}
-                          </p>
+                                on {stats.latestReflection.title}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Completed Worksheets */}
+                          {stats.completedWorksheets.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <FileText className="w-3 h-3" />
+                                Completed worksheets
+                              </p>
+                              {stats.completedWorksheets.slice(0, 2).map(ws => (
+                                <Button
+                                  key={ws.id}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start text-xs h-8 rounded-lg bg-muted/30"
+                                  onClick={() => viewWorksheetResponses(ws.id)}
+                                >
+                                  <CheckCircle2 className="w-3 h-3 mr-2 text-primary" />
+                                  {ws.worksheet_templates?.title}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
                     <div className="flex gap-2 mt-4">
                       {client.email && (
@@ -425,6 +497,21 @@ export default function ClientsPage() {
         onOpenChange={setIsAssignModalOpen}
         onAssignmentCreated={handleAssignmentCreated}
         preselectedClientId={selectedClientId}
+      />
+
+      {/* Assign Online Worksheet Modal */}
+      <AssignWorksheetModal
+        open={isAssignWorksheetOpen}
+        onOpenChange={setIsAssignWorksheetOpen}
+        onAssigned={handleAssignmentCreated}
+        preselectedClientId={selectedClientId}
+      />
+
+      {/* View Worksheet Responses Modal */}
+      <ViewResponsesModal
+        open={isViewResponsesOpen}
+        onOpenChange={setIsViewResponsesOpen}
+        assignmentId={selectedAssignmentId}
       />
     </div>
   )

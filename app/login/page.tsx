@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
+import { checkUserRole } from "@/lib/auth/check-user-role"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -18,27 +19,36 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
 
-  // Check session once on mount - if already logged in, redirect
+  // Check session once on mount - if already logged in, redirect based on role
   useEffect(() => {
     let isMounted = true
     
     const checkSession = async () => {
-      const supabase = getClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log("[v0] Login page: Checking existing session")
+      
+      const result = await checkUserRole()
       
       if (!isMounted) return
       
-      if (session) {
-        // Check user role from metadata
-        const userRole = session.user?.user_metadata?.role
-        if (userRole === "client") {
-          window.location.href = "/portal"
+      console.log("[v0] Login page: Session check result:", {
+        isAuthenticated: result.isAuthenticated,
+        role: result.role,
+        userId: result.user?.id,
+        email: result.user?.email
+      })
+      
+      if (result.isAuthenticated) {
+        if (result.role === "client") {
+          console.log("[v0] Login page: Already logged in as client, redirecting to /client-portal")
+          window.location.href = "/client-portal"
         } else {
+          console.log("[v0] Login page: Already logged in as therapist, redirecting to /dashboard")
           window.location.href = "/dashboard"
         }
         return
       }
       
+      console.log("[v0] Login page: No existing session, showing login form")
       setIsCheckingSession(false)
     }
     
@@ -57,33 +67,43 @@ export default function LoginPage() {
     try {
       const supabase = getClient()
       
+      console.log("[v0] Login: Attempting sign in for email:", email)
+      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (signInError) {
-        console.error("login error", signInError)
+        console.error("[v0] Login: Sign in error:", signInError.message)
         setError(signInError.message)
+        setIsLoading(false)
         return
       }
 
-      console.log("login success", data)
+      console.log("[v0] Login: Sign in success, user id:", data.user?.id)
+      console.log("[v0] Login: User email:", data.user?.email)
+      console.log("[v0] Login: User role from metadata:", data.user?.user_metadata?.role)
       
-      // Check user role from metadata to determine redirect
-      const userRole = data.user?.user_metadata?.role
+      // Use the auth utility to determine role and redirect
+      const result = await checkUserRole()
       
-      if (userRole === "client") {
-        // Client - redirect to portal (will look up by id = auth.uid())
-        window.location.href = "/portal"
+      console.log("[v0] Login: Role check result:", {
+        role: result.role,
+        hasTherapistRecord: !!result.therapistRecord,
+        hasClientRecord: !!result.clientRecord
+      })
+      
+      if (result.role === "client") {
+        console.log("[v0] Login: Redirecting to /client-portal")
+        window.location.href = "/client-portal"
       } else {
-        // Therapist (default) - redirect to dashboard
+        console.log("[v0] Login: Redirecting to /dashboard")
         window.location.href = "/dashboard"
       }
     } catch (err) {
-      console.error("login error", err)
+      console.error("[v0] Login: Unexpected error:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
-    } finally {
       setIsLoading(false)
     }
   }

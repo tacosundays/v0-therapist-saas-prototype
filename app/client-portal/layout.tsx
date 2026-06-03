@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { getClient } from "@/lib/supabase/client"
 import { Loader2, Brain, LogOut, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,37 +16,36 @@ export default function ClientPortalLayout({
   const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [clientName, setClientName] = useState<string | null>(null)
-  const isRedirecting = useRef(false)
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (isRedirecting.current) return
+      console.log("[v0] Client portal layout: Starting auth check")
       
       const result = await checkUserRole()
       
+      console.log("[v0] Client portal layout: Auth result:", {
+        isAuthenticated: result.isAuthenticated,
+        role: result.role,
+        hasClientRecord: !!result.clientRecord
+      })
+      
       // Not authenticated - redirect to login
       if (!result.isAuthenticated) {
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          console.log("[v0] Not authenticated, redirecting to login")
-          window.location.href = "/login"
-        }
+        console.log("[v0] Client portal layout: Not authenticated, redirecting to /login")
+        window.location.href = "/login"
         return
       }
       
       // User is a therapist - redirect to dashboard
       if (result.role === "therapist") {
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          console.log("[v0] User is therapist, redirecting to dashboard")
-          window.location.href = "/dashboard"
-        }
+        console.log("[v0] Client portal layout: User is therapist, redirecting to /dashboard")
+        window.location.href = "/dashboard"
         return
       }
       
       // User is a client - allow access
       if (result.role === "client" && result.clientRecord) {
-        console.log("[v0] User is client, allowing access to client-portal")
+        console.log("[v0] Client portal layout: User is client, allowing access")
         setClientName(result.clientRecord.full_name)
         setIsAuthorized(true)
         setIsChecking(false)
@@ -54,7 +53,7 @@ export default function ClientPortalLayout({
       }
       
       // Unknown role - show error instead of redirecting
-      console.log("[v0] Unknown role, showing error")
+      console.log("[v0] Client portal layout: Unknown role, showing error")
       setError(result.error || "Unable to determine your account type. Please contact your therapist.")
       setIsChecking(false)
     }

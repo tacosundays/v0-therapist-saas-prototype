@@ -1,10 +1,13 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
-import { getClient } from "@/lib/supabase/client"
-import { Loader2 } from "lucide-react"
+import { Loader2, AlertCircle } from "lucide-react"
+import { checkUserRole } from "@/lib/auth/check-user-role"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export default function DashboardLayout({
   children,
@@ -13,78 +16,43 @@ export default function DashboardLayout({
 }) {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const isRedirecting = useRef(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (isRedirecting.current) return
+      console.log("[v0] Dashboard layout: Starting auth check")
       
-      const supabase = getClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      const result = await checkUserRole()
+      
+      console.log("[v0] Dashboard layout: Auth result:", {
+        isAuthenticated: result.isAuthenticated,
+        role: result.role,
+        hasTherapistRecord: !!result.therapistRecord,
+        hasClientRecord: !!result.clientRecord
+      })
 
-      if (!session) {
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          window.location.href = "/login"
-        }
+      if (!result.isAuthenticated) {
+        console.log("[v0] Dashboard layout: Not authenticated, redirecting to /login")
+        window.location.href = "/login"
         return
       }
 
-      const user = session.user
-
-      // Check user role from metadata
-      const userRole = user.user_metadata?.role
-      if (userRole === "client") {
-        // Clients should not access the dashboard
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          window.location.href = "/portal"
-        }
+      if (result.role === "client") {
+        console.log("[v0] Dashboard layout: User is client, redirecting to /client-portal")
+        window.location.href = "/client-portal"
         return
       }
 
-      // For therapists, check if they exist in the therapists table
-      // If not found, they might be a new signup - allow access anyway
-      // The therapist record may not exist yet due to race condition
-      const { data: therapist } = await supabase
-        .from("therapists")
-        .select("id")
-        .eq("id", user.id)
-        .maybeSingle()
-
-      if (!therapist) {
-        // Check if user is actually a client
-        const { data: client } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("id", user.id)
-          .maybeSingle()
-
-        if (client) {
-          if (!isRedirecting.current) {
-            isRedirecting.current = true
-            window.location.href = "/portal"
-          }
-          return
-        }
-
-        // If role is therapist but no record exists yet, allow access
-        // This handles the race condition after signup
-        if (userRole === "therapist") {
-          setIsAuthorized(true)
-          setIsChecking(false)
-          return
-        }
-
-        // Unknown user type, redirect to login
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          window.location.href = "/login"
-        }
+      if (result.role === "therapist" || result.therapistRecord) {
+        console.log("[v0] Dashboard layout: User is therapist, authorizing")
+        setIsAuthorized(true)
+        setIsChecking(false)
         return
       }
 
-      setIsAuthorized(true)
+      // Unknown role - show error
+      console.log("[v0] Dashboard layout: Unknown role, showing error")
+      setError("Unable to determine your account type. Please contact support.")
       setIsChecking(false)
     }
 
@@ -94,7 +62,29 @@ export default function DashboardLayout({
   if (isChecking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Checking your account...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full rounded-2xl">
+          <CardContent className="p-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-6 h-6 text-destructive" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Account Error</h2>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <Button asChild className="rounded-xl">
+              <Link href="/login">Back to Login</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }

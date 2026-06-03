@@ -4,6 +4,7 @@ export type UserRole = "therapist" | "client" | "unknown"
 
 export interface UserRoleResult {
   isAuthenticated: boolean
+  user: { id: string; email: string | null } | null
   userId: string | null
   userEmail: string | null
   role: UserRole
@@ -26,6 +27,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     console.log("[v0] Auth session error:", sessionError.message)
     return {
       isAuthenticated: false,
+      user: null,
       userId: null,
       userEmail: null,
       role: "unknown",
@@ -39,6 +41,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     console.log("[v0] No session found")
     return {
       isAuthenticated: false,
+      user: null,
       userId: null,
       userEmail: null,
       role: "unknown",
@@ -75,6 +78,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     console.log("[v0] Final redirect destination: /dashboard (therapist)")
     return {
       isAuthenticated: true,
+      user: { id: userId, email: userEmail },
       userId,
       userEmail,
       role: "therapist",
@@ -126,6 +130,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     console.log("[v0] Final redirect destination: /client-portal (client)")
     return {
       isAuthenticated: true,
+      user: { id: userId, email: userEmail },
       userId,
       userEmail,
       role: "client",
@@ -141,6 +146,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     console.log("[v0] Final redirect destination: /dashboard (new therapist)")
     return {
       isAuthenticated: true,
+      user: { id: userId, email: userEmail },
       userId,
       userEmail,
       role: "therapist",
@@ -154,6 +160,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
   console.log("[v0] Final redirect destination: none (unknown role)")
   return {
     isAuthenticated: true,
+    user: { id: userId, email: userEmail },
     userId,
     userEmail,
     role: "unknown",

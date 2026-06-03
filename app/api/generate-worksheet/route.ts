@@ -10,6 +10,12 @@ const worksheetSchema = z.object({
     instructions: z.string(),
   })).describe('Practical exercises with clear instructions'),
   journalPrompts: z.array(z.string()).describe('Journal prompts for deeper self-exploration'),
+  // Interactive form questions
+  interactiveQuestions: z.array(z.object({
+    questionText: z.string().describe('The question to ask the client'),
+    questionType: z.enum(['short_text', 'long_text', 'scale', 'multiple_choice']).describe('Type of input field'),
+    options: z.array(z.string()).nullable().describe('Options for multiple_choice type, null for others'),
+  })).describe('5-8 interactive questions for the client to complete online'),
 })
 
 export async function POST(req: Request) {
@@ -48,7 +54,14 @@ Generate a complete worksheet including:
 2. Educational content explaining the topic and its relevance (2-3 paragraphs)
 3. 3-5 reflection questions
 4. 2-4 practical exercises with clear instructions
-5. 3-5 journal prompts for deeper exploration`,
+5. 3-5 journal prompts for deeper exploration
+6. 5-8 interactive questions for an online fillable form. Include a mix of:
+   - short_text: Brief answers (1-2 sentences)
+   - long_text: Extended reflection responses
+   - scale: Rate on a scale of 1-10 (include the scale description in the question)
+   - multiple_choice: Select from options (provide 3-5 relevant options)
+   
+Make the interactive questions actionable and directly related to the therapeutic goal.`,
     })
 
     return Response.json({ worksheet: result.output })

@@ -37,6 +37,11 @@ interface GeneratedWorksheet {
   reflectionQuestions: string[]
   exercises: { title: string; instructions: string }[]
   journalPrompts: string[]
+  interactiveQuestions: {
+    questionText: string
+    questionType: 'short_text' | 'long_text' | 'scale' | 'multiple_choice'
+    options: string[] | null
+  }[]
 }
 
 interface Client {
@@ -159,19 +164,40 @@ export function GenerateWorksheetModal({
         return
       }
 
-      const { error: insertError } = await supabase
-        .from("custom_worksheets")
+      // Save as worksheet template
+      const { data: template, error: templateError } = await supabase
+        .from("worksheet_templates")
         .insert({
           therapist_id: user.id,
           title: editedTitle || worksheet.title,
           description: `AI-generated worksheet: ${topic}`,
-          content: editedContent,
           category: category,
-          worksheet_type: "ai_generated",
+          source_type: "ai",
         })
+        .select()
+        .single()
 
-      if (insertError) {
-        setError(insertError.message)
+      if (templateError) {
+        setError(templateError.message)
+        return
+      }
+
+      // Save interactive questions
+      const questionsToInsert = worksheet.interactiveQuestions.map((q, index) => ({
+        worksheet_template_id: template.id,
+        question_text: q.questionText,
+        question_type: q.questionType,
+        options: q.options ? { choices: q.options } : null,
+        required: true,
+        order_index: index,
+      }))
+
+      const { error: questionsError } = await supabase
+        .from("worksheet_questions")
+        .insert(questionsToInsert)
+
+      if (questionsError) {
+        setError(questionsError.message)
         return
       }
 
@@ -223,33 +249,51 @@ export function GenerateWorksheetModal({
         return
       }
 
-      // Save to custom worksheets
-      const { data: savedWorksheet, error: insertError } = await supabase
-        .from("custom_worksheets")
+      // Save as worksheet template
+      const { data: template, error: templateError } = await supabase
+        .from("worksheet_templates")
         .insert({
           therapist_id: user.id,
           title: editedTitle || worksheet.title,
           description: `AI-generated worksheet: ${topic}`,
-          content: editedContent,
           category: category,
-          worksheet_type: "ai_generated",
+          source_type: "ai",
         })
         .select()
         .single()
 
-      if (insertError) {
-        setError(insertError.message)
+      if (templateError) {
+        setError(templateError.message)
         return
       }
 
-      // Create assignment
+      // Save interactive questions
+      const questionsToInsert = worksheet.interactiveQuestions.map((q, index) => ({
+        worksheet_template_id: template.id,
+        question_text: q.questionText,
+        question_type: q.questionType,
+        options: q.options ? { choices: q.options } : null,
+        required: true,
+        order_index: index,
+      }))
+
+      const { error: questionsError } = await supabase
+        .from("worksheet_questions")
+        .insert(questionsToInsert)
+
+      if (questionsError) {
+        setError(questionsError.message)
+        return
+      }
+
+      // Create worksheet assignment (not regular assignment)
       const { error: assignError } = await supabase
-        .from("assignments")
+        .from("worksheet_assignments")
         .insert({
           therapist_id: user.id,
           client_id: selectedClientId,
-          title: editedTitle || worksheet.title,
-          description: editedContent.substring(0, 500) + "...",
+          worksheet_template_id: template.id,
+          status: "assigned",
         })
 
       if (assignError) {
@@ -411,6 +455,24 @@ export function GenerateWorksheetModal({
                     <li key={i}>{p}</li>
                   ))}
                 </ol>
+
+                <h4 className="text-base font-semibold mt-4">Interactive Questions</h4>
+                <p className="text-xs text-muted-foreground mb-2">
+                  These questions will appear in the online form for your client to complete.
+                </p>
+                <div className="space-y-2">
+                  {worksheet.interactiveQuestions.map((q, i) => (
+                    <div key={i} className="p-3 bg-muted/30 rounded-xl">
+                      <p className="text-sm font-medium">{i + 1}. {q.questionText}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Type: {q.questionType.replace('_', ' ')}
+                        {q.options && q.options.length > 0 && (
+                          <span> | Options: {q.options.join(', ')}</span>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {error && (

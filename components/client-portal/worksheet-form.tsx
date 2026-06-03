@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,13 +9,17 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import { getClient } from "@/lib/supabase/client"
 import { 
   Loader2, 
   CheckCircle2,
   ArrowLeft,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Save,
+  Cloud,
+  CloudOff
 } from "lucide-react"
 import { motion } from "framer-motion"
 
@@ -53,10 +57,93 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [saveError, setSaveError] = useState(false)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasUnsavedChanges = useRef(false)
 
   useEffect(() => {
     fetchWorksheetData()
   }, [assignmentId])
+
+  // Auto-save function
+  const saveProgress = useCallback(async (answersToSave: Record<string, string | string[] | number>) => {
+    if (Object.keys(answersToSave).length === 0) return
+
+    setIsSaving(true)
+    setSaveError(false)
+
+    try {
+      const supabase = getClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        setSaveError(true)
+        return
+      }
+
+      // Upsert responses (delete existing and insert new)
+      const responses = Object.entries(answersToSave).map(([questionId, answer]) => {
+        const isComplex = Array.isArray(answer) || typeof answer === "number"
+        return {
+          assignment_id: assignmentId,
+          client_id: user.id,
+          question_id: questionId,
+          answer_text: isComplex ? null : String(answer),
+          answer_json: isComplex ? answer : null,
+        }
+      })
+
+      // Delete existing responses for questions we're updating
+      const questionIds = Object.keys(answersToSave)
+      await supabase
+        .from("worksheet_responses")
+        .delete()
+        .eq("assignment_id", assignmentId)
+        .in("question_id", questionIds)
+
+      // Insert new responses
+      const { error: insertError } = await supabase
+        .from("worksheet_responses")
+        .insert(responses)
+
+      if (insertError) throw insertError
+
+      // Update assignment status to in_progress if not already
+      await supabase
+        .from("worksheet_assignments")
+        .update({ status: "in_progress" })
+        .eq("id", assignmentId)
+        .eq("status", "assigned")
+
+      setLastSaved(new Date())
+      hasUnsavedChanges.current = false
+    } catch (err) {
+      console.error("Auto-save error:", err)
+      setSaveError(true)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [assignmentId])
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (hasUnsavedChanges.current && Object.keys(answers).length > 0) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        saveProgress(answers)
+      }, 2000) // Save after 2 seconds of inactivity
+    }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [answers, saveProgress])
 
   const fetchWorksheetData = async () => {
     setIsLoading(true)
@@ -117,7 +204,17 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
   const updateAnswer = (questionId: string, value: string | string[] | number) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
+    hasUnsavedChanges.current = true
   }
+
+  // Calculate progress percentage
+  const answeredCount = questions.filter(q => {
+    const answer = answers[q.id]
+    if (answer === undefined || answer === null || answer === "") return false
+    if (Array.isArray(answer) && answer.length === 0) return false
+    return true
+  }).length
+  const progressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0
 
   const handleSubmit = async () => {
     // Validate required questions
@@ -368,13 +465,34 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
       <Card className="rounded-2xl">
         <CardHeader>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            {assignment?.due_date && (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                Due {new Date(assignment.due_date).toLocaleDateString()}
-              </span>
-            )}
+          <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+            <div className="flex items-center gap-2">
+              {assignment?.due_date && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Due {new Date(assignment.due_date).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            {/* Auto-save status */}
+            <div className="flex items-center gap-1.5 text-xs">
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : saveError ? (
+                <>
+                  <CloudOff className="w-3 h-3 text-destructive" />
+                  <span className="text-destructive">Save failed</span>
+                </>
+              ) : lastSaved ? (
+                <>
+                  <Cloud className="w-3 h-3 text-primary" />
+                  <span>Saved</span>
+                </>
+              ) : null}
+            </div>
           </div>
           <CardTitle className="text-xl">{assignment?.worksheet_templates?.title}</CardTitle>
           {assignment?.worksheet_templates?.description && (
@@ -382,6 +500,14 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
               {assignment.worksheet_templates.description}
             </p>
           )}
+          {/* Progress bar */}
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{answeredCount} of {questions.length} questions</span>
+            </div>
+            <Progress value={progressPercent} className="h-2" />
+          </div>
         </CardHeader>
       </Card>
 

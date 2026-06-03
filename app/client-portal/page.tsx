@@ -17,7 +17,9 @@ import {
   Loader2,
   AlertCircle,
   ArrowLeft,
-  FileText
+  FileText,
+  AlertTriangle,
+  PlayCircle
 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -221,12 +223,25 @@ function ClientPortalContent() {
   const pendingAssignments = assignments.filter(a => !a.completed)
   const completedAssignments = assignments.filter(a => a.completed)
 
-  // Worksheet assignments
-  const pendingWorksheetAssignments = worksheetAssignments.filter(a => a.status !== "completed")
+  // Worksheet assignments - categorize by status
+  const inProgressWorksheetAssignments = worksheetAssignments.filter(a => a.status === "in_progress")
+  const pendingWorksheetAssignments = worksheetAssignments.filter(a => a.status === "assigned" || a.status === "overdue")
   const completedWorksheetAssignments = worksheetAssignments.filter(a => a.status === "completed")
 
+  // Check for overdue items
+  const now = new Date()
+  const overdueRegularAssignments = pendingAssignments.filter(a => {
+    if (!a.due_date) return false
+    return new Date(a.due_date) < now
+  })
+  const overdueWorksheetAssignments = [...inProgressWorksheetAssignments, ...pendingWorksheetAssignments].filter(a => {
+    if (!a.due_date) return false
+    return new Date(a.due_date) < now
+  })
+  const totalOverdue = overdueRegularAssignments.length + overdueWorksheetAssignments.length
+
   // Combined counts for progress
-  const totalPending = pendingAssignments.length + pendingWorksheetAssignments.length
+  const totalPending = pendingAssignments.length + pendingWorksheetAssignments.length + inProgressWorksheetAssignments.length
   const totalCompleted = completedAssignments.length + completedWorksheetAssignments.length
   const totalAll = totalPending + totalCompleted
 
@@ -321,6 +336,33 @@ function ClientPortalContent() {
                 : `You have ${totalPending} assignment${totalPending === 1 ? '' : 's'} waiting for you`}
             </p>
           </motion.div>
+
+          {/* Overdue Alert */}
+          {totalOverdue > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+            >
+              <Card className="rounded-2xl border-destructive/50 bg-destructive/5">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-destructive">
+                        {totalOverdue} overdue assignment{totalOverdue === 1 ? '' : 's'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Please complete these as soon as possible
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Progress Card */}
           <motion.div
@@ -487,7 +529,7 @@ function ClientPortalContent() {
                   <BookOpen className="w-5 h-5 text-primary" />
                   Your Assignments
                 </h2>
-                {pendingAssignments.length === 0 && pendingWorksheetAssignments.length === 0 ? (
+                {pendingAssignments.length === 0 && pendingWorksheetAssignments.length === 0 && inProgressWorksheetAssignments.length === 0 ? (
                   <Card className="rounded-2xl">
                     <CardContent className="p-8 text-center">
                       <CheckCircle2 className="w-12 h-12 text-primary mx-auto mb-4" />
@@ -499,49 +541,108 @@ function ClientPortalContent() {
                   </Card>
                 ) : (
                   <div className="space-y-4">
-                    {/* Interactive Worksheet Assignments */}
-                    {pendingWorksheetAssignments.map((assignment, index) => (
-                      <motion.div
-                        key={assignment.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 + index * 0.1 }}
-                      >
-                        <Card
-                          className="rounded-2xl cursor-pointer hover:shadow-lg transition-all hover:border-primary/30 border-chart-3/30"
-                          onClick={() => setSelectedWorksheetAssignment(assignment.id)}
+                    {/* In Progress Worksheet Assignments */}
+                    {inProgressWorksheetAssignments.map((assignment, index) => {
+                      const isOverdue = assignment.due_date && new Date(assignment.due_date) < now
+                      return (
+                        <motion.div
+                          key={assignment.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3 + index * 0.1 }}
                         >
-                          <CardContent className="p-5">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-chart-3/20 flex items-center justify-center shrink-0">
-                                <FileText className="w-6 h-6 text-chart-3" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-medium text-foreground truncate">{assignment.worksheet_templates?.title}</h3>
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-chart-3/10 text-chart-3 shrink-0">
-                                    Interactive
-                                  </span>
+                          <Card
+                            className={`rounded-2xl cursor-pointer hover:shadow-lg transition-all ${isOverdue ? "border-destructive/50 hover:border-destructive" : "border-primary/30 hover:border-primary"}`}
+                            onClick={() => setSelectedWorksheetAssignment(assignment.id)}
+                          >
+                            <CardContent className="p-5">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isOverdue ? "bg-destructive/20" : "bg-primary/20"}`}>
+                                  <PlayCircle className={`w-6 h-6 ${isOverdue ? "text-destructive" : "text-primary"}`} />
                                 </div>
-                                {assignment.worksheet_templates?.description && (
-                                  <p className="text-sm text-muted-foreground truncate">{assignment.worksheet_templates.description}</p>
-                                )}
-                                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    Due {formatDueDate(assignment.due_date)}
-                                  </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-medium text-foreground truncate">{assignment.worksheet_templates?.title}</h3>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                                      In Progress
+                                    </span>
+                                    {isOverdue && (
+                                      <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive shrink-0">
+                                        Overdue
+                                      </span>
+                                    )}
+                                  </div>
+                                  {assignment.worksheet_templates?.description && (
+                                    <p className="text-sm text-muted-foreground truncate">{assignment.worksheet_templates.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      Due {formatDueDate(assignment.due_date)}
+                                    </span>
+                                  </div>
                                 </div>
+                                <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
                               </div>
-                              <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      )
+                    })}
+
+                    {/* Not Started Interactive Worksheet Assignments */}
+                    {pendingWorksheetAssignments.map((assignment, index) => {
+                      const isOverdue = assignment.due_date && new Date(assignment.due_date) < now
+                      return (
+                        <motion.div
+                          key={assignment.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3 + (inProgressWorksheetAssignments.length + index) * 0.1 }}
+                        >
+                          <Card
+                            className={`rounded-2xl cursor-pointer hover:shadow-lg transition-all ${isOverdue ? "border-destructive/50 hover:border-destructive" : "border-chart-3/30 hover:border-primary/30"}`}
+                            onClick={() => setSelectedWorksheetAssignment(assignment.id)}
+                          >
+                            <CardContent className="p-5">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isOverdue ? "bg-destructive/20" : "bg-chart-3/20"}`}>
+                                  <FileText className={`w-6 h-6 ${isOverdue ? "text-destructive" : "text-chart-3"}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-medium text-foreground truncate">{assignment.worksheet_templates?.title}</h3>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-chart-3/10 text-chart-3 shrink-0">
+                                      Interactive
+                                    </span>
+                                    {isOverdue && (
+                                      <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive shrink-0">
+                                        Overdue
+                                      </span>
+                                    )}
+                                  </div>
+                                  {assignment.worksheet_templates?.description && (
+                                    <p className="text-sm text-muted-foreground truncate">{assignment.worksheet_templates.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      Due {formatDueDate(assignment.due_date)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      )
+                    })}
 
                     {/* Regular Assignments */}
-                    {pendingAssignments.map((assignment, index) => (
+                    {pendingAssignments.map((assignment, index) => {
+                      const isOverdue = assignment.due_date && new Date(assignment.due_date) < now
+                      return (
                       <motion.div
                         key={assignment.id}
                         initial={{ opacity: 0, x: -20 }}

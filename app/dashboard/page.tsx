@@ -39,10 +39,22 @@ interface Assignment {
   completed_at: string | null
 }
 
+interface WorksheetAssignment {
+  id: string
+  client_id: string
+  status: string
+  completed_at: string | null
+  worksheet_template_id: string
+  worksheet_templates: {
+    title: string
+  }
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
@@ -75,6 +87,27 @@ export default function DashboardPage() {
         console.error("Error fetching assignments:", assignmentsError)
       } else {
         setAssignments(assignmentsData || [])
+      }
+
+      // Fetch worksheet assignments
+      const { data: worksheetData, error: worksheetError } = await supabase
+        .from("worksheet_assignments")
+        .select(`
+          id,
+          client_id,
+          status,
+          completed_at,
+          worksheet_template_id,
+          worksheet_templates (
+            title
+          )
+        `)
+        .eq("therapist_id", userId)
+
+      if (worksheetError) {
+        console.error("Error fetching worksheet assignments:", worksheetError)
+      } else {
+        setWorksheetAssignments(worksheetData || [])
       }
     } catch (err) {
       console.error("Exception fetching data:", err)
@@ -118,15 +151,15 @@ export default function DashboardPage() {
     ? `${user.user_metadata.first_name}`
     : user?.email?.split('@')[0] || 'there'
 
-  // Calculate stats from real data
-  const totalAssignments = assignments.length
-  const completedAssignments = assignments.filter(a => a.completed).length
+  // Calculate stats from real data (including worksheet assignments)
+  const totalAssignments = assignments.length + worksheetAssignments.length
+  const completedAssignments = assignments.filter(a => a.completed).length + worksheetAssignments.filter(a => a.status === "completed").length
   const pendingAssignments = totalAssignments - completedAssignments
   const completionRate = totalAssignments > 0 
     ? Math.round((completedAssignments / totalAssignments) * 100) 
     : null
 
-  // Count assignments due soon (within 7 days)
+  // Count assignments due soon (within 7 days) - only regular assignments have due dates currently
   const assignmentsDueSoon = assignments.filter(a => {
     if (!a.due_date || a.completed) return false
     const dueDate = new Date(a.due_date)
@@ -141,9 +174,18 @@ export default function DashboardPage() {
     return new Date(a.due_date) < new Date()
   }).length
 
+  // Count in-progress worksheets
+  const inProgressWorksheets = worksheetAssignments.filter(a => a.status === "in_progress").length
+
   // Get latest reflections
   const latestReflections = assignments
     .filter(a => a.reflection && a.completed_at)
+    .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
+    .slice(0, 3)
+
+  // Get recently completed worksheet assignments
+  const recentlyCompletedWorksheets = worksheetAssignments
+    .filter(a => a.status === "completed" && a.completed_at)
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     .slice(0, 3)
 
@@ -151,7 +193,7 @@ export default function DashboardPage() {
     { label: "Active Clients", value: clients.length.toString(), icon: Users, change: "Total clients" },
     { label: "Completion Rate", value: completionRate !== null ? `${completionRate}%` : "--", icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No assignments yet" },
     { label: "Due This Week", value: assignmentsDueSoon.toString(), icon: Clock, change: overdueAssignments > 0 ? `${overdueAssignments} overdue` : "All on track" },
-    { label: "Pending", value: pendingAssignments.toString(), icon: TrendingUp, change: pendingAssignments > 0 ? "awaiting completion" : "All caught up" },
+    { label: "In Progress", value: inProgressWorksheets.toString(), icon: TrendingUp, change: pendingAssignments > 0 ? `${pendingAssignments} pending` : "All caught up" },
   ]
 
   // Calculate days since created
@@ -308,20 +350,44 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
-                Latest Reflections
+                Recent Activity
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {latestReflections.length === 0 ? (
+              {latestReflections.length === 0 && recentlyCompletedWorksheets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
                     <MessageSquare className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-muted-foreground">No reflections yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Reflections will appear when clients complete assignments</p>
+                  <p className="text-sm text-muted-foreground">No activity yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Activity will appear when clients complete assignments</p>
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Recently completed worksheets */}
+                  {recentlyCompletedWorksheets.map((assignment) => {
+                    const client = clients.find(c => c.id === assignment.client_id)
+                    return (
+                      <div
+                        key={assignment.id}
+                        className="p-4 bg-primary/5 rounded-xl border border-primary/20"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                            <CheckCircle2 className="w-3 h-3 text-primary" />
+                          </div>
+                          <span className="text-sm font-medium text-foreground">{client?.full_name || "Unknown"}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Worksheet</span>
+                        </div>
+                        <p className="text-sm text-foreground mb-1">Completed: {assignment.worksheet_templates?.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {assignment.completed_at ? new Date(assignment.completed_at).toLocaleDateString() : ""}
+                        </p>
+                      </div>
+                    )
+                  })}
+
+                  {/* Latest reflections */}
                   {latestReflections.map((assignment) => {
                     const client = clients.find(c => c.id === assignment.client_id)
                     return (

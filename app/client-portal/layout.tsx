@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { getClient } from "@/lib/supabase/client"
 import { Loader2, Brain, LogOut, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 
 export default function ClientPortalLayout({
@@ -88,12 +87,8 @@ export default function ClientPortalLayout({
           <h1 className="text-2xl font-bold text-foreground mb-2">Unable to Access Portal</h1>
           <p className="text-muted-foreground mb-6">{error}</p>
           <div className="space-y-3">
-            <Button asChild className="w-full">
-              <Link href="/login">Back to Login</Link>
-            </Button>
-            <Button variant="outline" onClick={handleSignOut} className="w-full">
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+            <Button onClick={handleSignOut} className="w-full">
+              Back to Login
             </Button>
           </div>
         </div>

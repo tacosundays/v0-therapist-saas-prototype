@@ -7,7 +7,7 @@ import { Loader2, AlertCircle } from "lucide-react"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
+import { getClient } from "@/lib/supabase/client"
 
 export default function DashboardLayout({
   children,
@@ -59,6 +59,12 @@ export default function DashboardLayout({
     checkAuth()
   }, [])
 
+  const handleSignOut = async () => {
+    const supabase = getClient()
+    await supabase.auth.signOut()
+    window.location.href = "/login"
+  }
+
   if (isChecking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -80,8 +86,8 @@ export default function DashboardLayout({
             </div>
             <h2 className="text-xl font-semibold mb-2">Account Error</h2>
             <p className="text-muted-foreground mb-6">{error}</p>
-            <Button asChild className="rounded-xl">
-              <Link href="/login">Back to Login</Link>
+            <Button onClick={handleSignOut} className="rounded-xl">
+              Back to Login
             </Button>
           </CardContent>
         </Card>

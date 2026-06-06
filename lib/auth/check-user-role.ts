@@ -54,14 +54,16 @@ export async function checkUserRole(): Promise<UserRoleResult> {
   const userId = session.user.id
   const userEmail = session.user.email || null
   
+  console.log("[v0] ========== ACCOUNT TYPE DEBUG ==========")
   console.log("[v0] Authenticated user id:", userId)
-  console.log("[v0] User email:", userEmail)
+  console.log("[v0] auth.user.email:", userEmail)
   
   // First check user_metadata for role hint
   const metadataRole = session.user.user_metadata?.role
   console.log("[v0] Metadata role:", metadataRole)
   
   // Check if user is a therapist (therapist_id = auth.uid())
+  console.log("[v0] Searching therapists table for id:", userId)
   const { data: therapistRecord, error: therapistError } = await supabase
     .from("therapists")
     .select("id")
@@ -70,9 +72,8 @@ export async function checkUserRole(): Promise<UserRoleResult> {
   
   if (therapistError) {
     console.log("[v0] Therapist lookup error:", therapistError.message)
-  } else {
-    console.log("[v0] Therapist record found:", !!therapistRecord)
   }
+  console.log("[v0] Therapist record found:", !!therapistRecord)
   
   if (therapistRecord) {
     console.log("[v0] Final redirect destination: /dashboard (therapist)")
@@ -96,6 +97,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
   let clientRecord = null
   
   // Try lookup by user_id first (for clients who have logged in before)
+  console.log("[v0] Searching clients table by user_id:", userId)
   const { data: clientByUserId, error: clientByUserIdError } = await supabase
     .from("clients")
     .select("id, therapist_id, full_name, email, user_id")
@@ -104,9 +106,8 @@ export async function checkUserRole(): Promise<UserRoleResult> {
   
   if (clientByUserIdError) {
     console.log("[v0] Client lookup by user_id error:", clientByUserIdError.message)
-  } else {
-    console.log("[v0] Client record found by user_id:", !!clientByUserId)
   }
+  console.log("[v0] Client record found by user_id:", !!clientByUserId)
   
   if (clientByUserId) {
     clientRecord = clientByUserId
@@ -114,7 +115,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     // Try lookup by email (for clients created by therapist before first login)
     // This finds clients who haven't linked their auth account yet
     const normalizedEmail = userEmail.toLowerCase().trim()
-    console.log("[v0] Looking up client by email:", normalizedEmail)
+    console.log("[v0] Searching clients table by email:", normalizedEmail)
     
     const { data: clientByEmail, error: clientByEmailError } = await supabase
       .from("clients")
@@ -125,9 +126,8 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     
     if (clientByEmailError) {
       console.log("[v0] Client lookup by email error:", clientByEmailError.message)
-    } else {
-      console.log("[v0] Client record found by email:", !!clientByEmail)
     }
+    console.log("[v0] Client record found by email:", !!clientByEmail)
     
     if (clientByEmail) {
       // Link the auth user to this client record (first login)
@@ -178,8 +178,11 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     }
   }
   
-  console.log("[v0] No therapist or client record found")
+  console.log("[v0] No therapist record found:", !therapistRecord)
+  console.log("[v0] No client record found: true")
+  console.log("[v0] No matching client record found for email:", userEmail)
   console.log("[v0] Final redirect destination: none (unknown role)")
+  console.log("[v0] ========================================")
   return {
     isAuthenticated: true,
     user: { id: userId, email: userEmail },
@@ -188,6 +191,6 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     role: "unknown",
     therapistRecord: null,
     clientRecord: null,
-    error: "No client portal found for this email. Ask your therapist to invite you.",
+    error: `No matching client record found for email: ${userEmail ?? "unknown"}. Ask your therapist to invite you.`,
   }
 }

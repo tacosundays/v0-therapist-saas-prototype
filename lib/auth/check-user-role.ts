@@ -8,21 +8,26 @@ export interface UserRoleResult {
   userId: string | null
   userEmail: string | null
   role: UserRole
-  therapistRecord: { id: string } | null
+  therapistRecord: { id: string; email: string | null } | null
   clientRecord: { id: string; therapist_id: string; full_name: string; email: string | null } | null
   error: string | null
 }
 
 /**
- * Checks the authenticated user's role by looking up their records in the database.
- * This is the single source of truth for determining if a user is a therapist or client.
+ * Checks the authenticated user's role by matching their auth email against the
+ * therapists and clients tables (case-insensitive). This is the single source of
+ * truth for determining if a user is a therapist or client.
+ *
+ * Known schema:
+ *   therapists: id, email, full_name, subscription_status, subscription_plan
+ *   clients:    id, therapist_id, full_name, email, status, created_at, invite_code, [user_id?]
  */
 export async function checkUserRole(): Promise<UserRoleResult> {
   const supabase = getClient()
-  
+
   // Get session
   const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-  
+
   if (sessionError) {
     console.log("[v0] Auth session error:", sessionError.message)
     return {
@@ -36,7 +41,7 @@ export async function checkUserRole(): Promise<UserRoleResult> {
       error: sessionError.message,
     }
   }
-  
+
   if (!session) {
     console.log("[v0] No session found")
     return {
@@ -50,33 +55,47 @@ export async function checkUserRole(): Promise<UserRoleResult> {
       error: null,
     }
   }
-  
+
   const userId = session.user.id
   const userEmail = session.user.email || null
-  
+  const normalizedEmail = userEmail ? userEmail.toLowerCase().trim() : null
+
   console.log("[v0] ========== ACCOUNT TYPE DEBUG ==========")
   console.log("[v0] Authenticated user id:", userId)
   console.log("[v0] auth.user.email:", userEmail)
-  
-  // First check user_metadata for role hint
-  const metadataRole = session.user.user_metadata?.role
-  console.log("[v0] Metadata role:", metadataRole)
-  
-  // Check if user is a therapist (therapist_id = auth.uid())
-  console.log("[v0] Searching therapists table for id:", userId)
+  console.log("[v0] Normalized email used for matching:", normalizedEmail)
+
+  if (!normalizedEmail) {
+    console.log("[v0] No email on auth user - cannot match account")
+    console.log("[v0] ========================================")
+    return {
+      isAuthenticated: true,
+      user: { id: userId, email: userEmail },
+      userId,
+      userEmail,
+      role: "unknown",
+      therapistRecord: null,
+      clientRecord: null,
+      error: "No email found on your account. Please contact support.",
+    }
+  }
+
+  // 1. Check therapists by email (case-insensitive)
+  console.log("[v0] Searching therapists table by email:", normalizedEmail)
   const { data: therapistRecord, error: therapistError } = await supabase
     .from("therapists")
-    .select("id")
-    .eq("id", userId)
+    .select("id, email")
+    .ilike("email", normalizedEmail)
     .maybeSingle()
-  
+
   if (therapistError) {
     console.log("[v0] Therapist lookup error:", therapistError.message)
   }
   console.log("[v0] Therapist record found:", !!therapistRecord)
-  
+
   if (therapistRecord) {
     console.log("[v0] Final redirect destination: /dashboard (therapist)")
+    console.log("[v0] ========================================")
     return {
       isAuthenticated: true,
       user: { id: userId, email: userEmail },
@@ -88,68 +107,42 @@ export async function checkUserRole(): Promise<UserRoleResult> {
       error: null,
     }
   }
-  
-  // Check if user is a client
-  // Strategy: 
-  // 1. First check by user_id (for clients who have logged in before)
-  // 2. Then check by email (for clients created by therapist before first login)
-  // 3. If found by email, link the auth user_id to the client record
-  let clientRecord = null
-  
-  // Try lookup by user_id first (for clients who have logged in before)
-  console.log("[v0] Searching clients table by user_id:", userId)
-  const { data: clientByUserId, error: clientByUserIdError } = await supabase
+
+  // 2. Check clients by email (case-insensitive)
+  // Select "*" so the query works whether or not the user_id column exists.
+  console.log("[v0] Searching clients table by email:", normalizedEmail)
+  const { data: clientRecord, error: clientError } = await supabase
     .from("clients")
-    .select("id, therapist_id, full_name, email, user_id")
-    .eq("user_id", userId)
+    .select("*")
+    .ilike("email", normalizedEmail)
     .maybeSingle()
-  
-  if (clientByUserIdError) {
-    console.log("[v0] Client lookup by user_id error:", clientByUserIdError.message)
+
+  if (clientError) {
+    console.log("[v0] Client lookup by email error:", clientError.message)
   }
-  console.log("[v0] Client record found by user_id:", !!clientByUserId)
-  
-  if (clientByUserId) {
-    clientRecord = clientByUserId
-  } else if (userEmail) {
-    // Try lookup by email (for clients created by therapist before first login)
-    // This finds clients who haven't linked their auth account yet
-    const normalizedEmail = userEmail.toLowerCase().trim()
-    console.log("[v0] Searching clients table by email:", normalizedEmail)
-    
-    const { data: clientByEmail, error: clientByEmailError } = await supabase
-      .from("clients")
-      .select("id, therapist_id, full_name, email, user_id")
-      .ilike("email", normalizedEmail)
-      .is("user_id", null)
-      .maybeSingle()
-    
-    if (clientByEmailError) {
-      console.log("[v0] Client lookup by email error:", clientByEmailError.message)
-    }
-    console.log("[v0] Client record found by email:", !!clientByEmail)
-    
-    if (clientByEmail) {
-      // Link the auth user to this client record (first login)
-      console.log("[v0] Linking auth user to client record (first login)")
+  console.log("[v0] Client record found:", !!clientRecord)
+
+  if (clientRecord) {
+    // 3. If the user_id column exists and is currently null, link it to this auth user.
+    const hasUserIdColumn = Object.prototype.hasOwnProperty.call(clientRecord, "user_id")
+    console.log("[v0] clients.user_id column present:", hasUserIdColumn)
+
+    if (hasUserIdColumn && !clientRecord.user_id) {
+      console.log("[v0] Linking auth user id into clients.user_id (first login)")
       const { error: updateError } = await supabase
         .from("clients")
         .update({ user_id: userId })
-        .eq("id", clientByEmail.id)
-      
+        .eq("id", clientRecord.id)
+
       if (updateError) {
         console.log("[v0] Failed to link user_id to client:", updateError.message)
-        // Still allow access even if link fails
       } else {
         console.log("[v0] Successfully linked user_id to client record")
       }
-      
-      clientRecord = clientByEmail
     }
-  }
-  
-  if (clientRecord) {
+
     console.log("[v0] Final redirect destination: /client-portal (client)")
+    console.log("[v0] ========================================")
     return {
       isAuthenticated: true,
       user: { id: userId, email: userEmail },
@@ -157,30 +150,20 @@ export async function checkUserRole(): Promise<UserRoleResult> {
       userEmail,
       role: "client",
       therapistRecord: null,
-      clientRecord,
+      clientRecord: {
+        id: clientRecord.id,
+        therapist_id: clientRecord.therapist_id,
+        full_name: clientRecord.full_name,
+        email: clientRecord.email,
+      },
       error: null,
     }
   }
-  
-  // No record found - check metadata role as fallback for new signups
-  if (metadataRole === "therapist") {
-    console.log("[v0] No therapist record but metadata says therapist - allowing access")
-    console.log("[v0] Final redirect destination: /dashboard (new therapist)")
-    return {
-      isAuthenticated: true,
-      user: { id: userId, email: userEmail },
-      userId,
-      userEmail,
-      role: "therapist",
-      therapistRecord: null,
-      clientRecord: null,
-      error: null,
-    }
-  }
-  
-  console.log("[v0] No therapist record found:", !therapistRecord)
+
+  // 4. No match in either table - report the exact email searched.
+  console.log("[v0] No therapist record found: true")
   console.log("[v0] No client record found: true")
-  console.log("[v0] No matching client record found for email:", userEmail)
+  console.log("[v0] No matching record found for email:", normalizedEmail)
   console.log("[v0] Final redirect destination: none (unknown role)")
   console.log("[v0] ========================================")
   return {
@@ -191,6 +174,6 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     role: "unknown",
     therapistRecord: null,
     clientRecord: null,
-    error: `No matching client record found for email: ${userEmail ?? "unknown"}. Ask your therapist to invite you.`,
+    error: `No matching client record found for email: ${normalizedEmail}. Ask your therapist to invite you.`,
   }
 }

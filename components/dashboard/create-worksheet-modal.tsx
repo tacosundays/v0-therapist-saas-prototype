@@ -23,6 +23,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { 
   Loader2, 
   Plus, 
@@ -127,11 +128,22 @@ export function CreateWorksheetModal({ open, onOpenChange, onWorksheetCreated }:
         return
       }
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Create worksheet: auth email:", userEmail)
+      console.log("[v0] Create worksheet: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) {
+        setError("No therapist account found for your email.")
+        setIsLoading(false)
+        return
+      }
+
       // Create worksheet template
       const { data: template, error: templateError } = await supabase
         .from("worksheet_templates")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           title: title.trim(),
           description: description.trim() || null,
           category,

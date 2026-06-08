@@ -2,16 +2,15 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2, Mail } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
+import { hashInviteToken, normalizeInviteEmail } from "@/lib/invitations"
 
 export default function SignupPage() {
-  const router = useRouter()
   const isRedirecting = useRef(false)
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
@@ -26,6 +25,9 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showVerificationMessage, setShowVerificationMessage] = useState(false)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [inviteToken, setInviteToken] = useState<string | null>(null)
+  const [inviteRole, setInviteRole] = useState<string | null>(null)
+  const isInviteSignup = !!inviteToken && inviteRole === "client"
 
   // Check for existing session on page load - redirect once if already logged in
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function SignupPage() {
         isRedirecting.current = true
         const userRole = session.user?.user_metadata?.role
         if (userRole === "client") {
-          window.location.href = "/portal"
+          window.location.href = "/client-portal"
         } else {
           window.location.href = "/dashboard"
         }
@@ -50,6 +52,24 @@ export default function SignupPage() {
     }
 
     checkSession()
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const role = params.get("role")
+    const invitedEmail = params.get("email")
+    const token = params.get("invite")
+
+    setInviteRole(role)
+    setInviteToken(token)
+
+    if (role === "client") {
+      setUserType("client")
+    }
+
+    if (invitedEmail) {
+      setEmail(normalizeInviteEmail(invitedEmail))
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,24 +89,33 @@ export default function SignupPage() {
     let therapistId: string | null = null
     let existingClientId: string | null = null
     if (userType === "client") {
-      const normalizedEmail = email.trim().toLowerCase()
+      const normalizedEmail = normalizeInviteEmail(email)
 
-      // Look up client by email to get therapist_id and client_id
-      const { data: clientData, error: clientLookupError } = await supabase
-        .from("clients")
-        .select("id, therapist_id, email")
-        .eq("email", normalizedEmail)
-        .maybeSingle()
+      const clientLookup = inviteToken
+        ? await supabase.rpc("verify_client_invite", {
+            client_email: normalizedEmail,
+            token_hash: await hashInviteToken(inviteToken),
+          })
+        : await supabase
+            .from("clients")
+            .select("id, therapist_id, email")
+            .eq("email", normalizedEmail)
+            .maybeSingle()
+
+      const clientData = Array.isArray(clientLookup.data)
+        ? clientLookup.data[0]
+        : clientLookup.data
+      const clientLookupError = clientLookup.error
 
       if (clientLookupError) {
         console.error("Error validating client:", clientLookupError)
-        setError("Error validating client. Please try again.")
+        setError(inviteToken ? "Error validating invite. Please ask your therapist for a new link." : "Error validating client. Please try again.")
         setIsLoading(false)
         return
       }
 
       if (!clientData) {
-        setError("No client record found with this email. Please ask your therapist to add you first.")
+        setError(inviteToken ? "Invalid or expired invite link. Please ask your therapist for a new link." : "No client record found with this email. Please ask your therapist to invite you first.")
         setIsLoading(false)
         return
       }
@@ -139,32 +168,26 @@ export default function SignupPage() {
       }
     }
 
-    // If client, delete old client record and insert new one with id = auth.uid()
-    if (userType === "client" && authData.user && existingClientId && therapistId) {
-      const normalizedEmail = email.trim().toLowerCase()
-      
-      // First, delete the old client record (created by therapist with invite code)
-      const { error: deleteError } = await supabase
-        .from("clients")
-        .delete()
-        .eq("id", existingClientId)
+    // If client, link the auth user to the existing invite record.
+    if (userType === "client" && authData.user && existingClientId && therapistId && inviteToken) {
+      const acceptResponse = await fetch("/api/client-invitations/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: existingClientId,
+          email: normalizeInviteEmail(email),
+          fullName: `${firstName} ${lastName}`,
+          inviteToken,
+          userId: authData.user.id,
+        }),
+      })
 
-      if (deleteError) {
-        console.error("Error deleting old client record:", deleteError)
-      }
-
-      // Insert new client record with id = auth.uid()
-      const { error: clientInsertError } = await supabase
-        .from("clients")
-        .insert({
-          id: authData.user.id,
-          therapist_id: therapistId,
-          full_name: `${firstName} ${lastName}`,
-          email: normalizedEmail,
-        })
-
-      if (clientInsertError) {
-        console.error("Error inserting client:", clientInsertError)
+      if (!acceptResponse.ok) {
+        const acceptResult = await acceptResponse.json().catch(() => null)
+        console.error("Error accepting client invite:", acceptResult)
+        setError(acceptResult?.error || "Unable to accept invite. Please ask your therapist for a new link.")
+        setIsLoading(false)
+        return
       }
     }
 
@@ -177,7 +200,7 @@ export default function SignupPage() {
         window.location.href = "/onboarding"
       } else {
         // Redirect client to their authenticated portal
-        window.location.href = "/portal"
+        window.location.href = "/client-portal"
       }
       return
     }
@@ -260,13 +283,16 @@ export default function SignupPage() {
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Create your account</h1>
-          <p className="text-muted-foreground mb-8">Start your 14-day free trial. No credit card required.</p>
+          <p className="text-muted-foreground mb-8">
+            {isInviteSignup ? "Accept your client portal invitation." : "Start your 14-day free trial. No credit card required."}
+          </p>
 
           {/* Role Toggle */}
           <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
             <button
               type="button"
               onClick={() => setUserType("therapist")}
+              disabled={isInviteSignup}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 userType === "therapist"
                   ? "bg-card text-foreground shadow-sm"
@@ -278,6 +304,7 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => setUserType("client")}
+              disabled={isInviteSignup}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 userType === "client"
                   ? "bg-card text-foreground shadow-sm"
@@ -334,7 +361,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || isInviteSignup}
               />
             </div>
 
@@ -370,7 +397,9 @@ export default function SignupPage() {
             {userType === "client" && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Your therapist must add you as a client first using your email address.
+                  {isInviteSignup
+                    ? "Create your account with the invited email address to access your client portal."
+                    : "Your therapist must invite you first using your email address."}
                 </p>
               </div>
             )}

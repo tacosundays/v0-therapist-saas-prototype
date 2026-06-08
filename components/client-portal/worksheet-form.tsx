@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { getClient } from "@/lib/supabase/client"
+import { getClientRecord } from "@/lib/auth/check-user-role"
 import { 
   Loader2, 
   CheckCircle2,
@@ -83,12 +84,22 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         return
       }
 
+      const { clientRecord, userEmail } = await getClientRecord()
+
+      console.log("[v0] Worksheet autosave: auth email:", userEmail)
+      console.log("[v0] Worksheet autosave: client id found:", clientRecord?.id ?? "none")
+
+      if (!clientRecord) {
+        setSaveError(true)
+        return
+      }
+
       // Upsert responses (delete existing and insert new)
       const responses = Object.entries(answersToSave).map(([questionId, answer]) => {
         const isComplex = Array.isArray(answer) || typeof answer === "number"
         return {
           assignment_id: assignmentId,
-          client_id: user.id,
+          client_id: clientRecord.id,
           question_id: questionId,
           answer_text: isComplex ? null : String(answer),
           answer_json: isComplex ? answer : null,
@@ -244,6 +255,17 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         return
       }
 
+      const { clientRecord, userEmail } = await getClientRecord()
+
+      console.log("[v0] Worksheet submit: auth email:", userEmail)
+      console.log("[v0] Worksheet submit: client id found:", clientRecord?.id ?? "none")
+
+      if (!clientRecord) {
+        setError("Unable to find your client record.")
+        setIsSubmitting(false)
+        return
+      }
+
       // Delete existing responses for this assignment
       await supabase
         .from("worksheet_responses")
@@ -255,7 +277,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         const isComplex = Array.isArray(answer) || typeof answer === "number"
         return {
           assignment_id: assignmentId,
-          client_id: user.id,
+          client_id: clientRecord.id,
           question_id: questionId,
           answer_text: isComplex ? null : String(answer),
           answer_json: isComplex ? answer : null,

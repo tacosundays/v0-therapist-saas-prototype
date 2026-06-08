@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { Loader2, FileText, Calendar } from "lucide-react"
 
 interface AssignWorksheetModalProps {
@@ -78,20 +79,28 @@ export function AssignWorksheetModal({
 
       if (!user) return
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Assign worksheet: auth email:", userEmail)
+      console.log("[v0] Assign worksheet: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) return
+
       // Fetch clients
       const { data: clientsData } = await supabase
         .from("clients")
         .select("id, full_name, email")
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
         .order("full_name")
 
+      console.log("[v0] Assign worksheet: clients count:", clientsData?.length ?? 0)
       setClients(clientsData || [])
 
       // Fetch worksheet templates
       const { data: templatesData } = await supabase
         .from("worksheet_templates")
         .select("id, title, description, category")
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
         .order("created_at", { ascending: false })
 
       setTemplates(templatesData || [])
@@ -121,10 +130,21 @@ export function AssignWorksheetModal({
         return
       }
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Assign worksheet submit: auth email:", userEmail)
+      console.log("[v0] Assign worksheet submit: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) {
+        setError("No therapist account found for your email.")
+        setIsLoading(false)
+        return
+      }
+
       const { error: insertError } = await supabase
         .from("worksheet_assignments")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           client_id: selectedClient,
           worksheet_template_id: selectedTemplate,
           due_date: dueDate || null,

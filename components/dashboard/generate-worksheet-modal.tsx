@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { 
   Loader2, 
   Sparkles, 
@@ -164,11 +165,21 @@ export function GenerateWorksheetModal({
         return
       }
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Generate worksheet save: auth email:", userEmail)
+      console.log("[v0] Generate worksheet save: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) {
+        setError("No therapist account found for your email.")
+        return
+      }
+
       // Save as worksheet template
       const { data: template, error: templateError } = await supabase
         .from("worksheet_templates")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           title: editedTitle || worksheet.title,
           description: `AI-generated worksheet: ${topic}`,
           category: category,
@@ -220,12 +231,20 @@ export function GenerateWorksheetModal({
 
       if (!user) return
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Generate worksheet assign: auth email:", userEmail)
+      console.log("[v0] Generate worksheet assign: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) return
+
       const { data } = await supabase
         .from("clients")
         .select("id, full_name")
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
         .order("full_name")
 
+      console.log("[v0] Generate worksheet assign: clients count:", data?.length ?? 0)
       setClients(data || [])
     } catch (err) {
       console.error("Error fetching clients:", err)
@@ -249,11 +268,21 @@ export function GenerateWorksheetModal({
         return
       }
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Generate worksheet save+assign: auth email:", userEmail)
+      console.log("[v0] Generate worksheet save+assign: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) {
+        setError("No therapist account found for your email.")
+        return
+      }
+
       // Save as worksheet template
       const { data: template, error: templateError } = await supabase
         .from("worksheet_templates")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           title: editedTitle || worksheet.title,
           description: `AI-generated worksheet: ${topic}`,
           category: category,
@@ -290,7 +319,7 @@ export function GenerateWorksheetModal({
       const { error: assignError } = await supabase
         .from("worksheet_assignments")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           client_id: selectedClientId,
           worksheet_template_id: template.id,
           status: "assigned",

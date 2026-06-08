@@ -19,6 +19,7 @@ import {
 import { PRODUCTS, type Product } from "@/lib/products"
 import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout, verifyAndActivateSubscription } from "@/app/actions/stripe"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClientLimitDisplay, getPlanLimits } from "@/lib/plan-limits"
 
 interface SubscriptionData {
@@ -64,13 +65,21 @@ export default function BillingPage() {
           practiceName: user.user_metadata?.practice_name || undefined
         })
 
+        const { therapistId, userEmail } = await getTherapistId()
+
+        console.log("[v0] Billing: auth email:", userEmail)
+        console.log("[v0] Billing: therapist id found:", therapistId ?? "none")
+
         // Fetch client count
-        const { count } = await supabase
-          .from("clients")
-          .select("*", { count: "exact", head: true })
-          .eq("therapist_id", user.id)
+        if (therapistId) {
+          const { count } = await supabase
+            .from("clients")
+            .select("*", { count: "exact", head: true })
+            .eq("therapist_id", therapistId)
         
-        setClientCount(count || 0)
+          console.log("[v0] Billing: clients count:", count || 0)
+          setClientCount(count || 0)
+        }
       }
     }
     fetchUser()

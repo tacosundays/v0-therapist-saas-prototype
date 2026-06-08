@@ -77,7 +77,7 @@ export default function DashboardPage() {
       if (clientsError) {
         console.error("[v0] Error fetching clients:", clientsError)
       } else {
-        console.log("[v0] Dashboard: clients found:", clientsData?.length ?? 0)
+        console.log("[v0] Dashboard: clients count:", clientsData?.length ?? 0)
         console.log("[v0] Dashboard: client emails:", (clientsData || []).map(c => c.email))
         setClients(clientsData || [])
       }
@@ -131,7 +131,10 @@ export default function DashboardPage() {
       }
 
       // Resolve therapist id by email (therapists.id may != auth.user.id)
-      const { therapistId } = await getTherapistId()
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Dashboard: auth email:", userEmail)
+      console.log("[v0] Dashboard: therapist id found:", therapistId ?? "none")
 
       if (!therapistId) {
         console.log("[v0] Dashboard: no therapist record resolved, no clients to load")
@@ -245,7 +248,7 @@ export default function DashboardPage() {
           </Button>
           <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Client
+            Invite Client
           </Button>
         </div>
       </div>
@@ -437,7 +440,7 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Add Client Modal */}
+      {/* Invite Client Modal */}
       <AddClientModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}

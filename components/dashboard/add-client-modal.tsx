@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/dialog"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
-import { Loader2 } from "lucide-react"
+import { buildClientInviteLink, createInviteToken, hashInviteToken, normalizeInviteEmail } from "@/lib/invitations"
+import { CheckCircle2, Copy, Loader2, Mail } from "lucide-react"
 import { UpgradeModal } from "./upgrade-modal"
 import { canAddClient, getPlanLimits } from "@/lib/plan-limits"
 
@@ -29,7 +30,8 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [clientCount, setClientCount] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
@@ -95,7 +97,8 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setSuccess(false)
+    setInviteLink(null)
+    setCopied(false)
     setIsLoading(true)
 
     try {
@@ -117,33 +120,50 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         return
       }
 
-      // Insert client - normalize email to lowercase for consistent lookups
-      const normalizedEmail = email.trim().toLowerCase() || null
-      
-      const { error: insertError } = await supabase
-        .from("clients")
-        .insert({
-          therapist_id: therapistId,
-          full_name: name.trim(),
-          email: normalizedEmail,
-        })
+      const normalizedEmail = normalizeInviteEmail(email)
 
-      if (insertError) {
-        setError(insertError.message)
+      if (!normalizedEmail) {
+        setError("Client email is required for an invitation.")
         return
       }
-      setSuccess(true)
+
+      const inviteToken = createInviteToken()
+      const inviteTokenHash = await hashInviteToken(inviteToken)
+
+      const { data: existingClient, error: lookupError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("therapist_id", therapistId)
+        .eq("email", normalizedEmail)
+        .maybeSingle()
+
+      if (lookupError) {
+        setError(lookupError.message)
+        return
+      }
+
+      const clientPayload = {
+        therapist_id: therapistId,
+        full_name: name.trim(),
+        email: normalizedEmail,
+        status: "active",
+        invite_token_hash: inviteTokenHash,
+        invite_sent_at: new Date().toISOString(),
+        invite_accepted_at: null,
+      }
       
-      // Reset form
-      setName("")
-      setEmail("")
-      
-      // Notify parent and close modal after brief delay
-      setTimeout(() => {
-        onClientAdded()
-        onOpenChange(false)
-        setSuccess(false)
-      }, 1000)
+      const { error: saveError } = existingClient
+        ? await supabase.from("clients").update(clientPayload).eq("id", existingClient.id)
+        : await supabase.from("clients").insert(clientPayload)
+
+      if (saveError) {
+        setError(saveError.message)
+        return
+      }
+
+      const origin = typeof window !== "undefined" ? window.location.origin : ""
+      setInviteLink(buildClientInviteLink(origin, normalizedEmail, inviteToken))
+      onClientAdded()
       
     } catch (err) {
       console.error("Exception adding client:", err)
@@ -158,9 +178,18 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       setName("")
       setEmail("")
       setError(null)
-      setSuccess(false)
+      setInviteLink(null)
+      setCopied(false)
       onOpenChange(false)
     }
+  }
+
+  const handleCopyInvite = async () => {
+    if (!inviteLink) return
+
+    await navigator.clipboard.writeText(inviteLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const limits = getPlanLimits(planId)
@@ -176,9 +205,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
+                <DialogTitle>Invite Client</DialogTitle>
                 <DialogDescription>
-                  Add a new client to your practice. You can assign homework after creating them.
+                  Create a client record and share a secure signup link.
                 </DialogDescription>
               </DialogHeader>
         
@@ -197,7 +226,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="client-email">Email (optional)</Label>
+            <Label htmlFor="client-email">Email *</Label>
             <Input
               id="client-email"
               type="email"
@@ -205,10 +234,11 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-11 rounded-xl"
+              required
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Used to send homework notifications if provided
+              The client must sign up with this email address.
             </p>
           </div>
 
@@ -218,9 +248,30 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
             </div>
           )}
 
-          {success && (
-            <div className="p-3 bg-primary/10 text-primary text-sm rounded-xl">
-              Client added successfully!
+          {inviteLink && (
+            <div className="space-y-3 p-3 bg-primary/10 text-primary text-sm rounded-xl">
+              <div className="flex items-start gap-2">
+                <Mail className="w-4 h-4 mt-0.5 shrink-0" />
+                <p>
+                  Invite created. Email sending is not configured yet, so copy this link and send it to the client.
+                </p>
+              </div>
+              <div className="rounded-lg bg-background/80 border border-primary/20 p-2 text-xs text-foreground break-all">
+                {inviteLink}
+              </div>
+              <Button type="button" size="sm" className="rounded-xl" onClick={handleCopyInvite}>
+                {copied ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Invite Link
+                  </>
+                )}
+              </Button>
             </div>
           )}
 
@@ -232,20 +283,20 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
               disabled={isLoading}
               className="rounded-xl"
             >
-              Cancel
+              {inviteLink ? "Done" : "Cancel"}
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || !name.trim()}
+              disabled={isLoading || !name.trim() || !email.trim()}
               className="rounded-xl"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
+                  Creating invite...
                 </>
               ) : (
-                "Add Client"
+                "Create Invite"
               )}
             </Button>
           </DialogFooter>

@@ -94,7 +94,10 @@ export default function ClientsPage() {
       }
 
       // Resolve therapist id by email (therapists.id may != auth.user.id)
-      const { therapistId } = await getTherapistId()
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Clients page: auth email:", userEmail)
+      console.log("[v0] Clients page: therapist id found:", therapistId ?? "none")
 
       if (!therapistId) {
         console.log("[v0] Clients page: no therapist record resolved for this account")
@@ -117,7 +120,7 @@ export default function ClientsPage() {
         return
       }
 
-      console.log("[v0] Clients page: clients found:", clientsData?.length ?? 0)
+      console.log("[v0] Clients page: clients count:", clientsData?.length ?? 0)
       console.log("[v0] Clients page: client emails:", (clientsData || []).map(c => c.email))
 
       // Fetch assignments for this therapist
@@ -260,7 +263,7 @@ export default function ClientsPage() {
           </Button>
           <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Client
+            Invite Client
           </Button>
         </div>
       </div>
@@ -313,11 +316,11 @@ export default function ClientsPage() {
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">No clients yet</h3>
             <p className="text-muted-foreground text-center mb-4">
-              Get started by adding your first client
+              Get started by inviting your first client
             </p>
             <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Your First Client
+              Invite Your First Client
             </Button>
           </CardContent>
         </Card>
@@ -500,7 +503,7 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {/* Add Client Modal */}
+      {/* Invite Client Modal */}
       <AddClientModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}

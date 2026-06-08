@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
+import { getClientRecord } from "@/lib/auth/check-user-role"
 
 interface Assignment {
   id: string
@@ -33,7 +34,6 @@ interface Assignment {
 interface ClientRecord {
   id: string
   therapist_id: string
-  user_id: string | null
   full_name: string
   email: string | null
 }
@@ -78,19 +78,10 @@ export default function PortalPage() {
         return
       }
 
-      // Look up client by id = auth.uid()
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle()
+      const { clientRecord: client, userEmail } = await getClientRecord()
 
-      if (clientError) {
-        console.error("Error fetching client:", clientError)
-        setError("Error loading your account. Please try again.")
-        setIsLoading(false)
-        return
-      }
+      console.log("[v0] Legacy portal: auth email:", userEmail)
+      console.log("[v0] Legacy portal: client id found:", client?.id ?? "none")
 
       if (!client) {
         setError("No client record found. Please contact your therapist to set up your account.")

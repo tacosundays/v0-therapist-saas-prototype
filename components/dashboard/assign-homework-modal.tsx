@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { Loader2, Calendar } from "lucide-react"
 
 interface Client {
@@ -79,10 +80,17 @@ export function AssignHomeworkModal({
       
       if (!user) return
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Assign homework: auth email:", userEmail)
+      console.log("[v0] Assign homework: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) return
+
       const { data, error } = await supabase
         .from("clients")
         .select("id, full_name")
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
         .order("full_name", { ascending: true })
 
       if (error) {
@@ -90,6 +98,7 @@ export function AssignHomeworkModal({
         return
       }
 
+      console.log("[v0] Assign homework: clients count:", data?.length ?? 0)
       setClients(data || [])
     } catch (err) {
       console.error("Exception fetching clients:", err)
@@ -115,11 +124,21 @@ export function AssignHomeworkModal({
         return
       }
 
+      const { therapistId, userEmail } = await getTherapistId()
+
+      console.log("[v0] Assign homework submit: auth email:", userEmail)
+      console.log("[v0] Assign homework submit: therapist id found:", therapistId ?? "none")
+
+      if (!therapistId) {
+        setError("No therapist account found for your email.")
+        return
+      }
+
       // Insert assignment
       const { error: insertError } = await supabase
         .from("assignments")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           client_id: selectedClientId,
           title: title.trim(),
           description: description.trim() || null,

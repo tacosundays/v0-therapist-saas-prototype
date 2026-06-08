@@ -29,6 +29,7 @@ import {
   User
 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { GenerateWorksheetModal } from "@/components/dashboard/generate-worksheet-modal"
 import { CreateWorksheetModal } from "@/components/dashboard/create-worksheet-modal"
@@ -113,10 +114,21 @@ export default function LibraryPage() {
       // Fetch custom worksheets if user is logged in
       let customContent: ContentItem[] = []
       if (user) {
+        const { therapistId, userEmail } = await getTherapistId()
+
+        console.log("[v0] Library: auth email:", userEmail)
+        console.log("[v0] Library: therapist id found:", therapistId ?? "none")
+
+        if (!therapistId) {
+          setContentItems(builtInContent || [])
+          setIsLoading(false)
+          return
+        }
+
         const { data: customData } = await supabase
           .from("custom_worksheets")
           .select("*")
-          .eq("therapist_id", user.id)
+          .eq("therapist_id", therapistId)
           .order("created_at", { ascending: false })
 
         if (customData) {
@@ -136,7 +148,7 @@ export default function LibraryPage() {
         const { data: templatesData } = await supabase
           .from("worksheet_templates")
           .select("*")
-          .eq("therapist_id", user.id)
+          .eq("therapist_id", therapistId)
           .order("created_at", { ascending: false })
 
         if (templatesData) {

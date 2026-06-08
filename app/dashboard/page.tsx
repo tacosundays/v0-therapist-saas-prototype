@@ -19,6 +19,7 @@ import Link from "next/link"
 import { getClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import type { User } from "@supabase/supabase-js"
 
 interface Client {
@@ -59,21 +60,25 @@ export default function DashboardPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
 
-  const fetchData = useCallback(async (userId: string) => {
+  const fetchData = useCallback(async (therapistId: string) => {
     try {
       const supabase = getClient()
-      
+
+      console.log("[v0] Dashboard: loading data for therapist.id:", therapistId)
+
       // Fetch clients
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
         .select("*")
-        .eq("therapist_id", userId)
+        .eq("therapist_id", therapistId)
         .order("created_at", { ascending: false })
         .limit(5)
 
       if (clientsError) {
-        console.error("Error fetching clients:", clientsError)
+        console.error("[v0] Error fetching clients:", clientsError)
       } else {
+        console.log("[v0] Dashboard: clients found:", clientsData?.length ?? 0)
+        console.log("[v0] Dashboard: client emails:", (clientsData || []).map(c => c.email))
         setClients(clientsData || [])
       }
 
@@ -81,10 +86,10 @@ export default function DashboardPage() {
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
         .select("id, client_id, title, completed, due_date, reflection, completed_at")
-        .eq("therapist_id", userId)
+        .eq("therapist_id", therapistId)
 
       if (assignmentsError) {
-        console.error("Error fetching assignments:", assignmentsError)
+        console.error("[v0] Error fetching assignments:", assignmentsError)
       } else {
         setAssignments(assignmentsData || [])
       }
@@ -102,40 +107,55 @@ export default function DashboardPage() {
             title
           )
         `)
-        .eq("therapist_id", userId)
+        .eq("therapist_id", therapistId)
 
       if (worksheetError) {
-        console.error("Error fetching worksheet assignments:", worksheetError)
+        console.error("[v0] Error fetching worksheet assignments:", worksheetError)
       } else {
         setWorksheetAssignments(worksheetData || [])
       }
     } catch (err) {
-      console.error("Exception fetching data:", err)
+      console.error("[v0] Exception fetching data:", err)
     }
   }, [])
 
   useEffect(() => {
-    const supabase = getClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const loadDashboard = async () => {
+      const supabase = getClient()
+      const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-      if (user) {
-        fetchData(user.id).finally(() => setIsLoading(false))
-      } else {
+
+      if (!user) {
         setIsLoading(false)
+        return
       }
-    })
+
+      // Resolve therapist id by email (therapists.id may != auth.user.id)
+      const { therapistId } = await getTherapistId()
+
+      if (!therapistId) {
+        console.log("[v0] Dashboard: no therapist record resolved, no clients to load")
+        setIsLoading(false)
+        return
+      }
+
+      await fetchData(therapistId)
+      setIsLoading(false)
+    }
+
+    loadDashboard()
   }, [fetchData])
 
   const handleClientAdded = () => {
-    if (user) {
-      fetchData(user.id)
-    }
+    getTherapistId().then(({ therapistId }) => {
+      if (therapistId) fetchData(therapistId)
+    })
   }
 
   const handleAssignmentCreated = () => {
-    if (user) {
-      fetchData(user.id)
-    }
+    getTherapistId().then(({ therapistId }) => {
+      if (therapistId) fetchData(therapistId)
+    })
   }
 
   // Get greeting based on time of day

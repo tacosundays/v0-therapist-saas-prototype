@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { Loader2 } from "lucide-react"
 import { UpgradeModal } from "./upgrade-modal"
 import { canAddClient, getPlanLimits } from "@/lib/plan-limits"
@@ -52,18 +53,26 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         return
       }
 
+      // Resolve therapist id by email (therapists.id may != auth.user.id)
+      const { therapistId } = await getTherapistId()
+
+      if (!therapistId) {
+        setIsCheckingLimits(false)
+        return
+      }
+
       // Get therapist subscription info
       const { data: therapist } = await supabase
         .from("therapists")
         .select("subscription_plan")
-        .eq("id", user.id)
+        .eq("id", therapistId)
         .single()
 
       // Get current client count
       const { count } = await supabase
         .from("clients")
         .select("*", { count: "exact", head: true })
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
 
       const currentPlan = therapist?.subscription_plan || null
       const currentCount = count || 0
@@ -100,13 +109,21 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         return
       }
 
+      // Resolve therapist id by email (therapists.id may != auth.user.id)
+      const { therapistId } = await getTherapistId()
+
+      if (!therapistId) {
+        setError("No therapist account found for your email.")
+        return
+      }
+
       // Insert client - normalize email to lowercase for consistent lookups
       const normalizedEmail = email.trim().toLowerCase() || null
       
       const { error: insertError } = await supabase
         .from("clients")
         .insert({
-          therapist_id: user.id,
+          therapist_id: therapistId,
           full_name: name.trim(),
           email: normalizedEmail,
         })

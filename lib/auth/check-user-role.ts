@@ -177,3 +177,53 @@ export async function checkUserRole(): Promise<UserRoleResult> {
     error: `No matching client record found for email: ${normalizedEmail}. Ask your therapist to invite you.`,
   }
 }
+
+/**
+ * Resolves the therapist's database id for the currently authenticated user.
+ *
+ * IMPORTANT: therapists are matched by EMAIL, so therapists.id is NOT guaranteed
+ * to equal auth.user.id. Always use the returned id to filter clients/assignments
+ * by therapist_id.
+ *
+ * Returns null if the user is not authenticated or has no matching therapist row.
+ */
+export async function getTherapistId(): Promise<{
+  therapistId: string | null
+  userId: string | null
+  userEmail: string | null
+}> {
+  const supabase = getClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    console.log("[v0] getTherapistId: no authenticated user")
+    return { therapistId: null, userId: null, userEmail: null }
+  }
+
+  const userId = user.id
+  const userEmail = user.email || null
+  const normalizedEmail = userEmail ? userEmail.toLowerCase().trim() : null
+
+  console.log("[v0] getTherapistId: auth.user.id:", userId)
+  console.log("[v0] getTherapistId: auth.user.email:", userEmail)
+
+  if (!normalizedEmail) {
+    console.log("[v0] getTherapistId: no email on auth user")
+    return { therapistId: null, userId, userEmail }
+  }
+
+  const { data: therapistRecord, error } = await supabase
+    .from("therapists")
+    .select("id")
+    .ilike("email", normalizedEmail)
+    .maybeSingle()
+
+  if (error) {
+    console.log("[v0] getTherapistId: lookup error:", error.message)
+    return { therapistId: null, userId, userEmail }
+  }
+
+  console.log("[v0] getTherapistId: therapist.id found:", therapistRecord?.id ?? "none")
+  return { therapistId: therapistRecord?.id ?? null, userId, userEmail }
+}

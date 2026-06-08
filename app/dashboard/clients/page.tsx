@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getClient } from "@/lib/supabase/client"
+import { getTherapistId } from "@/lib/auth/check-user-role"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { AssignWorksheetModal } from "@/components/dashboard/assign-worksheet-modal"
@@ -92,11 +93,23 @@ export default function ClientsPage() {
         return
       }
 
+      // Resolve therapist id by email (therapists.id may != auth.user.id)
+      const { therapistId } = await getTherapistId()
+
+      if (!therapistId) {
+        console.log("[v0] Clients page: no therapist record resolved for this account")
+        setError("No therapist account found for your email.")
+        setIsLoading(false)
+        return
+      }
+
+      console.log("[v0] Clients page: loading clients for therapist.id:", therapistId)
+
       // Fetch clients for this therapist
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
         .select("*")
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
         .order("created_at", { ascending: false })
 
       if (clientsError) {
@@ -104,11 +117,14 @@ export default function ClientsPage() {
         return
       }
 
+      console.log("[v0] Clients page: clients found:", clientsData?.length ?? 0)
+      console.log("[v0] Clients page: client emails:", (clientsData || []).map(c => c.email))
+
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
         .select("id, client_id, title, completed, due_date, reflection, completed_at")
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
 
       if (assignmentsError) {
         console.error("Error fetching assignments:", assignmentsError)
@@ -127,7 +143,7 @@ export default function ClientsPage() {
             title
           )
         `)
-        .eq("therapist_id", user.id)
+        .eq("therapist_id", therapistId)
 
       setClients(clientsData || [])
       setAssignments(assignmentsData || [])

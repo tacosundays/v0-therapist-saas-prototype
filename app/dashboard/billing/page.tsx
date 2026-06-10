@@ -452,8 +452,8 @@ function PlanCard({ product, isCurrentPlan, isLoading, onSelect, delay }: PlanCa
                 Current Plan
               </Button>
             ) : product.isEnterprise ? (
-              <Button variant="outline" className="w-full rounded-xl" asChild>
-                <a href="mailto:sales@example.com">Contact Sales</a>
+              <Button variant="outline" className="w-full rounded-xl" disabled>
+                Contact Sales
               </Button>
             ) : (
               <Button 

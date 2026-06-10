@@ -134,7 +134,7 @@ export default function SignupPage() {
         data: {
           first_name: firstName,
           last_name: lastName,
-          full_name: `${firstName} ${lastName}`,
+          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
           role: userType,
           credentials: userType === "therapist" ? credentials : null,
         },
@@ -152,11 +152,14 @@ export default function SignupPage() {
       const trialEndDate = new Date()
       trialEndDate.setDate(trialEndDate.getDate() + 14) // 14-day trial
       
-      const { error: insertError } = await supabase
+      const { error: insertError } = await (supabase as any)
         .from("therapists")
         .insert({
           id: authData.user.id,
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
           full_name: `${firstName} ${lastName}`,
+          credentials: credentials.trim() || null,
           practice_name: practiceName || null,
           email: email,
           trial_end_date: trialEndDate.toISOString(),

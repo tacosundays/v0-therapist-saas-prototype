@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +19,8 @@ import {
   HelpCircle,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Upload
 } from "lucide-react"
 
 type TherapistRecord = Record<string, unknown> & {
@@ -56,8 +57,10 @@ export default function SettingsPage() {
   const [profilePhotoUrl, setProfilePhotoUrl] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const loadTherapist = async () => {
@@ -116,31 +119,15 @@ export default function SettingsPage() {
     setSuccess(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
       const updates: Record<string, string | null> = {
+        first_name: firstName.trim() || null,
+        last_name: lastName.trim() || null,
         full_name: fullName || null,
         email: email.trim().toLowerCase() || null,
-      }
-
-      if (Object.prototype.hasOwnProperty.call(therapist, "first_name")) {
-        updates.first_name = firstName.trim() || null
-      }
-
-      if (Object.prototype.hasOwnProperty.call(therapist, "last_name")) {
-        updates.last_name = lastName.trim() || null
-      }
-
-      if (Object.prototype.hasOwnProperty.call(therapist, "credentials")) {
-        updates.credentials = credentials.trim() || null
-      }
-
-      if (Object.prototype.hasOwnProperty.call(therapist, "profile_photo_url")) {
-        updates.profile_photo_url = profilePhotoUrl.trim() || null
-      } else if (Object.prototype.hasOwnProperty.call(therapist, "avatar_url")) {
-        updates.avatar_url = profilePhotoUrl.trim() || null
-      } else if (Object.prototype.hasOwnProperty.call(therapist, "photo_url")) {
-        updates.photo_url = profilePhotoUrl.trim() || null
+        credentials: credentials.trim() || null,
+        profile_photo_url: profilePhotoUrl.trim() || null,
       }
 
       const { data, error: updateError } = await supabase
@@ -163,6 +150,80 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : "Failed to save settings")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !therapistId) return
+
+    setIsUploadingPhoto(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      if (!file.type.startsWith("image/")) {
+        setError("Please upload an image file.")
+        return
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Profile photo must be smaller than 5 MB.")
+        return
+      }
+
+      const supabase = getClient() as any
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        setError("You must be logged in to upload a profile photo.")
+        return
+      }
+
+      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg"
+      const filePath = `${user.id}/${therapistId}-${Date.now()}.${extension}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("therapist-avatars")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        })
+
+      if (uploadError) {
+        setError(uploadError.message)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("therapist-avatars")
+        .getPublicUrl(filePath)
+
+      const publicUrl = publicUrlData.publicUrl
+      setProfilePhotoUrl(publicUrl)
+
+      const { data, error: updateError } = await supabase
+        .from("therapists")
+        .update({ profile_photo_url: publicUrl })
+        .eq("id", therapistId)
+        .select("*")
+        .single()
+
+      if (updateError) {
+        setError(updateError.message)
+        return
+      }
+
+      setTherapist(data as TherapistRecord)
+      setSuccess("Profile photo uploaded.")
+    } catch (err) {
+      console.error("[v0] Settings: failed to upload profile photo", err)
+      setError(err instanceof Error ? err.message : "Failed to upload profile photo")
+    } finally {
+      setIsUploadingPhoto(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     }
   }
 
@@ -208,15 +269,34 @@ export default function SettingsPage() {
                       <span className="text-xl font-medium text-primary">{initials}</span>
                     )}
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="profilePhotoUrl">Profile photo URL</Label>
+                  <div className="space-y-2">
                     <Input
-                      id="profilePhotoUrl"
-                      value={profilePhotoUrl}
-                      onChange={(event) => setProfilePhotoUrl(event.target.value)}
-                      className="rounded-xl"
-                      placeholder=""
+                      ref={fileInputRef}
+                      id="profilePhotoUpload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl"
+                      disabled={isUploadingPhoto || !therapistId}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {isUploadingPhoto ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Photo
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -249,7 +329,7 @@ export default function SettingsPage() {
                     {success}
                   </div>
                 )}
-                <Button className="rounded-xl" onClick={handleSave} disabled={isSaving || !therapistId}>
+                <Button className="rounded-xl" onClick={handleSave} disabled={isSaving || isUploadingPhoto || !therapistId}>
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />

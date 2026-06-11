@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { 
   Search,
   Plus,
@@ -39,6 +40,9 @@ interface Client {
   email: string | null
   status: string | null
   created_at: string
+  user_id: string | null
+  invite_sent_at: string | null
+  invite_accepted_at: string | null
 }
 
 interface Assignment {
@@ -63,7 +67,7 @@ interface WorksheetAssignment {
 
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all")
+  const [filterStatus, setFilterStatus] = useState<"all" | "invited" | "email_sent" | "registered" | "active">("all")
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -76,13 +80,15 @@ export default function ClientsPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [copiedClientId, setCopiedClientId] = useState<string | null>(null)
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
+  const [resendingClientId, setResendingClientId] = useState<string | null>(null)
+  const [clientActionMessage, setClientActionMessage] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -121,7 +127,7 @@ export default function ClientsPage() {
       }
 
       console.log("[v0] Clients page: clients count:", clientsData?.length ?? 0)
-      console.log("[v0] Clients page: client emails:", (clientsData || []).map(c => c.email))
+      console.log("[v0] Clients page: client emails:", ((clientsData || []) as Client[]).map(c => c.email))
 
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -196,6 +202,57 @@ export default function ClientsPage() {
     }, 2000)
   }
 
+  const handleResendInvite = async (client: Client) => {
+    if (!client.email || client.user_id || client.invite_accepted_at) return
+
+    setResendingClientId(client.id)
+    setClientActionMessage(null)
+    setError(null)
+
+    try {
+      const supabase = getClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setError("You must be logged in to resend an invite.")
+        return
+      }
+
+      const response = await fetch("/api/client-invitations/resend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId: client.id }),
+      })
+
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        if (result?.inviteLink) {
+          await navigator.clipboard.writeText(result.inviteLink)
+          setCopiedClientId(client.id)
+          setClientActionMessage("Email delivery failed. Invite link copied so you can send it manually.")
+          setTimeout(() => setCopiedClientId(null), 2000)
+          await fetchData()
+          return
+        }
+
+        setError(result?.error || "Unable to resend invite.")
+        return
+      }
+
+      setClientActionMessage("Invitation email sent successfully.")
+      await fetchData()
+    } catch (err) {
+      console.error("Exception resending invite:", err)
+      setError(err instanceof Error ? err.message : "Unable to resend invite.")
+    } finally {
+      setResendingClientId(null)
+    }
+  }
+
   // Get assignment stats for a client
   const getClientStats = (clientId: string) => {
     const clientAssignments = assignments.filter(a => a.client_id === clientId)
@@ -229,8 +286,7 @@ export default function ClientsPage() {
   const filteredClients = clients.filter((client) => {
     const matchesSearch = client.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    // For now, treat all clients as active since we don't have status field yet
-    const matchesFilter = filterStatus === "all" || filterStatus === "active"
+    const matchesFilter = filterStatus === "all" || getClientInviteStatus(client).key === filterStatus
     return matchesSearch && matchesFilter
   })
 
@@ -240,6 +296,49 @@ export default function ClientsPage() {
     if (days === 0) return "Today"
     if (days === 1) return "Yesterday"
     return `${days} days ago`
+  }
+
+  const formatDate = (date: string | null) => {
+    if (!date) return null
+    return new Date(date).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  function getClientInviteStatus(client: Client) {
+    const isRegistered = Boolean(client.user_id || client.invite_accepted_at)
+
+    if (isRegistered && client.status === "active") {
+      return {
+        key: "active" as const,
+        label: "Active",
+        className: "bg-primary/10 text-primary border-primary/20",
+      }
+    }
+
+    if (isRegistered) {
+      return {
+        key: "registered" as const,
+        label: "Registered",
+        className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+      }
+    }
+
+    if (client.invite_sent_at) {
+      return {
+        key: "email_sent" as const,
+        label: "Email Sent",
+        className: "bg-blue-500/10 text-blue-700 border-blue-500/20",
+      }
+    }
+
+    return {
+      key: "invited" as const,
+      label: "Invited",
+      className: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+    }
   }
 
   return (
@@ -280,14 +379,14 @@ export default function ClientsPage() {
           />
         </div>
         <div className="flex gap-2">
-          {(["all", "active", "inactive"] as const).map((status) => (
+          {(["all", "invited", "email_sent", "registered", "active"] as const).map((status) => (
             <Button
               key={status}
               variant={filterStatus === status ? "default" : "outline"}
               onClick={() => setFilterStatus(status)}
               className="rounded-xl capitalize"
             >
-              {status}
+              {status.replace("_", " ")}
             </Button>
           ))}
         </div>
@@ -304,6 +403,12 @@ export default function ClientsPage() {
       {error && !isLoading && (
         <div className="p-4 bg-destructive/10 text-destructive rounded-xl">
           {error}
+        </div>
+      )}
+
+      {clientActionMessage && !isLoading && (
+        <div className="p-4 bg-primary/10 text-primary rounded-xl">
+          {clientActionMessage}
         </div>
       )}
 
@@ -331,6 +436,8 @@ export default function ClientsPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredClients.map((client, index) => {
             const stats = getClientStats(client.id)
+            const inviteStatus = getClientInviteStatus(client)
+            const isRegistered = Boolean(client.user_id || client.invite_accepted_at)
             return (
               <motion.div
                 key={client.id}
@@ -355,6 +462,9 @@ export default function ClientsPage() {
                               {client.email}
                             </p>
                           )}
+                          <Badge variant="outline" className={`mt-2 ${inviteStatus.className}`}>
+                            {inviteStatus.label}
+                          </Badge>
                         </div>
                       </div>
                       <DropdownMenu>
@@ -375,6 +485,12 @@ export default function ClientsPage() {
                             <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
                               <LinkIcon className="w-4 h-4 mr-2" />
                               {copiedClientId === client.id ? "Copied!" : "Copy Portal Link"}
+                            </DropdownMenuItem>
+                          )}
+                          {!isRegistered && client.email && (
+                            <DropdownMenuItem onClick={() => handleResendInvite(client)}>
+                              <Mail className="w-4 h-4 mr-2" />
+                              Resend Invite
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem>Send Message</DropdownMenuItem>
@@ -429,6 +545,22 @@ export default function ClientsPage() {
                           Added
                         </span>
                         <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <Mail className="w-4 h-4" />
+                          Last invited
+                        </span>
+                        <span className="text-foreground">{formatDate(client.invite_sent_at) || "Not sent yet"}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Registered on
+                        </span>
+                        <span className="text-foreground">{formatDate(client.invite_accepted_at) || "Not registered yet"}</span>
                       </div>
 
                       {/* Latest Reflection */}
@@ -487,6 +619,27 @@ export default function ClientsPage() {
                             <>
                               <LinkIcon className="w-4 h-4 mr-1" />
                               Copy Portal Link
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      {!isRegistered && client.email && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 rounded-xl"
+                          onClick={() => handleResendInvite(client)}
+                          disabled={resendingClientId === client.id}
+                        >
+                          {resendingClientId === client.id ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              Sending
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-4 h-4 mr-1" />
+                              Resend Invite
                             </>
                           )}
                         </Button>

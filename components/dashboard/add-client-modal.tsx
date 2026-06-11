@@ -150,9 +150,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         therapist_id: therapistId,
         full_name: name.trim(),
         email: normalizedEmail,
-        status: "active",
+        status: "invited",
         invite_token_hash: inviteTokenHash,
-        invite_sent_at: new Date().toISOString(),
+        invite_sent_at: null,
         invite_accepted_at: null,
       }
       

@@ -48,6 +48,7 @@ export async function POST(request: Request) {
         full_name: fullName,
         invite_accepted_at: new Date().toISOString(),
         invite_token_hash: null,
+        status: "active",
       })
       .eq("id", clientId)
 

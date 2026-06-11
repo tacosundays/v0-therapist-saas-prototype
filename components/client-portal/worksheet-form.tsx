@@ -44,10 +44,19 @@ interface Assignment {
   worksheet_template_id: string
   status: string
   due_date: string | null
+  assigned_at: string | null
+  started_at: string | null
+  completed_at: string | null
   worksheet_templates: {
     title: string
     description: string | null
   }
+}
+
+interface ResponseRecord {
+  question_id: string
+  answer_text: string | null
+  answer_json: string[] | number | null
 }
 
 export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFormProps) {
@@ -76,7 +85,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
     setSaveError(false)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -124,7 +133,10 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
       // Update assignment status to in_progress if not already
       await supabase
         .from("worksheet_assignments")
-        .update({ status: "in_progress" })
+        .update({
+          status: "in_progress",
+          started_at: new Date().toISOString(),
+        })
         .eq("id", assignmentId)
         .eq("status", "assigned")
 
@@ -161,7 +173,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
     setError(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
 
       // Fetch assignment with template
       const { data: assignmentData, error: assignmentError } = await supabase
@@ -177,13 +189,37 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         .single()
 
       if (assignmentError) throw assignmentError
-      setAssignment(assignmentData)
+      let loadedAssignment = assignmentData as Assignment
+
+      if (loadedAssignment.status === "assigned" && !loadedAssignment.started_at) {
+        const startedAt = new Date().toISOString()
+        const { data: startedAssignment, error: startError } = await supabase
+          .from("worksheet_assignments")
+          .update({
+            status: "in_progress",
+            started_at: startedAt,
+          })
+          .eq("id", assignmentId)
+          .select(`
+            *,
+            worksheet_templates (
+              title,
+              description
+            )
+          `)
+          .single()
+
+        if (startError) throw startError
+        loadedAssignment = startedAssignment as Assignment
+      }
+
+      setAssignment(loadedAssignment)
 
       // Fetch questions
       const { data: questionsData, error: questionsError } = await supabase
         .from("worksheet_questions")
         .select("*")
-        .eq("worksheet_template_id", assignmentData.worksheet_template_id)
+        .eq("worksheet_template_id", loadedAssignment.worksheet_template_id)
         .order("order_index", { ascending: true })
 
       if (questionsError) throw questionsError
@@ -197,7 +233,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
       if (responsesData && responsesData.length > 0) {
         const existingAnswers: Record<string, string | string[] | number> = {}
-        responsesData.forEach(response => {
+        ;(responsesData as ResponseRecord[]).forEach(response => {
           if (response.answer_json) {
             existingAnswers[response.question_id] = response.answer_json
           } else if (response.answer_text) {
@@ -246,7 +282,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
     setError(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -297,6 +333,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         .from("worksheet_assignments")
         .update({
           status: "completed",
+          started_at: assignment?.started_at || new Date().toISOString(),
           completed_at: new Date().toISOString(),
         })
         .eq("id", assignmentId)

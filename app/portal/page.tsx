@@ -27,8 +27,11 @@ interface Assignment {
   description: string | null
   due_date: string | null
   completed: boolean
+  status: string | null
   reflection: string | null
   created_at: string
+  completed_at: string | null
+  started_at: string | null
 }
 
 interface ClientRecord {
@@ -115,13 +118,17 @@ export default function PortalPage() {
     setIsSubmitting(true)
     setSubmitSuccess(false)
 
-    const supabase = getClient()
+    const supabase = getClient() as any
+    const completedAt = new Date().toISOString()
 
     const { error: updateError } = await supabase
       .from("assignments")
       .update({
         completed: true,
+        status: "completed",
         reflection: reflection.trim() || null,
+        started_at: currentAssignment?.started_at || completedAt,
+        completed_at: completedAt,
       })
       .eq("id", selectedAssignment)
 
@@ -134,7 +141,7 @@ export default function PortalPage() {
     // Update local state
     setAssignments(prev => prev.map(a => 
       a.id === selectedAssignment 
-        ? { ...a, completed: true, reflection: reflection.trim() || null }
+        ? { ...a, completed: true, status: "completed", reflection: reflection.trim() || null, started_at: a.started_at || completedAt, completed_at: completedAt }
         : a
     ))
 
@@ -152,6 +159,33 @@ export default function PortalPage() {
   const currentAssignment = assignments.find(a => a.id === selectedAssignment)
   const pendingAssignments = assignments.filter(a => !a.completed)
   const completedAssignments = assignments.filter(a => a.completed)
+
+  const openAssignment = async (assignment: Assignment) => {
+    setSelectedAssignment(assignment.id)
+
+    if (assignment.completed || assignment.status === "started" || assignment.started_at) return
+
+    const startedAt = new Date().toISOString()
+    const supabase = getClient() as any
+
+    const { error: updateError } = await supabase
+      .from("assignments")
+      .update({
+        status: "started",
+        started_at: startedAt,
+      })
+      .eq("id", assignment.id)
+      .eq("client_id", assignment.client_id)
+
+    if (updateError) {
+      console.error("Error marking assignment started:", updateError)
+      return
+    }
+
+    setAssignments(prev => prev.map(a => (
+      a.id === assignment.id ? { ...a, status: "started", started_at: startedAt } : a
+    )))
+  }
 
   // Get user display name
   const displayName = clientRecord?.full_name?.split(" ")[0] || 'there'
@@ -392,7 +426,7 @@ export default function PortalPage() {
                   >
                     <Card
                       className="rounded-2xl cursor-pointer hover:shadow-lg transition-all hover:border-primary/30"
-                      onClick={() => setSelectedAssignment(assignment.id)}
+                      onClick={() => openAssignment(assignment)}
                     >
                       <CardContent className="p-5">
                         <div className="flex items-center gap-4">
@@ -400,7 +434,12 @@ export default function PortalPage() {
                             <BookOpen className="w-6 h-6 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-foreground truncate">{assignment.title}</h3>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-medium text-foreground truncate">{assignment.title}</h3>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                                {assignment.status === "started" || assignment.started_at ? "Started" : "Assigned"}
+                              </span>
+                            </div>
                             {assignment.description && (
                               <p className="text-sm text-muted-foreground truncate">{assignment.description}</p>
                             )}
@@ -450,7 +489,7 @@ export default function PortalPage() {
                         <div className="flex-1">
                           <p className="font-medium text-foreground">{assignment.title}</p>
                           <p className="text-xs text-muted-foreground">
-                            Completed {new Date(assignment.created_at).toLocaleDateString()}
+                            Completed {assignment.completed_at ? new Date(assignment.completed_at).toLocaleDateString() : ""}
                           </p>
                         </div>
                         <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />

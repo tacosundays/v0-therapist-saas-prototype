@@ -157,7 +157,7 @@ export function GenerateWorksheetModal({
     setError(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -226,7 +226,7 @@ export function GenerateWorksheetModal({
     setIsLoadingClients(true)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) return
@@ -260,7 +260,7 @@ export function GenerateWorksheetModal({
     setError(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -323,6 +323,7 @@ export function GenerateWorksheetModal({
           client_id: selectedClientId,
           worksheet_template_id: template.id,
           status: "assigned",
+          assigned_at: new Date().toISOString(),
         })
 
       if (assignError) {

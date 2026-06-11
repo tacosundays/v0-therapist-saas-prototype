@@ -75,7 +75,7 @@ export function AssignHomeworkModal({
   const fetchClients = async () => {
     setIsLoadingClients(true)
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) return
@@ -114,7 +114,7 @@ export function AssignHomeworkModal({
     setIsLoading(true)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -144,6 +144,8 @@ export function AssignHomeworkModal({
           description: description.trim() || null,
           due_date: dueDate || null,
           completed: false,
+          status: "assigned",
+          assigned_at: new Date().toISOString(),
         })
 
       if (insertError) {

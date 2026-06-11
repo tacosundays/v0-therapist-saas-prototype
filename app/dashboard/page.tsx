@@ -35,9 +35,12 @@ interface Assignment {
   client_id: string
   title: string
   completed: boolean
+  status: string | null
   due_date: string | null
   reflection: string | null
   completed_at: string | null
+  assigned_at: string | null
+  started_at: string | null
 }
 
 interface WorksheetAssignment {
@@ -45,6 +48,8 @@ interface WorksheetAssignment {
   client_id: string
   status: string
   completed_at: string | null
+  assigned_at: string | null
+  started_at: string | null
   worksheet_template_id: string
   worksheet_templates: {
     title: string
@@ -62,7 +67,7 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async (therapistId: string) => {
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
 
       console.log("[v0] Dashboard: loading data for therapist.id:", therapistId)
 
@@ -78,14 +83,14 @@ export default function DashboardPage() {
         console.error("[v0] Error fetching clients:", clientsError)
       } else {
         console.log("[v0] Dashboard: clients count:", clientsData?.length ?? 0)
-        console.log("[v0] Dashboard: client emails:", (clientsData || []).map(c => c.email))
+        console.log("[v0] Dashboard: client emails:", ((clientsData || []) as Client[]).map(c => c.email))
         setClients(clientsData || [])
       }
 
       // Fetch assignments
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
-        .select("id, client_id, title, completed, due_date, reflection, completed_at")
+        .select("id, client_id, title, completed, status, due_date, reflection, completed_at, assigned_at, started_at")
         .eq("therapist_id", therapistId)
 
       if (assignmentsError) {
@@ -102,6 +107,8 @@ export default function DashboardPage() {
           client_id,
           status,
           completed_at,
+          assigned_at,
+          started_at,
           worksheet_template_id,
           worksheet_templates (
             title
@@ -176,7 +183,7 @@ export default function DashboardPage() {
 
   // Calculate stats from real data (including worksheet assignments)
   const totalAssignments = assignments.length + worksheetAssignments.length
-  const completedAssignments = assignments.filter(a => a.completed).length + worksheetAssignments.filter(a => a.status === "completed").length
+  const completedAssignments = assignments.filter(a => a.completed || a.status === "completed").length + worksheetAssignments.filter(a => a.status === "completed").length
   const pendingAssignments = totalAssignments - completedAssignments
   const completionRate = totalAssignments > 0 
     ? Math.round((completedAssignments / totalAssignments) * 100) 
@@ -198,7 +205,8 @@ export default function DashboardPage() {
   }).length
 
   // Count in-progress worksheets
-  const inProgressWorksheets = worksheetAssignments.filter(a => a.status === "in_progress").length
+  const startedAssignments = assignments.filter(a => !a.completed && (a.status === "started" || a.started_at)).length
+  const inProgressWorksheets = worksheetAssignments.filter(a => a.status === "in_progress" || a.started_at).length
 
   // Get latest reflections
   const latestReflections = assignments
@@ -213,10 +221,10 @@ export default function DashboardPage() {
     .slice(0, 3)
 
   const stats = [
-    { label: "Active Clients", value: clients.length.toString(), icon: Users, change: "Total clients" },
-    { label: "Completion Rate", value: completionRate !== null ? `${completionRate}%` : "--", icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No assignments yet" },
-    { label: "Due This Week", value: assignmentsDueSoon.toString(), icon: Clock, change: overdueAssignments > 0 ? `${overdueAssignments} overdue` : "All on track" },
-    { label: "In Progress", value: inProgressWorksheets.toString(), icon: TrendingUp, change: pendingAssignments > 0 ? `${pendingAssignments} pending` : "All caught up" },
+    { label: "Total Assignments", value: totalAssignments.toString(), icon: FileText, change: pendingAssignments > 0 ? `${pendingAssignments} not completed` : "All caught up" },
+    { label: "Completed Assignments", value: completedAssignments.toString(), icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No assignments yet" },
+    { label: "Completion Rate", value: completionRate !== null ? `${completionRate}%` : "--", icon: TrendingUp, change: totalAssignments > 0 ? "Across all homework" : "No assignments yet" },
+    { label: "Started", value: (startedAssignments + inProgressWorksheets).toString(), icon: Clock, change: overdueAssignments > 0 ? `${overdueAssignments} overdue` : `${assignmentsDueSoon} due this week` },
   ]
 
   // Calculate days since created
@@ -322,7 +330,15 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   {clients.map((client) => {
                     const clientAssignments = assignments.filter(a => a.client_id === client.id)
-                    const activeCount = clientAssignments.filter(a => !a.completed).length
+                    const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === client.id)
+                    const clientTotal = clientAssignments.length + clientWorksheetAssignments.length
+                    const clientCompleted = clientAssignments.filter(a => a.completed || a.status === "completed").length + clientWorksheetAssignments.filter(a => a.status === "completed").length
+                    const clientStarted = clientAssignments.filter(a => !a.completed && (a.status === "started" || a.started_at)).length + clientWorksheetAssignments.filter(a => a.status === "in_progress" || a.started_at).length
+                    const clientCompletionRate = clientTotal > 0 ? Math.round((clientCompleted / clientTotal) * 100) : null
+                    const latestCompletedAt = [
+                      ...clientAssignments.map(a => a.completed_at).filter(Boolean),
+                      ...clientWorksheetAssignments.map(a => a.completed_at).filter(Boolean),
+                    ].sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
                     return (
                       <div
                         key={client.id}
@@ -336,9 +352,9 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-foreground truncate">{client.full_name}</p>
-                            {activeCount > 0 && (
+                            {clientStarted > 0 && (
                               <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-primary/10 text-primary">
-                                {activeCount} active
+                                {clientStarted} started
                               </span>
                             )}
                           </div>
@@ -347,6 +363,14 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <div className="text-right shrink-0">
+                          <p className="text-xs text-muted-foreground">
+                            {clientCompletionRate !== null ? `${clientCompletionRate}% complete` : "No assignments"}
+                          </p>
+                          {latestCompletedAt && (
+                            <p className="text-xs text-muted-foreground">
+                              Completed {new Date(latestCompletedAt).toLocaleDateString()}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">Added {getDaysSinceCreated(client.created_at)}</p>
                           <Button variant="outline" size="sm" className="mt-2 rounded-lg text-xs" asChild>
                             <Link href="/dashboard/clients">

@@ -50,9 +50,12 @@ interface Assignment {
   client_id: string
   title: string
   completed: boolean
+  status: string | null
   due_date: string | null
   reflection: string | null
   completed_at: string | null
+  assigned_at: string | null
+  started_at: string | null
 }
 
 interface WorksheetAssignment {
@@ -60,6 +63,8 @@ interface WorksheetAssignment {
   client_id: string
   status: string
   completed_at: string | null
+  assigned_at: string | null
+  started_at: string | null
   worksheet_templates: {
     title: string
   }
@@ -132,7 +137,7 @@ export default function ClientsPage() {
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
-        .select("id, client_id, title, completed, due_date, reflection, completed_at")
+        .select("id, client_id, title, completed, status, due_date, reflection, completed_at, assigned_at, started_at")
         .eq("therapist_id", therapistId)
 
       if (assignmentsError) {
@@ -148,6 +153,8 @@ export default function ClientsPage() {
           client_id,
           status,
           completed_at,
+          assigned_at,
+          started_at,
           worksheet_templates (
             title
           )
@@ -259,9 +266,12 @@ export default function ClientsPage() {
     const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === clientId)
     
     const total = clientAssignments.length + clientWorksheetAssignments.length
-    const completed = clientAssignments.filter(a => a.completed).length + 
+    const completed = clientAssignments.filter(a => a.completed || a.status === "completed").length +
                       clientWorksheetAssignments.filter(a => a.status === "completed").length
     const active = total - completed
+    const started = clientAssignments.filter(a => !a.completed && (a.status === "started" || a.started_at)).length +
+                    clientWorksheetAssignments.filter(a => a.status === "in_progress" || a.started_at).length
+    const assigned = active - started
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : null
     
     // Check for overdue assignments
@@ -279,8 +289,12 @@ export default function ClientsPage() {
 
     // Get completed worksheet assignments for this client
     const completedWorksheets = clientWorksheetAssignments.filter(a => a.status === "completed")
+    const latestCompletedAt = [
+      ...clientAssignments.map(a => a.completed_at).filter(Boolean),
+      ...clientWorksheetAssignments.map(a => a.completed_at).filter(Boolean),
+    ].sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0] || null
     
-    return { total, completed, active, completionRate, overdue, latestReflection, completedWorksheets }
+    return { total, completed, active, started, assigned, completionRate, overdue, latestReflection, completedWorksheets, latestCompletedAt }
   }
 
   const filteredClients = clients.filter((client) => {
@@ -525,10 +539,16 @@ export default function ClientsPage() {
                             {stats.completed} completed
                           </span>
                         )}
-                        {stats.active > 0 && stats.overdue === 0 && (
+                        {stats.started > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-blue-500/10 text-blue-700">
+                            <Clock className="w-3 h-3" />
+                            {stats.started} started
+                          </span>
+                        )}
+                        {stats.assigned > 0 && stats.overdue === 0 && (
                           <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600">
                             <Clock className="w-3 h-3" />
-                            {stats.active} pending
+                            {stats.assigned} assigned
                           </span>
                         )}
                         {stats.overdue > 0 && (
@@ -545,6 +565,14 @@ export default function ClientsPage() {
                           Added
                         </span>
                         <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Completed date
+                        </span>
+                        <span className="text-foreground">{formatDate(stats.latestCompletedAt) || "No completions yet"}</span>
                       </div>
 
                       <div className="flex items-center justify-between text-sm">

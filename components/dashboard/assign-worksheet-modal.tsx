@@ -74,7 +74,7 @@ export function AssignWorksheetModal({
   const fetchData = async () => {
     setIsFetching(true)
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) return
@@ -121,7 +121,7 @@ export function AssignWorksheetModal({
     setError(null)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -149,6 +149,7 @@ export function AssignWorksheetModal({
           worksheet_template_id: selectedTemplate,
           due_date: dueDate || null,
           status: "assigned",
+          assigned_at: new Date().toISOString(),
         })
 
       if (insertError) throw insertError

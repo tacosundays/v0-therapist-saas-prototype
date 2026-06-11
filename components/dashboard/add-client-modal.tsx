@@ -30,7 +30,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [emailDeliveryFailed, setEmailDeliveryFailed] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [clientCount, setClientCount] = useState(0)
@@ -47,7 +49,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const checkPlanLimits = async () => {
     setIsCheckingLimits(true)
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
@@ -97,12 +99,14 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccessMessage(null)
     setInviteLink(null)
+    setEmailDeliveryFailed(false)
     setCopied(false)
     setIsLoading(true)
 
     try {
-      const supabase = getClient()
+      const supabase = getClient() as any
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -152,9 +156,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         invite_accepted_at: null,
       }
       
-      const { error: saveError } = existingClient
-        ? await supabase.from("clients").update(clientPayload).eq("id", existingClient.id)
-        : await supabase.from("clients").insert(clientPayload)
+      const { data: savedClient, error: saveError } = existingClient
+        ? await supabase.from("clients").update(clientPayload).eq("id", existingClient.id).select("id").single()
+        : await supabase.from("clients").insert(clientPayload).select("id").single()
 
       if (saveError) {
         setError(saveError.message)
@@ -162,7 +166,40 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       }
 
       const origin = typeof window !== "undefined" ? window.location.origin : ""
-      setInviteLink(buildClientInviteLink(origin, normalizedEmail, inviteToken))
+      const generatedInviteLink = buildClientInviteLink(origin, normalizedEmail, inviteToken)
+      setInviteLink(generatedInviteLink)
+
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setEmailDeliveryFailed(true)
+        setSuccessMessage("Client created. Email delivery failed. Copy invite link manually.")
+        onClientAdded()
+        return
+      }
+
+      const emailResponse = await fetch("/api/client-invitations/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          clientId: savedClient?.id || existingClient?.id,
+          inviteLink: generatedInviteLink,
+        }),
+      })
+
+      if (!emailResponse.ok) {
+        const emailResult = await emailResponse.json().catch(() => null)
+        console.error("Invitation email failed:", emailResult)
+        setEmailDeliveryFailed(true)
+        setSuccessMessage("Client created. Email delivery failed. Copy invite link manually.")
+      } else {
+        setEmailDeliveryFailed(false)
+        setSuccessMessage("Invitation email sent successfully.")
+      }
+
       onClientAdded()
       
     } catch (err) {
@@ -178,7 +215,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       setName("")
       setEmail("")
       setError(null)
+      setSuccessMessage(null)
       setInviteLink(null)
+      setEmailDeliveryFailed(false)
       setCopied(false)
       onOpenChange(false)
     }
@@ -248,14 +287,23 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
             </div>
           )}
 
+          {successMessage && (
+            <div className="p-3 bg-primary/10 text-primary text-sm rounded-xl flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+              <p>{successMessage}</p>
+            </div>
+          )}
+
           {inviteLink && (
             <div className="space-y-3 p-3 bg-primary/10 text-primary text-sm rounded-xl">
-              <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 mt-0.5 shrink-0" />
-                <p>
-                  Invite created. Email sending is not configured yet, so copy this link and send it to the client.
-                </p>
-              </div>
+              {emailDeliveryFailed && (
+                <div className="flex items-start gap-2">
+                  <Mail className="w-4 h-4 mt-0.5 shrink-0" />
+                  <p>
+                    The invite link is ready. Copy it and send it to the client manually.
+                  </p>
+                </div>
+              )}
               <div className="rounded-lg bg-background/80 border border-primary/20 p-2 text-xs text-foreground break-all">
                 {inviteLink}
               </div>

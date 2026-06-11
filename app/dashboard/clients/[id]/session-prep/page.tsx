@@ -86,6 +86,14 @@ interface ProgressNote {
   updated_at: string | null
 }
 
+interface ClientReflection {
+  id: string
+  title: string | null
+  reflection_text: string
+  mood_rating: number | null
+  created_at: string
+}
+
 interface TimelineItem {
   date: string
   label: string
@@ -168,6 +176,7 @@ export default function SessionPrepPage() {
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignmentRecord[]>([])
   const [worksheetResponses, setWorksheetResponses] = useState<WorksheetResponseRecord[]>([])
+  const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [progressNotes, setProgressNotes] = useState<ProgressNote[]>([])
   const [noteId, setNoteId] = useState<string | null>(null)
   const [note, setNote] = useState("")
@@ -218,7 +227,7 @@ export default function SessionPrepPage() {
           return
         }
 
-        const [assignmentsResult, worksheetsResult, notesResult, progressNotesResult] = await Promise.all([
+        const [assignmentsResult, worksheetsResult, notesResult, progressNotesResult, clientReflectionsResult] = await Promise.all([
           supabase
             .from("assignments")
             .select("id, client_id, title, completed, status, reflection, created_at, assigned_at, started_at, completed_at")
@@ -255,12 +264,20 @@ export default function SessionPrepPage() {
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
             .limit(5),
+          supabase
+            .from("client_reflections")
+            .select("id, title, reflection_text, mood_rating, created_at")
+            .eq("client_id", clientId)
+            .eq("therapist_id", resolvedTherapistId)
+            .order("created_at", { ascending: false })
+            .limit(10),
         ])
 
         if (assignmentsResult.error) throwQueryError("assignments query failed", assignmentsResult.error)
         if (worksheetsResult.error) throwQueryError("worksheet_assignments query failed", worksheetsResult.error)
         if (notesResult.error) throwQueryError("session_prep_notes query failed", notesResult.error)
         if (progressNotesResult.error) throwQueryError("progress_notes query failed", progressNotesResult.error)
+        if (clientReflectionsResult.error) throwQueryError("client_reflections query failed", clientReflectionsResult.error)
 
         const worksheetData = (worksheetsResult.data || []) as WorksheetAssignmentRecord[]
         const worksheetAssignmentIds = worksheetData.map((assignment) => assignment.id)
@@ -281,6 +298,7 @@ export default function SessionPrepPage() {
         setAssignments((assignmentsResult.data || []) as AssignmentRecord[])
         setWorksheetAssignments(worksheetData)
         setWorksheetResponses((responsesResult.data || []) as WorksheetResponseRecord[])
+        setClientReflections((clientReflectionsResult.data || []) as ClientReflection[])
         setProgressNotes((progressNotesResult.data || []) as ProgressNote[])
         setNoteId(latestNote?.id || null)
         setNote(latestNote?.note || "")
@@ -303,28 +321,14 @@ export default function SessionPrepPage() {
     return map
   }, [worksheetAssignments])
 
-  const regularReflections = assignments
-    .filter((assignment) => assignment.reflection?.trim())
-    .map((assignment) => ({
-      id: assignment.id,
-      text: assignment.reflection || "",
-      date: assignment.completed_at || assignment.created_at,
-      assignmentTitle: assignment.title,
-    }))
-
-  const worksheetReflections = worksheetResponses
-    .map((response) => ({
-      id: response.id,
-      text: answerToText(response),
-      date: response.updated_at || response.created_at,
-      assignmentTitle: worksheetTitleById.get(response.assignment_id) || "Worksheet response",
-    }))
-    .filter((response) => response.text)
-
-  const reflections = [...regularReflections, ...worksheetReflections]
-    .filter((reflection) => reflection.date)
-    .sort((a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime())
-    .slice(0, 5)
+  const journalReflectionCount = clientReflections.length
+  const moodRatings = clientReflections
+    .map((reflection) => reflection.mood_rating)
+    .filter((rating): rating is number => typeof rating === "number")
+  const averageMoodRating = moodRatings.length > 0
+    ? Number((moodRatings.reduce((sum, rating) => sum + rating, 0) / moodRatings.length).toFixed(1))
+    : null
+  const mostRecentReflectionDate = clientReflections[0]?.created_at || null
 
   const totalAssignments = assignments.length + worksheetAssignments.length
   const completedAssignments = assignments.filter((assignment) => assignment.completed || assignment.status === "completed").length
@@ -395,8 +399,16 @@ export default function SessionPrepPage() {
       }
     })
 
+    clientReflections.forEach((reflection) => {
+      items.push({
+        date: reflection.created_at,
+        label: "Submitted reflection",
+        detail: reflection.title || "Reflection journal entry",
+      })
+    })
+
     return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20)
-  }, [assignments, clientRecord, worksheetAssignments, worksheetResponses, worksheetTitleById])
+  }, [assignments, clientRecord, clientReflections, worksheetAssignments, worksheetResponses, worksheetTitleById])
 
   const buildProgressNoteContext = () => {
     const recentCompletedAssignments = [
@@ -424,8 +436,8 @@ export default function SessionPrepPage() {
         ? recentCompletedAssignments.map((assignment) => `- ${assignment.title} (${formatDate(assignment.completedAt)})`)
         : ["- None"]),
       "Recent reflections:",
-      ...(reflections.length > 0
-        ? reflections.slice(0, 3).map((reflection) => `- ${reflection.assignmentTitle}: ${reflection.text}`)
+      ...(clientReflections.length > 0
+        ? clientReflections.slice(0, 3).map((reflection) => `- ${reflection.title || "Untitled"}: ${reflection.reflection_text}`)
         : ["- None"]),
       "Recent activity:",
       ...(timeline.length > 0
@@ -655,16 +667,39 @@ export default function SessionPrepPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {reflections.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No reflection submissions yet.</p>
+            <div className="grid sm:grid-cols-3 gap-4 mb-5">
+              <div className="p-3 rounded-xl bg-muted/30">
+                <p className="text-xs text-muted-foreground">Reflection count</p>
+                <p className="text-2xl font-bold text-foreground">{journalReflectionCount}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-muted/30">
+                <p className="text-xs text-muted-foreground">Average mood</p>
+                <p className="text-2xl font-bold text-foreground">{averageMoodRating !== null ? `${averageMoodRating}/10` : "--"}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-muted/30">
+                <p className="text-xs text-muted-foreground">Most recent</p>
+                <p className="font-medium text-foreground">{formatDate(mostRecentReflectionDate)}</p>
+              </div>
+            </div>
+
+            {clientReflections.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No reflection journal submissions yet.</p>
             ) : (
               <div className="space-y-4">
-                {reflections.map((reflection) => (
+                {clientReflections.slice(0, 10).map((reflection) => (
                   <div key={reflection.id} className="p-4 rounded-xl bg-muted/30">
-                    <p className="text-sm text-foreground line-clamp-4">{reflection.text}</p>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <p className="text-sm font-medium text-foreground">{reflection.title || "Untitled reflection"}</p>
+                      {reflection.mood_rating && (
+                        <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0">
+                          Mood {reflection.mood_rating}/10
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-foreground line-clamp-4 whitespace-pre-wrap">{reflection.reflection_text}</p>
                     <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>{reflection.assignmentTitle}</span>
-                      <span>{formatDateTime(reflection.date)}</span>
+                      <span>Reflection Journal</span>
+                      <span>{formatDateTime(reflection.created_at)}</span>
                     </div>
                   </div>
                 ))}

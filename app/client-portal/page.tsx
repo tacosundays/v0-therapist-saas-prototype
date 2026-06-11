@@ -499,6 +499,26 @@ function ClientPortalContent() {
             </motion.div>
           )}
 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+          >
+            <Card className="rounded-2xl">
+              <CardContent className="p-5 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">Reflection Journal</p>
+                  <p className="text-sm text-muted-foreground mt-1">Write a between-session reflection for your therapist.</p>
+                </div>
+                <Button className="rounded-xl shrink-0" asChild>
+                  <Link href="/client-portal/reflections">
+                    Open Journal
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Progress Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

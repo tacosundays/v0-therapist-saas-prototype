@@ -71,6 +71,11 @@ interface WorksheetAssignment {
   }
 }
 
+interface ClientReflection {
+  id: string
+  client_id: string
+}
+
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<"all" | "invited" | "email_sent" | "registered" | "active">("all")
@@ -86,6 +91,7 @@ export default function ClientsPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [copiedClientId, setCopiedClientId] = useState<string | null>(null)
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
+  const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [resendingClientId, setResendingClientId] = useState<string | null>(null)
   const [clientActionMessage, setClientActionMessage] = useState<string | null>(null)
 
@@ -162,9 +168,19 @@ export default function ClientsPage() {
         `)
         .eq("therapist_id", therapistId)
 
+      const { data: clientReflectionsData, error: clientReflectionsError } = await supabase
+        .from("client_reflections")
+        .select("id, client_id")
+        .eq("therapist_id", therapistId)
+
+      if (clientReflectionsError) {
+        console.error("Error fetching client reflections:", clientReflectionsError)
+      }
+
       setClients(clientsData || [])
       setAssignments(assignmentsData || [])
       setWorksheetAssignments(worksheetAssignmentsData || [])
+      setClientReflections(clientReflectionsData || [])
     } catch (err) {
       console.error("Exception fetching data:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
@@ -294,8 +310,9 @@ export default function ClientsPage() {
       ...clientAssignments.map(a => a.completed_at).filter(Boolean),
       ...clientWorksheetAssignments.map(a => a.completed_at).filter(Boolean),
     ].sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0] || null
+    const reflectionCount = clientReflections.filter(reflection => reflection.client_id === clientId).length
     
-    return { total, completed, active, started, assigned, completionRate, overdue, latestReflection, completedWorksheets, latestCompletedAt }
+    return { total, completed, active, started, assigned, completionRate, overdue, latestReflection, completedWorksheets, latestCompletedAt, reflectionCount }
   }
 
   const filteredClients = clients.filter((client) => {
@@ -609,6 +626,14 @@ export default function ClientsPage() {
                           Registered on
                         </span>
                         <span className="text-foreground">{getRegisteredDateLabel(client)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <MessageSquare className="w-4 h-4" />
+                          Reflections
+                        </span>
+                        <span className="text-foreground">{stats.reflectionCount}</span>
                       </div>
 
                       {/* Latest Reflection */}

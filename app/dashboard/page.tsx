@@ -75,6 +75,15 @@ interface CoupleCheckIn {
   intimacy: number
 }
 
+interface ClientReflection {
+  id: string
+  client_id: string
+  title: string | null
+  reflection_text: string
+  mood_rating: number | null
+  created_at: string
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [clients, setClients] = useState<Client[]>([])
@@ -82,6 +91,7 @@ export default function DashboardPage() {
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
   const [couples, setCouples] = useState<CoupleRecord[]>([])
   const [coupleCheckIns, setCoupleCheckIns] = useState<CoupleCheckIn[]>([])
+  const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
@@ -163,6 +173,19 @@ export default function DashboardPage() {
         console.error("[v0] Error fetching couple check-ins:", checkInsError)
       } else {
         setCoupleCheckIns(checkInsData || [])
+      }
+
+      const { data: reflectionsData, error: reflectionsError } = await supabase
+        .from("client_reflections")
+        .select("id, client_id, title, reflection_text, mood_rating, created_at")
+        .eq("therapist_id", therapistId)
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+      if (reflectionsError) {
+        console.error("[v0] Error fetching client reflections:", reflectionsError)
+      } else {
+        setClientReflections(reflectionsData || [])
       }
     } catch (err) {
       console.error("[v0] Exception fetching data:", err)
@@ -639,6 +662,60 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.55 }}
+      >
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Recent Client Reflections
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="rounded-xl" asChild>
+              <Link href="/dashboard/reflections">
+                View all
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {clientReflections.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">No client reflections yet.</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {clientReflections.map((reflection) => {
+                  const client = clients.find(c => c.id === reflection.client_id)
+                  return (
+                    <div key={reflection.id} className="p-4 bg-muted/30 rounded-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{reflection.title || "Untitled reflection"}</p>
+                          <p className="text-xs text-muted-foreground truncate">{client?.full_name || "Unknown client"}</p>
+                        </div>
+                        {reflection.mood_rating && (
+                          <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0">
+                            {reflection.mood_rating}/10
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-foreground line-clamp-3 mt-3">{reflection.reflection_text}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{new Date(reflection.created_at).toLocaleDateString()}</p>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>

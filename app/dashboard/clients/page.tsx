@@ -509,6 +509,12 @@ export default function ClientsPage() {
                               Session Prep
                             </Link>
                           </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/clients/${client.id}/session-prep#progress-notes`}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              View Notes
+                            </Link>
+                          </DropdownMenuItem>
                           {client.email && (
                             <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
                               <LinkIcon className="w-4 h-4 mr-2" />

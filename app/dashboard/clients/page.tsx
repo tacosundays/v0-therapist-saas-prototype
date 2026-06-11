@@ -322,8 +322,18 @@ export default function ClientsPage() {
     })
   }
 
+  function isClientRegistered(client: Client) {
+    return Boolean(client.user_id || client.invite_accepted_at || client.status === "active")
+  }
+
+  function getRegisteredDateLabel(client: Client) {
+    if (client.invite_accepted_at) return formatDate(client.invite_accepted_at)
+    if (client.user_id || client.status === "active") return formatDate(client.created_at)
+    return "Not registered yet"
+  }
+
   function getClientInviteStatus(client: Client) {
-    const isRegistered = Boolean(client.user_id || client.invite_accepted_at)
+    const isRegistered = isClientRegistered(client)
 
     if (isRegistered && client.status === "active") {
       return {
@@ -341,7 +351,7 @@ export default function ClientsPage() {
       }
     }
 
-    if (client.invite_sent_at) {
+    if (client.invite_sent_at && !isRegistered) {
       return {
         key: "email_sent" as const,
         label: "Email Sent",
@@ -452,7 +462,7 @@ export default function ClientsPage() {
           {filteredClients.map((client, index) => {
             const stats = getClientStats(client.id)
             const inviteStatus = getClientInviteStatus(client)
-            const isRegistered = Boolean(client.user_id || client.invite_accepted_at)
+            const isRegistered = isClientRegistered(client)
             return (
               <motion.div
                 key={client.id}
@@ -460,7 +470,7 @@ export default function ClientsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="rounded-2xl hover:shadow-lg transition-shadow">
+                <Card className="rounded-2xl hover:shadow-lg transition-shadow h-full flex flex-col">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
@@ -490,9 +500,6 @@ export default function ClientsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl">
                           <DropdownMenuItem>View Profile</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
-                            Assign Homework
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openAssignWorksheetModal(client.id)}>
                             Assign Online Worksheet
                           </DropdownMenuItem>
@@ -520,8 +527,8 @@ export default function ClientsPage() {
                       </DropdownMenu>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="space-y-3">
+                  <CardContent className="pt-4 flex flex-col flex-1">
+                    <div className="space-y-4 flex-1">
                       {/* Progress Bar */}
                       {stats.total > 0 && (
                         <div className="space-y-1.5">
@@ -595,7 +602,7 @@ export default function ClientsPage() {
                           <CheckCircle2 className="w-4 h-4" />
                           Registered on
                         </span>
-                        <span className="text-foreground">{formatDate(client.invite_accepted_at) || "Not registered yet"}</span>
+                        <span className="text-foreground">{getRegisteredDateLabel(client)}</span>
                       </div>
 
                       {/* Latest Reflection */}
@@ -637,56 +644,9 @@ export default function ClientsPage() {
                           )}
                         </div>
 
-                    <div className="flex gap-2 mt-4">
-                      {client.email && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1 rounded-xl"
-                          onClick={() => copyPortalLink(client.email!, client.id)}
-                        >
-                          {copiedClientId === client.id ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
-                              Copied!
-                            </>
-                          ) : (
-                            <>
-                              <LinkIcon className="w-4 h-4 mr-1" />
-                              Copy Portal Link
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {!isRegistered && client.email && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 rounded-xl"
-                          onClick={() => handleResendInvite(client)}
-                          disabled={resendingClientId === client.id}
-                        >
-                          {resendingClientId === client.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              Sending
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="w-4 h-4 mr-1" />
-                              Resend Invite
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      <Button size="sm" className="flex-1 rounded-xl" onClick={() => openAssignModal(client.id)}>
+                    <div className="pt-5 mt-5 border-t border-border">
+                      <Button size="sm" className="w-full rounded-xl" onClick={() => openAssignModal(client.id)}>
                         Assign
-                      </Button>
-                      <Button variant="outline" size="sm" className="flex-1 rounded-xl" asChild>
-                        <Link href={`/dashboard/clients/${client.id}/session-prep`}>
-                          <FileText className="w-4 h-4 mr-1" />
-                          Session Prep
-                        </Link>
                       </Button>
                     </div>
                   </CardContent>

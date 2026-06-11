@@ -6,6 +6,7 @@ import {
   Brain, 
   LayoutDashboard, 
   Users, 
+  HeartHandshake,
   BookOpen, 
   Sparkles, 
   BarChart3, 
@@ -24,6 +25,7 @@ import type { User } from "@supabase/supabase-js"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/clients", label: "Clients", icon: Users },
+  { href: "/dashboard/couples", label: "Couples", icon: HeartHandshake },
   { href: "/dashboard/library", label: "Content Library", icon: BookOpen },
   { href: "/dashboard/ai-suggestions", label: "AI Suggestions", icon: Sparkles },
   { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },

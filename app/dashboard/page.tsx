@@ -57,11 +57,31 @@ interface WorksheetAssignment {
   }
 }
 
+interface CoupleRecord {
+  id: string
+  relationship_name: string
+  partner_1_client_id: string
+  partner_2_client_id: string
+}
+
+interface CoupleCheckIn {
+  id: string
+  couple_id: string
+  client_id: string
+  check_in_week: string
+  relationship_satisfaction: number
+  trust: number
+  communication: number
+  intimacy: number
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
+  const [couples, setCouples] = useState<CoupleRecord[]>([])
+  const [coupleCheckIns, setCoupleCheckIns] = useState<CoupleCheckIn[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
@@ -120,6 +140,29 @@ export default function DashboardPage() {
         console.error("[v0] Error fetching worksheet assignments:", worksheetError)
       } else {
         setWorksheetAssignments(worksheetData || [])
+      }
+
+      const { data: couplesData, error: couplesError } = await supabase
+        .from("couples")
+        .select("id, relationship_name, partner_1_client_id, partner_2_client_id")
+        .eq("therapist_id", therapistId)
+
+      if (couplesError) {
+        console.error("[v0] Error fetching couples:", couplesError)
+      } else {
+        setCouples(couplesData || [])
+      }
+
+      const { data: checkInsData, error: checkInsError } = await supabase
+        .from("couple_check_ins")
+        .select("id, couple_id, client_id, check_in_week, relationship_satisfaction, trust, communication, intimacy")
+        .eq("therapist_id", therapistId)
+        .order("check_in_week", { ascending: false })
+
+      if (checkInsError) {
+        console.error("[v0] Error fetching couple check-ins:", checkInsError)
+      } else {
+        setCoupleCheckIns(checkInsData || [])
       }
     } catch (err) {
       console.error("[v0] Exception fetching data:", err)
@@ -262,6 +305,39 @@ export default function DashboardPage() {
         completionRate: clientCompletionRate,
         reasons,
       }
+    })
+    .filter((item) => item.reasons.length > 0)
+    .slice(0, 5)
+
+  const couplesNeedingAttention = couples
+    .map((couple) => {
+      const checkInsForCouple = coupleCheckIns.filter((checkIn) => checkIn.couple_id === couple.id)
+      const latestWeek = checkInsForCouple[0]?.check_in_week || null
+      const latestPartnerOne = latestWeek
+        ? checkInsForCouple.find((checkIn) => checkIn.check_in_week === latestWeek && checkIn.client_id === couple.partner_1_client_id)
+        : null
+      const latestPartnerTwo = latestWeek
+        ? checkInsForCouple.find((checkIn) => checkIn.check_in_week === latestWeek && checkIn.client_id === couple.partner_2_client_id)
+        : null
+      const scores = [latestPartnerOne, latestPartnerTwo].filter(Boolean) as CoupleCheckIn[]
+      const satisfactionScores = scores.map((score) => score.relationship_satisfaction)
+      const trustScores = scores.map((score) => score.trust)
+      const discrepancies = latestPartnerOne && latestPartnerTwo
+        ? [
+            Math.abs(latestPartnerOne.relationship_satisfaction - latestPartnerTwo.relationship_satisfaction),
+            Math.abs(latestPartnerOne.trust - latestPartnerTwo.trust),
+            Math.abs(latestPartnerOne.communication - latestPartnerTwo.communication),
+            Math.abs(latestPartnerOne.intimacy - latestPartnerTwo.intimacy),
+          ]
+        : []
+      const largestDiscrepancy = Math.max(0, ...discrepancies)
+      const reasons = [
+        satisfactionScores.some((score) => score < 5) ? "Satisfaction below 5" : null,
+        trustScores.some((score) => score < 5) ? "Trust below 5" : null,
+        largestDiscrepancy >= 3 ? `Partner discrepancy ${largestDiscrepancy}` : null,
+      ].filter(Boolean) as string[]
+
+      return { couple, reasons }
     })
     .filter((item) => item.reasons.length > 0)
     .slice(0, 5)
@@ -559,6 +635,57 @@ export default function DashboardPage() {
                     <Button variant="outline" size="sm" className="mt-4 rounded-lg text-xs" asChild>
                       <Link href={`/dashboard/clients/${item.client.id}/session-prep`}>
                         Session Prep
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7 }}
+      >
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-primary" />
+              Couples Needing Attention
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="rounded-xl" asChild>
+              <Link href="/dashboard/couples">
+                View couples
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {couplesNeedingAttention.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                  <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">No couples need attention right now.</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {couplesNeedingAttention.map((item) => (
+                  <div key={item.couple.id} className="p-4 bg-muted/30 rounded-xl">
+                    <p className="text-sm font-medium text-foreground">{item.couple.relationship_name}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {item.reasons.map((reason) => (
+                        <span key={reason} className="text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700">
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" className="mt-4 rounded-lg text-xs" asChild>
+                      <Link href="/dashboard/couples">
+                        Open Couples
                       </Link>
                     </Button>
                   </div>

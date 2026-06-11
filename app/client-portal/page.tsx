@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { 
   BookOpen, 
@@ -66,6 +67,27 @@ interface ClientRecord {
   email: string | null
 }
 
+interface CoupleRecord {
+  id: string
+  therapist_id: string
+  relationship_name: string
+  partner_1_client_id: string
+  partner_2_client_id: string
+}
+
+interface CoupleCheckIn {
+  id: string
+  couple_id: string
+  client_id: string
+  check_in_week: string
+  relationship_satisfaction: number
+  trust: number
+  communication: number
+  intimacy: number
+  conflict_level: number
+  reflection: string | null
+}
+
 function ClientPortalContent() {
   const searchParams = useSearchParams()
   
@@ -75,10 +97,22 @@ function ClientPortalContent() {
   const [clientRecord, setClientRecord] = useState<ClientRecord | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
+  const [couples, setCouples] = useState<CoupleRecord[]>([])
+  const [coupleCheckIns, setCoupleCheckIns] = useState<CoupleCheckIn[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [checkInSubmittingId, setCheckInSubmittingId] = useState<string | null>(null)
+  const [checkInSuccessId, setCheckInSuccessId] = useState<string | null>(null)
+  const [checkInForms, setCheckInForms] = useState<Record<string, {
+    relationship_satisfaction: number
+    trust: number
+    communication: number
+    intimacy: number
+    conflict_level: number
+    reflection: string
+  }>>({})
 
   useEffect(() => {
     const fetchData = async () => {
@@ -135,6 +169,36 @@ function ClientPortalContent() {
       }
 
       setWorksheetAssignments(worksheetAssignmentsData || [])
+
+      const { data: couplesData, error: couplesError } = await (supabase as any)
+        .from("couples")
+        .select("id, therapist_id, relationship_name, partner_1_client_id, partner_2_client_id")
+        .or(`partner_1_client_id.eq.${client.id},partner_2_client_id.eq.${client.id}`)
+        .order("created_at", { ascending: false })
+
+      if (couplesError) {
+        console.error("[v0] Error fetching couples:", couplesError)
+      }
+
+      const relationshipUnits = (couplesData || []) as CoupleRecord[]
+      setCouples(relationshipUnits)
+
+      if (relationshipUnits.length > 0) {
+        const coupleIds = relationshipUnits.map((couple) => couple.id)
+        const { data: checkInsData, error: checkInsError } = await (supabase as any)
+          .from("couple_check_ins")
+          .select("*")
+          .eq("client_id", client.id)
+          .in("couple_id", coupleIds)
+          .order("check_in_week", { ascending: false })
+
+        if (checkInsError) {
+          console.error("[v0] Error fetching couple check-ins:", checkInsError)
+        } else {
+          setCoupleCheckIns(checkInsData || [])
+        }
+      }
+
       setIsLoading(false)
     }
 
@@ -240,6 +304,84 @@ function ClientPortalContent() {
 
   // Get client display name
   const displayName = clientRecord?.full_name?.split(" ")[0] || "there"
+
+  const currentCheckInWeek = (() => {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    date.setDate(date.getDate() - date.getDay())
+    return date.toISOString().split("T")[0]
+  })()
+
+  const updateCheckInForm = (coupleId: string, field: string, value: string) => {
+    setCheckInForms(prev => ({
+      ...prev,
+      [coupleId]: {
+        ...(prev[coupleId] || {
+          relationship_satisfaction: 5,
+          trust: 5,
+          communication: 5,
+          intimacy: 5,
+          conflict_level: 5,
+          reflection: "",
+        }),
+        [field]: field === "reflection" ? value : Number(value),
+      },
+    }))
+  }
+
+  const submitCoupleCheckIn = async (couple: CoupleRecord) => {
+    if (!clientRecord) return
+
+    setCheckInSubmittingId(couple.id)
+    setCheckInSuccessId(null)
+
+    const supabase = getClient() as any
+    const existingCheckIn = coupleCheckIns.find((checkIn) => (
+      checkIn.couple_id === couple.id && checkIn.check_in_week === currentCheckInWeek
+    ))
+    const form = checkInForms[couple.id] || {
+      relationship_satisfaction: existingCheckIn?.relationship_satisfaction || 5,
+      trust: existingCheckIn?.trust || 5,
+      communication: existingCheckIn?.communication || 5,
+      intimacy: existingCheckIn?.intimacy || 5,
+      conflict_level: existingCheckIn?.conflict_level || 5,
+      reflection: existingCheckIn?.reflection || "",
+    }
+
+    const payload = {
+      couple_id: couple.id,
+      therapist_id: couple.therapist_id,
+      client_id: clientRecord.id,
+      check_in_week: currentCheckInWeek,
+      relationship_satisfaction: form.relationship_satisfaction,
+      trust: form.trust,
+      communication: form.communication,
+      intimacy: form.intimacy,
+      conflict_level: form.conflict_level,
+      reflection: form.reflection.trim() || null,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data, error: upsertError } = await supabase
+      .from("couple_check_ins")
+      .upsert(payload, { onConflict: "couple_id,client_id,check_in_week" })
+      .select("*")
+      .single()
+
+    if (upsertError) {
+      console.error("[v0] Error saving couple check-in:", upsertError)
+      setCheckInSubmittingId(null)
+      return
+    }
+
+    setCoupleCheckIns(prev => [
+      data,
+      ...prev.filter((checkIn) => checkIn.id !== data.id),
+    ])
+    setCheckInSuccessId(couple.id)
+    setCheckInSubmittingId(null)
+    setTimeout(() => setCheckInSuccessId(null), 2000)
+  }
 
   // Format due date
   const formatDueDate = (dateStr: string | null) => {
@@ -513,6 +655,88 @@ function ClientPortalContent() {
             /* Assignment List View */
             <>
               {/* Active Assignments */}
+              {couples.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                >
+                  <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-primary" />
+                    Relationship Check-In
+                  </h2>
+                  <div className="space-y-4">
+                    {couples.map((couple) => {
+                      const existingCheckIn = coupleCheckIns.find((checkIn) => (
+                        checkIn.couple_id === couple.id && checkIn.check_in_week === currentCheckInWeek
+                      ))
+                      const form = checkInForms[couple.id] || {
+                        relationship_satisfaction: existingCheckIn?.relationship_satisfaction || 5,
+                        trust: existingCheckIn?.trust || 5,
+                        communication: existingCheckIn?.communication || 5,
+                        intimacy: existingCheckIn?.intimacy || 5,
+                        conflict_level: existingCheckIn?.conflict_level || 5,
+                        reflection: existingCheckIn?.reflection || "",
+                      }
+
+                      return (
+                        <Card key={couple.id} className="rounded-2xl">
+                          <CardHeader>
+                            <CardTitle className="text-base">{couple.relationship_name}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            {[
+                              ["relationship_satisfaction", "Relationship satisfaction"],
+                              ["trust", "Trust"],
+                              ["communication", "Communication"],
+                              ["intimacy", "Intimacy"],
+                              ["conflict_level", "Conflict level"],
+                            ].map(([field, label]) => (
+                              <div key={field} className="grid grid-cols-[1fr_72px] gap-3 items-center">
+                                <label className="text-sm text-foreground">{label}</label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={10}
+                                  value={form[field as keyof typeof form] as number}
+                                  onChange={(event) => updateCheckInForm(couple.id, field, event.target.value)}
+                                  className="h-10 rounded-xl"
+                                />
+                              </div>
+                            ))}
+                            <Textarea
+                              value={form.reflection}
+                              onChange={(event) => updateCheckInForm(couple.id, "reflection", event.target.value)}
+                              placeholder="Optional reflection for your therapist..."
+                              className="min-h-24 rounded-xl"
+                            />
+                            <Button
+                              className="w-full rounded-xl"
+                              onClick={() => submitCoupleCheckIn(couple)}
+                              disabled={checkInSubmittingId === couple.id}
+                            >
+                              {checkInSubmittingId === couple.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : checkInSuccessId === couple.id ? (
+                                <>
+                                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                                  Saved
+                                </>
+                              ) : (
+                                "Submit Weekly Check-In"
+                              )}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </motion.div>
+              )}
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

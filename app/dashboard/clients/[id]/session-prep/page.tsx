@@ -109,6 +109,26 @@ function answerToText(response: WorksheetResponseRecord) {
   return ""
 }
 
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === "object") {
+    const errorObject = err as { message?: string; details?: string; hint?: string; code?: string }
+    return [
+      errorObject.message,
+      errorObject.details ? `Details: ${errorObject.details}` : null,
+      errorObject.hint ? `Hint: ${errorObject.hint}` : null,
+      errorObject.code ? `Code: ${errorObject.code}` : null,
+    ].filter(Boolean).join(" ")
+  }
+  return "Unknown error"
+}
+
+function throwQueryError(label: string, err: unknown): never {
+  const message = `${label}: ${getErrorMessage(err)}`
+  console.error(`[v0] Session Prep: ${message}`, err)
+  throw new Error(message)
+}
+
 export default function SessionPrepPage() {
   const params = useParams<{ id: string }>()
   const clientId = params.id
@@ -151,7 +171,7 @@ export default function SessionPrepPage() {
           .eq("therapist_id", resolvedTherapistId)
           .maybeSingle()
 
-        if (clientError) throw clientError
+        if (clientError) throwQueryError("clients query failed", clientError)
         if (!clientData) {
           setError("Client not found.")
           return
@@ -189,9 +209,9 @@ export default function SessionPrepPage() {
             .limit(1),
         ])
 
-        if (assignmentsResult.error) throw assignmentsResult.error
-        if (worksheetsResult.error) throw worksheetsResult.error
-        if (notesResult.error) throw notesResult.error
+        if (assignmentsResult.error) throwQueryError("assignments query failed", assignmentsResult.error)
+        if (worksheetsResult.error) throwQueryError("worksheet_assignments query failed", worksheetsResult.error)
+        if (notesResult.error) throwQueryError("session_prep_notes query failed", notesResult.error)
 
         const worksheetData = (worksheetsResult.data || []) as WorksheetAssignmentRecord[]
         const worksheetAssignmentIds = worksheetData.map((assignment) => assignment.id)
@@ -205,7 +225,7 @@ export default function SessionPrepPage() {
               .limit(10)
           : { data: [], error: null }
 
-        if (responsesResult.error) throw responsesResult.error
+        if (responsesResult.error) throwQueryError("worksheet_responses query failed", responsesResult.error)
 
         const latestNote = (notesResult.data?.[0] || null) as SessionPrepNote | null
         setClientRecord(clientData as ClientRecord)
@@ -216,7 +236,7 @@ export default function SessionPrepPage() {
         setNote(latestNote?.note || "")
       } catch (err) {
         console.error("[v0] Session Prep: failed to load", err)
-        setError(err instanceof Error ? err.message : "Failed to load session prep.")
+        setError(`Failed to load session prep. ${getErrorMessage(err)}`)
       } finally {
         setIsLoading(false)
       }
@@ -345,7 +365,7 @@ export default function SessionPrepPage() {
           .eq("id", noteId)
           .eq("therapist_id", therapistId)
 
-        if (updateError) throw updateError
+        if (updateError) throwQueryError("session_prep_notes update failed", updateError)
       } else {
         const { data, error: insertError } = await supabase
           .from("session_prep_notes")
@@ -357,14 +377,14 @@ export default function SessionPrepPage() {
           .select("id")
           .single()
 
-        if (insertError) throw insertError
+        if (insertError) throwQueryError("session_prep_notes insert failed", insertError)
         setNoteId(data.id)
       }
 
       setSuccess("Session notes saved.")
     } catch (err) {
       console.error("[v0] Session Prep: failed to save note", err)
-      setError(err instanceof Error ? err.message : "Failed to save note.")
+      setError(`Failed to save note. ${getErrorMessage(err)}`)
     } finally {
       setIsSaving(false)
     }

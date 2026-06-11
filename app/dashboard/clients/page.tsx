@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -495,6 +496,12 @@ export default function ClientsPage() {
                           <DropdownMenuItem onClick={() => openAssignWorksheetModal(client.id)}>
                             Assign Online Worksheet
                           </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/clients/${client.id}/session-prep`}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Session Prep
+                            </Link>
+                          </DropdownMenuItem>
                           {client.email && (
                             <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
                               <LinkIcon className="w-4 h-4 mr-2" />
@@ -674,6 +681,12 @@ export default function ClientsPage() {
                       )}
                       <Button size="sm" className="flex-1 rounded-xl" onClick={() => openAssignModal(client.id)}>
                         Assign
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1 rounded-xl" asChild>
+                        <Link href={`/dashboard/clients/${client.id}/session-prep`}>
+                          <FileText className="w-4 h-4 mr-1" />
+                          Session Prep
+                        </Link>
                       </Button>
                     </div>
                   </CardContent>

@@ -13,7 +13,8 @@ import {
   ArrowRight,
   Loader2,
   FileText,
-  MessageSquare
+  MessageSquare,
+  AlertTriangle
 } from "lucide-react"
 import Link from "next/link"
 import { getClient } from "@/lib/supabase/client"
@@ -77,7 +78,6 @@ export default function DashboardPage() {
         .select("*")
         .eq("therapist_id", therapistId)
         .order("created_at", { ascending: false })
-        .limit(5)
 
       if (clientsError) {
         console.error("[v0] Error fetching clients:", clientsError)
@@ -220,6 +220,52 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     .slice(0, 3)
 
+  const getLatestActivityAt = (client: Client, clientAssignments: Assignment[], clientWorksheetAssignments: WorksheetAssignment[]) => {
+    const activityDates = [
+      client.created_at,
+      ...clientAssignments.flatMap((assignment) => [
+        assignment.assigned_at,
+        assignment.started_at,
+        assignment.completed_at,
+      ]),
+      ...clientWorksheetAssignments.flatMap((assignment) => [
+        assignment.assigned_at,
+        assignment.started_at,
+        assignment.completed_at,
+      ]),
+    ].filter(Boolean) as string[]
+
+    return activityDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null
+  }
+
+  const clientsNeedingAttention = clients
+    .map((client) => {
+      const clientAssignments = assignments.filter(a => a.client_id === client.id)
+      const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === client.id)
+      const clientTotal = clientAssignments.length + clientWorksheetAssignments.length
+      const clientCompleted = clientAssignments.filter(a => a.completed || a.status === "completed").length
+        + clientWorksheetAssignments.filter(a => a.status === "completed").length
+      const pending = clientTotal - clientCompleted
+      const clientCompletionRate = clientTotal > 0 ? Math.round((clientCompleted / clientTotal) * 100) : null
+      const latestActivityAt = getLatestActivityAt(client, clientAssignments, clientWorksheetAssignments)
+      const inactiveDays = latestActivityAt
+        ? Math.floor((Date.now() - new Date(latestActivityAt).getTime()) / (1000 * 60 * 60 * 24))
+        : null
+      const reasons = [
+        clientCompletionRate !== null && clientCompletionRate < 25 ? "Completion under 25%" : null,
+        inactiveDays !== null && inactiveDays >= 14 ? `No activity in ${inactiveDays} days` : null,
+        pending > 0 ? `${pending} pending assignment${pending === 1 ? "" : "s"}` : null,
+      ].filter(Boolean) as string[]
+
+      return {
+        client,
+        completionRate: clientCompletionRate,
+        reasons,
+      }
+    })
+    .filter((item) => item.reasons.length > 0)
+    .slice(0, 5)
+
   const stats = [
     { label: "Total Assignments", value: totalAssignments.toString(), icon: FileText, change: pendingAssignments > 0 ? `${pendingAssignments} not completed` : "All caught up" },
     { label: "Completed Assignments", value: completedAssignments.toString(), icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No assignments yet" },
@@ -328,7 +374,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {clients.map((client) => {
+                  {clients.slice(0, 5).map((client) => {
                     const clientAssignments = assignments.filter(a => a.client_id === client.id)
                     const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === client.id)
                     const clientTotal = clientAssignments.length + clientWorksheetAssignments.length
@@ -373,8 +419,8 @@ export default function DashboardPage() {
                           )}
                           <p className="text-xs text-muted-foreground">Added {getDaysSinceCreated(client.created_at)}</p>
                           <Button variant="outline" size="sm" className="mt-2 rounded-lg text-xs" asChild>
-                            <Link href="/dashboard/clients">
-                              View
+                            <Link href={`/dashboard/clients/${client.id}/session-prep`}>
+                              Session Prep
                             </Link>
                           </Button>
                         </div>
@@ -463,6 +509,65 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+      >
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-primary" />
+              Clients Needing Attention
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="rounded-xl" asChild>
+              <Link href="/dashboard/clients">
+                View clients
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {clientsNeedingAttention.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                  <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">No clients need attention right now.</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {clientsNeedingAttention.map((item) => (
+                  <div key={item.client.id} className="p-4 bg-muted/30 rounded-xl">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{item.client.full_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{item.client.email || "No email provided"}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground shrink-0">
+                        {item.completionRate !== null ? `${item.completionRate}%` : "--"}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {item.reasons.map((reason) => (
+                        <span key={reason} className="text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700">
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" className="mt-4 rounded-lg text-xs" asChild>
+                      <Link href={`/dashboard/clients/${item.client.id}/session-prep`}>
+                        Session Prep
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Invite Client Modal */}
       <AddClientModal

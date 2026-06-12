@@ -94,6 +94,15 @@ interface ClientReflection {
   created_at: string
 }
 
+interface MoodCheckIn {
+  id: string
+  mood_rating: number
+  anxiety_rating: number | null
+  stress_rating: number | null
+  note: string | null
+  created_at: string
+}
+
 interface TimelineItem {
   date: string
   label: string
@@ -177,6 +186,7 @@ export default function SessionPrepPage() {
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignmentRecord[]>([])
   const [worksheetResponses, setWorksheetResponses] = useState<WorksheetResponseRecord[]>([])
   const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
+  const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [progressNotes, setProgressNotes] = useState<ProgressNote[]>([])
   const [noteId, setNoteId] = useState<string | null>(null)
   const [note, setNote] = useState("")
@@ -227,7 +237,7 @@ export default function SessionPrepPage() {
           return
         }
 
-        const [assignmentsResult, worksheetsResult, notesResult, progressNotesResult, clientReflectionsResult] = await Promise.all([
+        const [assignmentsResult, worksheetsResult, notesResult, progressNotesResult, clientReflectionsResult, moodCheckInsResult] = await Promise.all([
           supabase
             .from("assignments")
             .select("id, client_id, title, completed, status, reflection, created_at, assigned_at, started_at, completed_at")
@@ -271,6 +281,13 @@ export default function SessionPrepPage() {
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
             .limit(10),
+          supabase
+            .from("client_mood_checkins")
+            .select("id, mood_rating, anxiety_rating, stress_rating, note, created_at")
+            .eq("client_id", clientId)
+            .eq("therapist_id", resolvedTherapistId)
+            .order("created_at", { ascending: false })
+            .limit(30),
         ])
 
         if (assignmentsResult.error) throwQueryError("assignments query failed", assignmentsResult.error)
@@ -278,6 +295,7 @@ export default function SessionPrepPage() {
         if (notesResult.error) throwQueryError("session_prep_notes query failed", notesResult.error)
         if (progressNotesResult.error) throwQueryError("progress_notes query failed", progressNotesResult.error)
         if (clientReflectionsResult.error) throwQueryError("client_reflections query failed", clientReflectionsResult.error)
+        if (moodCheckInsResult.error) throwQueryError("client_mood_checkins query failed", moodCheckInsResult.error)
 
         const worksheetData = (worksheetsResult.data || []) as WorksheetAssignmentRecord[]
         const worksheetAssignmentIds = worksheetData.map((assignment) => assignment.id)
@@ -299,6 +317,7 @@ export default function SessionPrepPage() {
         setWorksheetAssignments(worksheetData)
         setWorksheetResponses((responsesResult.data || []) as WorksheetResponseRecord[])
         setClientReflections((clientReflectionsResult.data || []) as ClientReflection[])
+        setMoodCheckIns((moodCheckInsResult.data || []) as MoodCheckIn[])
         setProgressNotes((progressNotesResult.data || []) as ProgressNote[])
         setNoteId(latestNote?.id || null)
         setNote(latestNote?.note || "")
@@ -329,6 +348,27 @@ export default function SessionPrepPage() {
     ? Number((moodRatings.reduce((sum, rating) => sum + rating, 0) / moodRatings.length).toFixed(1))
     : null
   const mostRecentReflectionDate = clientReflections[0]?.created_at || null
+  const now = new Date()
+  const moodLast30Days = moodCheckIns.filter((checkIn) => (
+    now.getTime() - new Date(checkIn.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
+  ))
+  const moodLast7Days = moodCheckIns.filter((checkIn) => (
+    now.getTime() - new Date(checkIn.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000
+  ))
+  const averageMood = (items: MoodCheckIn[]) => (
+    items.length > 0 ? Number((items.reduce((sum, item) => sum + item.mood_rating, 0) / items.length).toFixed(1)) : null
+  )
+  const averageMood30 = averageMood(moodLast30Days)
+  const averageMood7 = averageMood(moodLast7Days)
+  const mostRecentMood = moodCheckIns[0] || null
+  const oldestRecentMood = moodCheckIns.length > 1 ? moodCheckIns[Math.min(moodCheckIns.length - 1, 6)] : null
+  const moodTrend = mostRecentMood && oldestRecentMood
+    ? mostRecentMood.mood_rating - oldestRecentMood.mood_rating >= 2
+      ? "improving"
+      : oldestRecentMood.mood_rating - mostRecentMood.mood_rating >= 2
+        ? "declining"
+        : "stable"
+    : "stable"
 
   const totalAssignments = assignments.length + worksheetAssignments.length
   const completedAssignments = assignments.filter((assignment) => assignment.completed || assignment.status === "completed").length
@@ -407,8 +447,16 @@ export default function SessionPrepPage() {
       })
     })
 
+    moodCheckIns.forEach((checkIn) => {
+      items.push({
+        date: checkIn.created_at,
+        label: "Mood check-in",
+        detail: `Mood ${checkIn.mood_rating}/10${checkIn.note ? `: ${checkIn.note}` : ""}`,
+      })
+    })
+
     return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20)
-  }, [assignments, clientRecord, clientReflections, worksheetAssignments, worksheetResponses, worksheetTitleById])
+  }, [assignments, clientRecord, clientReflections, moodCheckIns, worksheetAssignments, worksheetResponses, worksheetTitleById])
 
   const buildProgressNoteContext = () => {
     const recentCompletedAssignments = [
@@ -653,6 +701,52 @@ export default function SessionPrepPage() {
               <p className="text-xs text-muted-foreground">Last completed assignment</p>
               <p className="font-medium text-foreground">{lastCompletedAssignment.title}</p>
               <p className="text-xs text-muted-foreground">{formatDateTime(lastCompletedAssignment.completedAt)}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />
+            Mood Trend
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {moodCheckIns.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No mood check-ins submitted yet.</p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="p-3 rounded-xl bg-muted/30">
+                  <p className="text-xs text-muted-foreground">30-day average</p>
+                  <p className="text-2xl font-bold text-foreground">{averageMood30 !== null ? `${averageMood30}/10` : "--"}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-muted/30">
+                  <p className="text-xs text-muted-foreground">7-day average</p>
+                  <p className="text-2xl font-bold text-foreground">{averageMood7 !== null ? `${averageMood7}/10` : "--"}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-muted/30">
+                  <p className="text-xs text-muted-foreground">Most recent</p>
+                  <p className="text-2xl font-bold text-foreground">{mostRecentMood ? `${mostRecentMood.mood_rating}/10` : "--"}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-muted/30">
+                  <p className="text-xs text-muted-foreground">Check-ins</p>
+                  <p className="text-2xl font-bold text-foreground">{moodCheckIns.length}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-muted/30">
+                  <p className="text-xs text-muted-foreground">Trend</p>
+                  <p className="font-semibold text-foreground capitalize">{moodTrend}</p>
+                </div>
+              </div>
+              {mostRecentMood?.note && (
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-xs text-muted-foreground">Most recent note</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap mt-1">{mostRecentMood.note}</p>
+                  <p className="text-xs text-muted-foreground mt-2">{formatDateTime(mostRecentMood.created_at)}</p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Slider } from "@/components/ui/slider"
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -88,6 +89,15 @@ interface CoupleCheckIn {
   reflection: string | null
 }
 
+interface MoodCheckIn {
+  id: string
+  mood_rating: number
+  anxiety_rating: number | null
+  stress_rating: number | null
+  note: string | null
+  created_at: string
+}
+
 function ClientPortalContent() {
   const searchParams = useSearchParams()
   
@@ -99,12 +109,19 @@ function ClientPortalContent() {
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
   const [couples, setCouples] = useState<CoupleRecord[]>([])
   const [coupleCheckIns, setCoupleCheckIns] = useState<CoupleCheckIn[]>([])
+  const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [checkInSubmittingId, setCheckInSubmittingId] = useState<string | null>(null)
   const [checkInSuccessId, setCheckInSuccessId] = useState<string | null>(null)
+  const [moodRating, setMoodRating] = useState(5)
+  const [anxietyRating, setAnxietyRating] = useState<number | null>(null)
+  const [stressRating, setStressRating] = useState<number | null>(null)
+  const [moodNote, setMoodNote] = useState("")
+  const [isMoodSaving, setIsMoodSaving] = useState(false)
+  const [moodSuccess, setMoodSuccess] = useState(false)
   const [checkInForms, setCheckInForms] = useState<Record<string, {
     relationship_satisfaction: number
     trust: number
@@ -197,6 +214,19 @@ function ClientPortalContent() {
         } else {
           setCoupleCheckIns(checkInsData || [])
         }
+      }
+
+      const { data: moodData, error: moodError } = await (supabase as any)
+        .from("client_mood_checkins")
+        .select("id, mood_rating, anxiety_rating, stress_rating, note, created_at")
+        .eq("client_id", client.id)
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+      if (moodError) {
+        console.error("[v0] Error fetching mood check-ins:", moodError)
+      } else {
+        setMoodCheckIns(moodData || [])
       }
 
       setIsLoading(false)
@@ -383,6 +413,42 @@ function ClientPortalContent() {
     setTimeout(() => setCheckInSuccessId(null), 2000)
   }
 
+  const saveMoodCheckIn = async () => {
+    if (!clientRecord) return
+
+    setIsMoodSaving(true)
+    setMoodSuccess(false)
+
+    const supabase = getClient() as any
+    const { data, error: insertError } = await supabase
+      .from("client_mood_checkins")
+      .insert({
+        therapist_id: clientRecord.therapist_id,
+        client_id: clientRecord.id,
+        mood_rating: moodRating,
+        anxiety_rating: anxietyRating,
+        stress_rating: stressRating,
+        note: moodNote.trim() || null,
+      })
+      .select("id, mood_rating, anxiety_rating, stress_rating, note, created_at")
+      .single()
+
+    if (insertError) {
+      console.error("[v0] Error saving mood check-in:", insertError)
+      setIsMoodSaving(false)
+      return
+    }
+
+    setMoodCheckIns(prev => [data, ...prev])
+    setMoodRating(5)
+    setAnxietyRating(null)
+    setStressRating(null)
+    setMoodNote("")
+    setMoodSuccess(true)
+    setIsMoodSaving(false)
+    setTimeout(() => setMoodSuccess(false), 2000)
+  }
+
   // Format due date
   const formatDueDate = (dateStr: string | null) => {
     if (!dateStr) return "No due date"
@@ -515,6 +581,74 @@ function ClientPortalContent() {
                     Open Journal
                   </Link>
                 </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  Mood Check-In
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">Mood today</p>
+                    <p className="text-sm font-semibold text-primary">{moodRating}/10</p>
+                  </div>
+                  <Slider value={[moodRating]} min={1} max={10} step={1} onValueChange={(value) => setMoodRating(value[0] || 5)} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">Anxiety</p>
+                      <p className="text-sm text-muted-foreground">{anxietyRating ? `${anxietyRating}/10` : "Optional"}</p>
+                    </div>
+                    <Slider value={[anxietyRating || 1]} min={1} max={10} step={1} onValueChange={(value) => setAnxietyRating(value[0] || null)} />
+                    <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setAnxietyRating(null)}>Clear anxiety</Button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">Stress</p>
+                      <p className="text-sm text-muted-foreground">{stressRating ? `${stressRating}/10` : "Optional"}</p>
+                    </div>
+                    <Slider value={[stressRating || 1]} min={1} max={10} step={1} onValueChange={(value) => setStressRating(value[0] || null)} />
+                    <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setStressRating(null)}>Clear stress</Button>
+                  </div>
+                </div>
+                <Textarea
+                  value={moodNote}
+                  onChange={(event) => setMoodNote(event.target.value)}
+                  placeholder="Optional note..."
+                  className="min-h-24 rounded-xl"
+                />
+                <Button className="w-full rounded-xl" onClick={saveMoodCheckIn} disabled={isMoodSaving}>
+                  {isMoodSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : moodSuccess ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Saved
+                    </>
+                  ) : (
+                    "Save Check-In"
+                  )}
+                </Button>
+                {moodCheckIns.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Most recent mood: {moodCheckIns[0].mood_rating}/10 on {new Date(moodCheckIns[0].created_at).toLocaleDateString()}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </motion.div>

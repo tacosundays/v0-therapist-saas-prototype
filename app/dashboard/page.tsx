@@ -84,6 +84,14 @@ interface ClientReflection {
   created_at: string
 }
 
+interface MoodCheckIn {
+  id: string
+  client_id: string
+  mood_rating: number
+  anxiety_rating: number | null
+  created_at: string
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [clients, setClients] = useState<Client[]>([])
@@ -92,6 +100,7 @@ export default function DashboardPage() {
   const [couples, setCouples] = useState<CoupleRecord[]>([])
   const [coupleCheckIns, setCoupleCheckIns] = useState<CoupleCheckIn[]>([])
   const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
+  const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
@@ -186,6 +195,18 @@ export default function DashboardPage() {
         console.error("[v0] Error fetching client reflections:", reflectionsError)
       } else {
         setClientReflections(reflectionsData || [])
+      }
+
+      const { data: moodData, error: moodError } = await supabase
+        .from("client_mood_checkins")
+        .select("id, client_id, mood_rating, anxiety_rating, created_at")
+        .eq("therapist_id", therapistId)
+        .order("created_at", { ascending: false })
+
+      if (moodError) {
+        console.error("[v0] Error fetching client mood check-ins:", moodError)
+      } else {
+        setMoodCheckIns(moodData || [])
       }
     } catch (err) {
       console.error("[v0] Exception fetching data:", err)
@@ -317,10 +338,29 @@ export default function DashboardPage() {
       const inactiveDays = latestActivityAt
         ? Math.floor((Date.now() - new Date(latestActivityAt).getTime()) / (1000 * 60 * 60 * 24))
         : null
+      const clientMoodCheckIns = moodCheckIns.filter((checkIn) => checkIn.client_id === client.id)
+      const recentMoodCheckIns = clientMoodCheckIns.slice(0, 5)
+      const averageMood = recentMoodCheckIns.length > 0
+        ? recentMoodCheckIns.reduce((sum, checkIn) => sum + checkIn.mood_rating, 0) / recentMoodCheckIns.length
+        : null
+      const latestMoodCheckIn = clientMoodCheckIns[0] || null
+      const daysSinceMoodCheckIn = latestMoodCheckIn
+        ? Math.floor((Date.now() - new Date(latestMoodCheckIn.created_at).getTime()) / (1000 * 60 * 60 * 24))
+        : null
+      const daysSinceClientCreated = Math.floor((Date.now() - new Date(client.created_at).getTime()) / (1000 * 60 * 60 * 24))
+      const oldestRecentMood = clientMoodCheckIns.length > 1 ? clientMoodCheckIns[Math.min(clientMoodCheckIns.length - 1, 4)] : null
+      const moodDropped = latestMoodCheckIn && oldestRecentMood
+        ? oldestRecentMood.mood_rating - latestMoodCheckIn.mood_rating >= 3
+        : false
       const reasons = [
         clientCompletionRate !== null && clientCompletionRate < 25 ? "Completion under 25%" : null,
         inactiveDays !== null && inactiveDays >= 14 ? `No activity in ${inactiveDays} days` : null,
         pending > 0 ? `${pending} pending assignment${pending === 1 ? "" : "s"}` : null,
+        averageMood !== null && averageMood < 4 ? "Average mood under 4" : null,
+        clientMoodCheckIns.some((checkIn) => (checkIn.anxiety_rating || 0) > 8) ? "Anxiety over 8" : null,
+        daysSinceMoodCheckIn !== null && daysSinceMoodCheckIn >= 14 ? `No mood check-in in ${daysSinceMoodCheckIn} days` : null,
+        daysSinceMoodCheckIn === null && daysSinceClientCreated >= 14 ? "No mood check-in" : null,
+        moodDropped ? "Mood dropped 3+ points" : null,
       ].filter(Boolean) as string[]
 
       return {

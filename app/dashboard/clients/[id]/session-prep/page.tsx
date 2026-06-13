@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Clock, FileText, Loader2, Plus, Save, UserRound } from "lucide-react"
+import { ArrowLeft, Clock, FileText, Loader2, Plus, Save, Sparkles, UserRound } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -103,6 +103,26 @@ interface MoodCheckIn {
   created_at: string
 }
 
+interface SessionSummarySections {
+  clientOverview?: string | null
+  progressSinceLastSession?: string | null
+  moodTrends?: string | null
+  reflectionThemes?: string | null
+  homeworkProgress?: string | null
+  suggestedDiscussionTopics?: string[] | null
+}
+
+interface SessionSummaryRecord {
+  id: string
+  therapist_id: string
+  client_id: string
+  summary_json: SessionSummarySections | null
+  summary_text: string | null
+  source_counts: Record<string, number> | null
+  model: string | null
+  created_at: string
+}
+
 interface TimelineItem {
   date: string
   label: string
@@ -188,10 +208,12 @@ export default function SessionPrepPage() {
   const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [progressNotes, setProgressNotes] = useState<ProgressNote[]>([])
+  const [sessionSummaries, setSessionSummaries] = useState<SessionSummaryRecord[]>([])
   const [noteId, setNoteId] = useState<string | null>(null)
   const [note, setNote] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false)
   const [isProgressNoteOpen, setIsProgressNoteOpen] = useState(false)
   const [isProgressNoteSaving, setIsProgressNoteSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -237,7 +259,15 @@ export default function SessionPrepPage() {
           return
         }
 
-        const [assignmentsResult, worksheetsResult, notesResult, progressNotesResult, clientReflectionsResult, moodCheckInsResult] = await Promise.all([
+        const [
+          assignmentsResult,
+          worksheetsResult,
+          notesResult,
+          progressNotesResult,
+          clientReflectionsResult,
+          moodCheckInsResult,
+          sessionSummariesResult,
+        ] = await Promise.all([
           supabase
             .from("assignments")
             .select("id, client_id, title, completed, status, reflection, created_at, assigned_at, started_at, completed_at")
@@ -288,6 +318,13 @@ export default function SessionPrepPage() {
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
             .limit(30),
+          supabase
+            .from("session_summaries")
+            .select("id, therapist_id, client_id, summary_json, summary_text, source_counts, model, created_at")
+            .eq("client_id", clientId)
+            .eq("therapist_id", resolvedTherapistId)
+            .order("created_at", { ascending: false })
+            .limit(5),
         ])
 
         if (assignmentsResult.error) throwQueryError("assignments query failed", assignmentsResult.error)
@@ -296,6 +333,7 @@ export default function SessionPrepPage() {
         if (progressNotesResult.error) throwQueryError("progress_notes query failed", progressNotesResult.error)
         if (clientReflectionsResult.error) throwQueryError("client_reflections query failed", clientReflectionsResult.error)
         if (moodCheckInsResult.error) throwQueryError("client_mood_checkins query failed", moodCheckInsResult.error)
+        if (sessionSummariesResult.error) throwQueryError("session_summaries query failed", sessionSummariesResult.error)
 
         const worksheetData = (worksheetsResult.data || []) as WorksheetAssignmentRecord[]
         const worksheetAssignmentIds = worksheetData.map((assignment) => assignment.id)
@@ -319,6 +357,7 @@ export default function SessionPrepPage() {
         setClientReflections((clientReflectionsResult.data || []) as ClientReflection[])
         setMoodCheckIns((moodCheckInsResult.data || []) as MoodCheckIn[])
         setProgressNotes((progressNotesResult.data || []) as ProgressNote[])
+        setSessionSummaries((sessionSummariesResult.data || []) as SessionSummaryRecord[])
         setNoteId(latestNote?.id || null)
         setNote(latestNote?.note || "")
       } catch (err) {
@@ -369,6 +408,7 @@ export default function SessionPrepPage() {
         ? "declining"
         : "stable"
     : "stable"
+  const latestSessionSummary = sessionSummaries[0] || null
 
   const totalAssignments = assignments.length + worksheetAssignments.length
   const completedAssignments = assignments.filter((assignment) => assignment.completed || assignment.status === "completed").length
@@ -554,6 +594,55 @@ export default function SessionPrepPage() {
     }
   }
 
+  const generateSessionSummary = async () => {
+    if (!clientRecord) return
+
+    setIsSummaryLoading(true)
+    setSuccess(null)
+    setError(null)
+
+    try {
+      const supabase = getClient() as any
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) throwQueryError("auth session query failed", sessionError)
+
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        setError("You must be logged in to generate a session summary.")
+        return
+      }
+
+      const response = await fetch("/api/session-summary", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ clientId: clientRecord.id }),
+      })
+
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to generate session summary.")
+      }
+
+      if (!result?.summary) {
+        throw new Error("Session summary was not returned.")
+      }
+
+      setSessionSummaries((current) => [result.summary as SessionSummaryRecord, ...current].slice(0, 5))
+      setSuccess("Session summary generated.")
+    } catch (err) {
+      console.error("[v0] Session Prep: failed to generate session summary", err)
+      setError(`Failed to generate session summary. ${getErrorMessage(err)}`)
+    } finally {
+      setIsSummaryLoading(false)
+    }
+  }
+
   const saveNote = async () => {
     if (!therapistId || !clientRecord) return
 
@@ -701,6 +790,115 @@ export default function SessionPrepPage() {
               <p className="text-xs text-muted-foreground">Last completed assignment</p>
               <p className="font-medium text-foreground">{lastCompletedAssignment.title}</p>
               <p className="text-xs text-muted-foreground">{formatDateTime(lastCompletedAssignment.completedAt)}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Session Summary
+          </CardTitle>
+          <Button className="rounded-xl" onClick={generateSessionSummary} disabled={isSummaryLoading}>
+            {isSummaryLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Summary
+              </>
+            )}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {!latestSessionSummary ? (
+            <div className="p-4 rounded-xl bg-muted/30">
+              <p className="text-sm text-muted-foreground">
+                No AI session summaries generated yet.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">Generated {formatDateTime(latestSessionSummary.created_at)}</Badge>
+                {latestSessionSummary.model && <Badge variant="outline">{latestSessionSummary.model}</Badge>}
+              </div>
+
+              <div className="grid gap-4">
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-sm font-medium text-foreground mb-1">Client Overview</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {latestSessionSummary.summary_json?.clientOverview || "No client overview available."}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-sm font-medium text-foreground mb-1">Progress Since Last Session</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {latestSessionSummary.summary_json?.progressSinceLastSession || "No progress summary available."}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-sm font-medium text-foreground mb-1">Mood Trends</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {latestSessionSummary.summary_json?.moodTrends || "No mood trend summary available."}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-sm font-medium text-foreground mb-1">Reflection Themes</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {latestSessionSummary.summary_json?.reflectionThemes || "No reflection theme summary available."}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-sm font-medium text-foreground mb-1">Homework Progress</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {latestSessionSummary.summary_json?.homeworkProgress || "No homework progress summary available."}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-muted/30">
+                  <p className="text-sm font-medium text-foreground mb-2">Suggested Discussion Topics</p>
+                  {latestSessionSummary.summary_json?.suggestedDiscussionTopics?.length ? (
+                    <div className="space-y-2">
+                      {latestSessionSummary.summary_json.suggestedDiscussionTopics.map((topic, index) => (
+                        <p key={`${topic}-${index}`} className="text-sm text-muted-foreground">
+                          {index + 1}. {topic}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No discussion topics available.</p>
+                  )}
+                </div>
+              </div>
+
+              {latestSessionSummary.source_counts && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {Object.entries(latestSessionSummary.source_counts).map(([label, count]) => (
+                    <Badge key={label} variant="secondary" className="capitalize">
+                      {label.replace(/([A-Z])/g, " $1")}: {count}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {sessionSummaries.length > 1 && (
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">Summary History</p>
+                  <div className="space-y-2">
+                    {sessionSummaries.slice(1).map((summary) => (
+                      <div key={summary.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30">
+                        <p className="text-sm text-foreground">Generated summary</p>
+                        <p className="text-xs text-muted-foreground">{formatDateTime(summary.created_at)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

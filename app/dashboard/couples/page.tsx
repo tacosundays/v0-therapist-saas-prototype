@@ -107,6 +107,26 @@ function getClientName(clientsById: Map<string, ClientRecord>, clientId: string)
   return clientsById.get(clientId)?.full_name || "Unknown client"
 }
 
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === "object") {
+    const errorObject = err as { message?: string; details?: string; hint?: string; code?: string }
+    return [
+      errorObject.message,
+      errorObject.details ? `Details: ${errorObject.details}` : null,
+      errorObject.hint ? `Hint: ${errorObject.hint}` : null,
+      errorObject.code ? `Code: ${errorObject.code}` : null,
+    ].filter(Boolean).join(" ")
+  }
+  return "Unknown error"
+}
+
+function throwQueryError(label: string, err: unknown): never {
+  const message = `${label}: ${getErrorMessage(err)}`
+  console.error(`[v0] Couples: ${message}`, err)
+  throw new Error(message)
+}
+
 function getLatestActivity(
   couple: CoupleRecord,
   checkIns: CheckInRecord[],
@@ -171,12 +191,18 @@ export default function CouplesPage() {
 
       setTherapistId(resolvedTherapistId)
 
-      const [clientsResult, couplesResult, checkInsResult, assignmentsResult, notesResult] = await Promise.all([
-        supabase
-          .from("clients")
-          .select("id, full_name, email")
-          .eq("therapist_id", resolvedTherapistId)
-          .order("full_name", { ascending: true }),
+      const clientsResult = await supabase
+        .from("clients")
+        .select("id, full_name, email")
+        .eq("therapist_id", resolvedTherapistId)
+        .order("full_name", { ascending: true })
+
+      if (clientsResult.error) throwQueryError("clients query failed", clientsResult.error)
+
+      console.log("[v0] Couples: clients count:", clientsResult.data?.length ?? 0)
+      setClients(clientsResult.data || [])
+
+      const [couplesResult, checkInsResult, assignmentsResult, notesResult] = await Promise.all([
         supabase
           .from("couples")
           .select("*")
@@ -200,13 +226,11 @@ export default function CouplesPage() {
           .order("created_at", { ascending: false }),
       ])
 
-      if (clientsResult.error) throw clientsResult.error
-      if (couplesResult.error) throw couplesResult.error
-      if (checkInsResult.error) throw checkInsResult.error
-      if (assignmentsResult.error) throw assignmentsResult.error
-      if (notesResult.error) throw notesResult.error
+      if (couplesResult.error) throwQueryError("couples query failed", couplesResult.error)
+      if (checkInsResult.error) throwQueryError("couple_check_ins query failed", checkInsResult.error)
+      if (assignmentsResult.error) throwQueryError("assignments couple_id query failed", assignmentsResult.error)
+      if (notesResult.error) throwQueryError("couple_notes query failed", notesResult.error)
 
-      setClients(clientsResult.data || [])
       setCouples(couplesResult.data || [])
       setCheckIns(checkInsResult.data || [])
       setAssignments(assignmentsResult.data || [])
@@ -217,7 +241,7 @@ export default function CouplesPage() {
       }
     } catch (err) {
       console.error("[v0] Couples: failed to load data", err)
-      setError(err instanceof Error ? err.message : "Failed to load couples.")
+      setError(`Failed to load couples. ${getErrorMessage(err)}`)
     } finally {
       setIsLoading(false)
     }

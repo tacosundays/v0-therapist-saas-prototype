@@ -215,6 +215,8 @@ export default function SessionPrepPage() {
   const [isProgressNoteSaving, setIsProgressNoteSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [noteSaveMessage, setNoteSaveMessage] = useState<string | null>(null)
+  const [noteSaveError, setNoteSaveError] = useState<string | null>(null)
   const [progressNoteForm, setProgressNoteForm] = useState<ProgressNoteForm>({
     note_type: "DAP",
     subjective: "",
@@ -646,37 +648,77 @@ export default function SessionPrepPage() {
     setIsSaving(true)
     setSuccess(null)
     setError(null)
+    setNoteSaveMessage(null)
+    setNoteSaveError(null)
 
     try {
       const supabase = getClient() as any
+      const notePayload = {
+        therapist_id: therapistId,
+        client_id: clientRecord.id,
+        note,
+      }
 
-      if (noteId) {
-        const { error: updateError } = await supabase
+      const { data: latestNote, error: latestNoteError } = await supabase
+        .from("session_prep_notes")
+        .select("id")
+        .eq("client_id", clientRecord.id)
+        .eq("therapist_id", therapistId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestNoteError) {
+        console.error("[v0] Session Prep: session_prep_notes latest note query failed", latestNoteError)
+        throwQueryError("session_prep_notes latest note query failed", latestNoteError)
+      }
+
+      const existingNoteId = latestNote?.id || noteId
+
+      if (existingNoteId) {
+        const { data: updatedNote, error: updateError } = await supabase
           .from("session_prep_notes")
           .update({ note })
-          .eq("id", noteId)
+          .eq("id", existingNoteId)
           .eq("therapist_id", therapistId)
+          .select("id, note")
+          .maybeSingle()
 
-        if (updateError) throwQueryError("session_prep_notes update failed", updateError)
+        if (updateError) {
+          console.error("[v0] Session Prep: session_prep_notes update failed", updateError)
+          throwQueryError("session_prep_notes update failed", updateError)
+        }
+
+        if (!updatedNote) {
+          console.error("[v0] Session Prep: session_prep_notes update returned no row", { existingNoteId, therapistId })
+          throw new Error("session_prep_notes update returned no row. Check RLS policy and note ownership.")
+        }
+
+        setNoteId(updatedNote.id)
+        setNote(updatedNote.note || "")
       } else {
         const { data, error: insertError } = await supabase
           .from("session_prep_notes")
-          .insert({
-            therapist_id: therapistId,
-            client_id: clientRecord.id,
-            note,
-          })
-          .select("id")
+          .insert(notePayload)
+          .select("id, note")
           .single()
 
-        if (insertError) throwQueryError("session_prep_notes insert failed", insertError)
+        if (insertError) {
+          console.error("[v0] Session Prep: session_prep_notes insert failed", insertError)
+          throwQueryError("session_prep_notes insert failed", insertError)
+        }
+
         setNoteId(data.id)
+        setNote(data.note || "")
       }
 
       setSuccess("Session notes saved.")
+      setNoteSaveMessage("Notes saved.")
     } catch (err) {
       console.error("[v0] Session Prep: failed to save note", err)
-      setError(`Failed to save note. ${getErrorMessage(err)}`)
+      const message = `Failed to save note. ${getErrorMessage(err)}`
+      setError(message)
+      setNoteSaveError(message)
     } finally {
       setIsSaving(false)
     }
@@ -1106,6 +1148,12 @@ export default function SessionPrepPage() {
               </>
             )}
           </Button>
+          {noteSaveMessage && (
+            <p className="text-sm text-primary">{noteSaveMessage}</p>
+          )}
+          {noteSaveError && (
+            <p className="text-sm text-destructive">{noteSaveError}</p>
+          )}
         </CardContent>
       </Card>
 

@@ -69,6 +69,31 @@ export async function getCheckoutAvailability() {
   )
 }
 
+async function logAndVerifyStripeCheckoutConfig(productId: string, priceId: string) {
+  const [account, price] = await Promise.all([
+    stripe.accounts.retrieve(null),
+    stripe.prices.retrieve(priceId),
+  ])
+
+  console.log('[v0] Stripe checkout config', {
+    stripeAccountId: account.id,
+    stripeAccountCountry: account.country,
+    stripeAccountChargesEnabled: account.charges_enabled,
+    productId,
+    priceId,
+    stripeSoloPriceId: process.env.STRIPE_SOLO_PRICE_ID || null,
+    soloPriceMatchesExpected: process.env.STRIPE_SOLO_PRICE_ID === 'price_1ThywzQ73wnXTr0yEVh5VwC9',
+    priceLivemode: price.livemode,
+    priceActive: price.active,
+    priceCurrency: price.currency,
+    priceUnitAmount: price.unit_amount,
+    priceRecurringInterval: price.recurring?.interval || null,
+    priceProduct: typeof price.product === 'string' ? price.product : price.product.id,
+  })
+
+  return { account, price }
+}
+
 export async function startSubscriptionCheckout(productId: string, userData: UserData) {
   try {
     const normalizedProductId = normalizeProductId(productId)
@@ -131,6 +156,7 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const { account, price } = await logAndVerifyStripeCheckoutConfig(product.id, priceId)
 
     // Create redirect-based checkout session
     const session = await stripe.checkout.sessions.create({
@@ -155,6 +181,13 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
     if (!session.url) {
       return { error: 'Failed to create checkout session' }
     }
+
+    console.log('[v0] Stripe checkout session created', {
+      stripeAccountId: account.id,
+      checkoutSessionId: session.id,
+      productId: product.id,
+      priceId: price.id,
+    })
 
     return { url: session.url }
   } catch (error) {

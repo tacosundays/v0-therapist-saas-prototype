@@ -63,7 +63,7 @@ export function UpgradeModal({ open, onOpenChange, currentLimit, currentCount }:
     setError(null)
 
     try {
-      const result = await startSubscriptionCheckout("group-practice", userData)
+      const result = await startSubscriptionCheckout("growing-practice", userData)
       
       if (result.error) {
         setError(result.error)
@@ -90,26 +90,26 @@ export function UpgradeModal({ open, onOpenChange, currentLimit, currentCount }:
           <DialogTitle className="text-center">Client Limit Reached</DialogTitle>
           <DialogDescription className="text-center">
             You&apos;ve reached your plan&apos;s limit of {currentLimit} clients ({currentCount}/{currentLimit} used).
-            Upgrade to Group Practice for unlimited clients.
+            Upgrade to Growing Practice for up to 75 active clients.
           </DialogDescription>
         </DialogHeader>
         
         <div className="bg-muted/50 rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span>Unlimited clients</span>
+            <span>Up to 75 active clients</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span>Up to 5 therapists</span>
+            <span>AI homework suggestions</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span>Team collaboration</span>
+            <span>Custom worksheet builder</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span>Priority support</span>
+            <span>Advanced analytics</span>
           </div>
         </div>
 
@@ -129,7 +129,7 @@ export function UpgradeModal({ open, onOpenChange, currentLimit, currentCount }:
               </>
             ) : (
               <>
-                Upgrade to Group Practice
+                Upgrade to Growing Practice
                 <ArrowRight className="w-4 h-4 ml-2" />
               </>
             )}

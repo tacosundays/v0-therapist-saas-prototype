@@ -1,8 +1,9 @@
 'use server'
 
 import { stripe } from '../../lib/stripe'
-import { PRODUCTS } from '../../lib/products'
+import { getProductById, getStripePriceId, normalizeProductId, PRODUCTS } from '../../lib/products'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import type Stripe from 'stripe'
 
 // Create admin client for server-side operations (doesn't rely on cookies)
 function getSupabaseAdmin() {
@@ -18,15 +19,65 @@ interface UserData {
   practiceName?: string
 }
 
+type StripeSubscriptionWithPeriod = Stripe.Subscription & {
+  current_period_end?: number | null
+}
+
+function convertUnixToISO(unixSeconds: number | null | undefined): string | null {
+  if (unixSeconds === null || unixSeconds === undefined) {
+    return null
+  }
+  if (typeof unixSeconds !== 'number' || unixSeconds <= 0) {
+    return null
+  }
+  const date = new Date(unixSeconds * 1000)
+  if (isNaN(date.getTime())) {
+    return null
+  }
+  return date.toISOString()
+}
+
+function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): string | null {
+  return convertUnixToISO((subscription as StripeSubscriptionWithPeriod).current_period_end)
+}
+
+function getTrialEnd(subscription: Stripe.Subscription): string | null {
+  return convertUnixToISO(subscription.trial_end)
+}
+
+function billingUpdateData(subscription: Stripe.Subscription, customerId: string | null, productId: string | null) {
+  const normalizedProductId = normalizeProductId(productId)
+  const currentPeriodEnd = getSubscriptionPeriodEnd(subscription)
+  const trialEnd = getTrialEnd(subscription)
+
+  return {
+    subscription_status: subscription.status || 'active',
+    subscription_plan: normalizedProductId,
+    stripe_subscription_id: subscription.id,
+    stripe_customer_id: customerId,
+    subscription_end_date: currentPeriodEnd,
+    trial_end_date: trialEnd,
+  }
+}
+
+export async function getCheckoutAvailability() {
+  return Object.fromEntries(
+    PRODUCTS.map((product) => [product.id, Boolean(getStripePriceId(product.id))])
+  )
+}
+
 export async function startSubscriptionCheckout(productId: string, userData: UserData) {
   try {
-    const product = PRODUCTS.find((p) => p.id === productId)
+    const normalizedProductId = normalizeProductId(productId)
+    const product = normalizedProductId ? getProductById(normalizedProductId) : null
     if (!product) {
       return { error: `Product with id "${productId}" not found` }
     }
 
-    if (product.isEnterprise) {
-      return { error: 'Please contact sales for Enterprise pricing' }
+    const priceId = getStripePriceId(product.id)
+
+    if (!priceId) {
+      return { error: `${product.name} checkout is not configured yet. Please contact sales.` }
     }
 
     // Validate user data
@@ -83,17 +134,7 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
       customer: customerId,
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: product.name,
-              description: product.description,
-            },
-            unit_amount: product.priceInCents,
-            recurring: {
-              interval: product.interval,
-            },
-          },
+          price: priceId,
           quantity: 1,
         },
       ],
@@ -103,7 +144,7 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
       subscription_data: {
         metadata: {
           therapist_id: userData.id,
-          product_id: productId,
+          product_id: product.id,
         },
       },
     })
@@ -140,13 +181,15 @@ export async function getSubscriptionStatus(userData?: UserData) {
   const trialEndDate = therapist.trial_end_date ? new Date(therapist.trial_end_date) : null
   const isInTrial = trialEndDate && trialEndDate > now && therapist.subscription_status !== 'active'
 
+  const normalizedPlan = normalizeProductId(therapist.subscription_plan) || 'free'
+
   return {
     status: therapist.subscription_status || (isInTrial ? 'trialing' : 'inactive'),
     subscription: {
-      plan: therapist.subscription_plan,
+      plan: normalizedPlan,
       endDate: therapist.subscription_end_date,
       trialEndDate: therapist.trial_end_date,
-      isInTrial,
+      isInTrial: Boolean(isInTrial),
     },
   }
 }
@@ -210,7 +253,7 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
       ? await stripe.subscriptions.retrieve(session.subscription)
       : session.subscription
 
-    const productId = subscription.metadata.product_id
+    const productId = normalizeProductId(subscription.metadata.product_id)
     const therapistId = subscription.metadata.therapist_id
 
     // Verify the therapist ID matches (if present in metadata)
@@ -220,44 +263,15 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
 
     const supabase = getSupabaseAdmin()
 
-    // Determine subscription status based on Stripe subscription status
-    const subscriptionStatus = subscription.status || 'active'
-
-    // Convert Unix timestamp (seconds) to ISO string, returns null if invalid
-    const convertUnixToISO = (unixSeconds: number | null | undefined): string | null => {
-      if (unixSeconds === null || unixSeconds === undefined) {
-        return null
-      }
-      if (typeof unixSeconds !== 'number' || unixSeconds <= 0) {
-        return null
-      }
-      const date = new Date(unixSeconds * 1000)
-      if (isNaN(date.getTime())) {
-        return null
-      }
-      return date.toISOString()
-    }
-
-    // Get dates from subscription
-    const subscriptionEndDate = convertUnixToISO(subscription.current_period_end)
-    const trialEndDate = convertUnixToISO(subscription.trial_end)
-
     console.log('[v0] Date conversion:', {
-      raw_current_period_end: subscription.current_period_end,
+      raw_current_period_end: (subscription as StripeSubscriptionWithPeriod).current_period_end,
       raw_trial_end: subscription.trial_end,
-      converted_subscription_end_date: subscriptionEndDate,
-      converted_trial_end_date: trialEndDate,
+      converted_subscription_end_date: getSubscriptionPeriodEnd(subscription),
+      converted_trial_end_date: getTrialEnd(subscription),
     })
 
     // Update the therapist record with subscription info
-    const updateData = {
-      subscription_status: subscriptionStatus,
-      subscription_plan: productId || null,
-      stripe_subscription_id: subscription.id,
-      stripe_customer_id: session.customer as string,
-      subscription_end_date: subscriptionEndDate,
-      trial_end_date: trialEndDate,
-    }
+    const updateData = billingUpdateData(subscription, session.customer as string, productId)
 
     console.log('[v0] Updating therapist with:', updateData)
 

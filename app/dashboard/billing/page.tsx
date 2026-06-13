@@ -17,7 +17,7 @@ import {
   Users
 } from "lucide-react"
 import { PRODUCTS, type Product } from "@/lib/products"
-import { getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout, verifyAndActivateSubscription } from "@/app/actions/stripe"
+import { getCheckoutAvailability, getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout, verifyAndActivateSubscription } from "@/app/actions/stripe"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClientLimitDisplay, getPlanLimits } from "@/lib/plan-limits"
@@ -49,6 +49,7 @@ export default function BillingPage() {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [clientCount, setClientCount] = useState<number>(0)
+  const [checkoutAvailability, setCheckoutAvailability] = useState<Record<string, boolean>>({})
   const hasVerified = useRef(false)
 
   // Get current user on mount
@@ -58,17 +59,17 @@ export default function BillingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user?.id && user?.email) {
-        setUserData({ 
-          id: user.id, 
-          email: user.email,
-          fullName: user.user_metadata?.full_name || `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || undefined,
-          practiceName: user.user_metadata?.practice_name || undefined
-        })
-
         const { therapistId, userEmail } = await getTherapistId()
 
         console.log("[v0] Billing: auth email:", userEmail)
         console.log("[v0] Billing: therapist id found:", therapistId ?? "none")
+
+        setUserData({ 
+          id: therapistId || user.id,
+          email: user.email,
+          fullName: user.user_metadata?.full_name || `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || undefined,
+          practiceName: user.user_metadata?.practice_name || undefined
+        })
 
         // Fetch client count
         if (therapistId) {
@@ -81,6 +82,9 @@ export default function BillingPage() {
           setClientCount(count || 0)
         }
       }
+
+      const availability = await getCheckoutAvailability()
+      setCheckoutAvailability(availability)
     }
     fetchUser()
   }, [])
@@ -392,6 +396,7 @@ export default function BillingPage() {
               product={product}
               isCurrentPlan={currentPlan === product.id}
               isLoading={checkoutLoading === product.id}
+              canCheckout={checkoutAvailability[product.id] ?? false}
               onSelect={() => handleSelectPlan(product.id)}
               delay={index * 0.1}
             />
@@ -406,11 +411,12 @@ interface PlanCardProps {
   product: Product
   isCurrentPlan: boolean
   isLoading: boolean
+  canCheckout: boolean
   onSelect: () => void
   delay: number
 }
 
-function PlanCard({ product, isCurrentPlan, isLoading, onSelect, delay }: PlanCardProps) {
+function PlanCard({ product, isCurrentPlan, isLoading, canCheckout, onSelect, delay }: PlanCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -427,14 +433,8 @@ function PlanCard({ product, isCurrentPlan, isLoading, onSelect, delay }: PlanCa
           <CardTitle>{product.name}</CardTitle>
           <CardDescription>{product.description}</CardDescription>
           <div className="pt-2">
-            {product.isEnterprise ? (
-              <span className="text-3xl font-bold">Custom</span>
-            ) : (
-              <>
-                <span className="text-3xl font-bold">${(product.priceInCents / 100).toFixed(0)}</span>
-                <span className="text-muted-foreground">/{product.interval}</span>
-              </>
-            )}
+            <span className="text-3xl font-bold">${(product.priceInCents / 100).toFixed(0)}</span>
+            <span className="text-muted-foreground">/{product.interval}</span>
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col">
@@ -451,7 +451,7 @@ function PlanCard({ product, isCurrentPlan, isLoading, onSelect, delay }: PlanCa
               <Button disabled className="w-full rounded-xl">
                 Current Plan
               </Button>
-            ) : product.isEnterprise ? (
+            ) : product.contactSalesIfMissingPrice && !canCheckout ? (
               <Button variant="outline" className="w-full rounded-xl" disabled>
                 Contact Sales
               </Button>

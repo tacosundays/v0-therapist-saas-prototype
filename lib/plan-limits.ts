@@ -1,4 +1,4 @@
-import { PRODUCTS } from './products'
+import { getProductById, normalizeProductId } from './products'
 
 export interface PlanLimits {
   clientLimit: number | null // null = unlimited
@@ -6,41 +6,26 @@ export interface PlanLimits {
 }
 
 export const FREE_TRIAL_LIMITS: PlanLimits = {
-  clientLimit: 20,
+  clientLimit: 3,
   therapistLimit: 1,
 }
 
 export function getPlanLimits(planId: string | null | undefined): PlanLimits {
-  if (!planId) {
+  const normalizedPlanId = normalizeProductId(planId)
+
+  if (!normalizedPlanId || normalizedPlanId === "free") {
     return FREE_TRIAL_LIMITS
   }
 
-  const product = PRODUCTS.find(p => p.id === planId)
+  const product = getProductById(normalizedPlanId)
   
   if (!product) {
     return FREE_TRIAL_LIMITS
   }
 
-  // Enterprise = unlimited everything
-  if (product.isEnterprise) {
-    return {
-      clientLimit: null,
-      therapistLimit: null,
-    }
-  }
-
-  // Group Practice = unlimited clients, limited therapists
-  if (planId === 'group-practice') {
-    return {
-      clientLimit: null,
-      therapistLimit: product.therapistLimit || 5,
-    }
-  }
-
-  // Solo = limited clients
   return {
-    clientLimit: product.clientLimit || 20,
-    therapistLimit: 1,
+    clientLimit: product.clientLimit,
+    therapistLimit: product.therapistLimit || 1,
   }
 }
 

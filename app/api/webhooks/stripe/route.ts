@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { normalizeProductId } from '@/lib/products'
+
+type StripeSubscriptionWithPeriod = Stripe.Subscription & {
+  current_period_end?: number | null
+}
+
+type StripeInvoiceWithSubscription = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -45,6 +54,23 @@ export async function POST(req: NextRequest) {
     return date.toISOString()
   }
 
+  const getCurrentPeriodEnd = (subscription: Stripe.Subscription) => (
+    convertUnixToISO((subscription as StripeSubscriptionWithPeriod).current_period_end)
+  )
+
+  const buildSubscriptionUpdate = (
+    subscription: Stripe.Subscription,
+    customerId?: string | null,
+    productId?: string | null,
+  ) => ({
+    subscription_status: subscription.status || 'active',
+    subscription_plan: normalizeProductId(productId || subscription.metadata.product_id),
+    stripe_subscription_id: subscription.id,
+    ...(customerId ? { stripe_customer_id: customerId } : {}),
+    subscription_end_date: getCurrentPeriodEnd(subscription),
+    trial_end_date: convertUnixToISO(subscription.trial_end),
+  })
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -63,7 +89,7 @@ export async function POST(req: NextRequest) {
           )
           
           const therapistId = subscription.metadata.therapist_id
-          const productId = subscription.metadata.product_id
+          const productId = normalizeProductId(subscription.metadata.product_id)
 
           console.log('[v0] Webhook: Subscription details', {
             subscriptionId: subscription.id,
@@ -74,27 +100,14 @@ export async function POST(req: NextRequest) {
           })
 
           if (therapistId) {
-            const subscriptionStatus = subscription.status || 'active'
-
-            // Convert dates
-            const subscriptionEndDate = convertUnixToISO(subscription.current_period_end)
-            const trialEndDate = convertUnixToISO(subscription.trial_end)
-
             console.log('[v0] Webhook: Date conversion', {
-              raw_current_period_end: subscription.current_period_end,
+              raw_current_period_end: (subscription as StripeSubscriptionWithPeriod).current_period_end,
               raw_trial_end: subscription.trial_end,
-              converted_subscription_end_date: subscriptionEndDate,
-              converted_trial_end_date: trialEndDate,
+              converted_subscription_end_date: getCurrentPeriodEnd(subscription),
+              converted_trial_end_date: convertUnixToISO(subscription.trial_end),
             })
 
-            const updateData = {
-              subscription_status: subscriptionStatus,
-              subscription_plan: productId || null,
-              stripe_subscription_id: subscription.id,
-              stripe_customer_id: session.customer as string,
-              subscription_end_date: subscriptionEndDate,
-              trial_end_date: trialEndDate,
-            }
+            const updateData = buildSubscriptionUpdate(subscription, session.customer as string, productId)
 
             console.log('[v0] Webhook: Updating therapist', { therapistId, updateData })
 
@@ -120,16 +133,9 @@ export async function POST(req: NextRequest) {
         const therapistId = subscription.metadata.therapist_id
 
         if (therapistId) {
-          const subscriptionEndDate = convertUnixToISO(subscription.current_period_end)
-          const trialEndDate = convertUnixToISO(subscription.trial_end)
-
           await supabaseAdmin
             .from('therapists')
-            .update({
-              subscription_status: subscription.status || 'active',
-              subscription_end_date: subscriptionEndDate,
-              trial_end_date: trialEndDate,
-            })
+            .update(buildSubscriptionUpdate(subscription))
             .eq('id', therapistId)
         }
         break
@@ -144,7 +150,7 @@ export async function POST(req: NextRequest) {
             .from('therapists')
             .update({
               subscription_status: 'canceled',
-              subscription_plan: null,
+              subscription_plan: 'free',
               stripe_subscription_id: null,
             })
             .eq('id', therapistId)
@@ -153,11 +159,11 @@ export async function POST(req: NextRequest) {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice
+        const invoice = event.data.object as StripeInvoiceWithSubscription
         
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
-            invoice.subscription as string
+            typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
           )
           const therapistId = subscription.metadata.therapist_id
 

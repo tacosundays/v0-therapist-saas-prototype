@@ -62,14 +62,23 @@ export async function POST(req: NextRequest) {
     subscription: Stripe.Subscription,
     customerId?: string | null,
     productId?: string | null,
-  ) => ({
-    subscription_status: subscription.status || 'active',
-    subscription_plan: normalizeProductId(productId || subscription.metadata.product_id),
-    stripe_subscription_id: subscription.id,
-    ...(customerId ? { stripe_customer_id: customerId } : {}),
-    subscription_end_date: getCurrentPeriodEnd(subscription),
-    trial_end_date: convertUnixToISO(subscription.trial_end),
-  })
+  ) => {
+    const normalizedProductId = normalizeProductId(productId || subscription.metadata.product_id)
+    const currentPeriodEnd = getCurrentPeriodEnd(subscription)
+    const trialEnd = convertUnixToISO(subscription.trial_end)
+
+    return {
+      subscription_status: subscription.status || 'active',
+      subscription_plan: normalizedProductId,
+      stripe_subscription_id: subscription.id,
+      ...(customerId ? { stripe_customer_id: customerId } : {}),
+      subscription_end_date: currentPeriodEnd,
+      trial_end_date: trialEnd,
+      plan: normalizedProductId || 'free',
+      current_period_end: currentPeriodEnd,
+      trial_ends_at: trialEnd,
+    }
+  }
 
   try {
     switch (event.type) {
@@ -151,7 +160,10 @@ export async function POST(req: NextRequest) {
             .update({
               subscription_status: 'canceled',
               subscription_plan: 'free',
+              plan: 'free',
               stripe_subscription_id: null,
+              subscription_end_date: null,
+              current_period_end: null,
             })
             .eq('id', therapistId)
         }

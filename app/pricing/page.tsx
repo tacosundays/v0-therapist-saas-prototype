@@ -18,65 +18,23 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { PRODUCTS } from "@/lib/products"
 
-const plans = [
-  {
-    name: "Solo Practice",
-    price: { monthly: 29, annual: 24 },
-    description: "Perfect for individual therapists just getting started",
-    features: [
-      "Up to 25 active clients",
-      "Full content library (200+ exercises)",
-      "Client portal access",
-      "Progress tracking",
-      "Email support",
-      "Basic analytics"
-    ],
-    limitations: [
-      "No AI suggestions",
-      "No custom worksheets"
-    ],
-    cta: "Start free trial",
-    popular: false
-  },
-  {
-    name: "Growing Practice",
-    price: { monthly: 79, annual: 66 },
-    description: "For therapists scaling their impact",
-    features: [
-      "Up to 75 active clients",
-      "Everything in Solo, plus:",
-      "AI homework suggestions",
-      "Custom worksheet builder",
-      "Priority email support",
-      "Advanced analytics",
-      "Client satisfaction tracking",
-      "Bulk assignment tools"
-    ],
-    limitations: [],
-    cta: "Start free trial",
-    popular: true
-  },
-  {
-    name: "Group Practice",
-    price: { monthly: 199, annual: 166 },
-    description: "For multi-therapist practices",
-    features: [
-      "Unlimited clients",
-      "Everything in Growing, plus:",
-      "Up to 5 therapist seats",
-      "Practice-wide analytics",
-      "Custom branding",
-      "API access",
-      "Dedicated success manager",
-      "HIPAA BAA included",
-      "SSO authentication"
-    ],
-    limitations: [],
-    cta: "Contact sales",
-    popular: false
+function getMonthlyPrice(productPriceInCents: number) {
+  return productPriceInCents / 100
+}
+
+function getAnnualMonthlyPrice(productPriceInCents: number) {
+  return Math.round((getMonthlyPrice(productPriceInCents) * 10) / 12)
+}
+
+function getPlanLimitations(productId: string) {
+  if (productId === "solo-practice") {
+    return ["No AI suggestions", "No custom worksheets"]
   }
-]
+
+  return []
+}
 
 const faqs = [
   {
@@ -173,15 +131,21 @@ export default function PricingPage() {
 
           {/* Pricing Cards */}
           <div className="grid md:grid-cols-3 gap-8 mb-20">
-            {plans.map((plan, index) => (
+            {PRODUCTS.map((plan, index) => {
+              const monthlyPrice = getMonthlyPrice(plan.priceInCents)
+              const annualMonthlyPrice = getAnnualMonthlyPrice(plan.priceInCents)
+              const displayedPrice = billingCycle === "monthly" ? monthlyPrice : annualMonthlyPrice
+              const limitations = getPlanLimitations(plan.id)
+
+              return (
               <motion.div
-                key={plan.name}
+                key={plan.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
                 className="relative"
               >
-                {plan.popular && (
+                {plan.isPopular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
                     <span className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1 rounded-full flex items-center gap-1">
                       <Sparkles className="w-3 h-3" />
@@ -190,7 +154,7 @@ export default function PricingPage() {
                   </div>
                 )}
                 <Card className={`rounded-2xl h-full ${
-                  plan.popular ? "border-primary shadow-lg" : "border-border"
+                  plan.isPopular ? "border-primary shadow-lg" : "border-border"
                 }`}>
                   <CardContent className="p-8 flex flex-col h-full">
                     <div className="mb-6">
@@ -200,12 +164,12 @@ export default function PricingPage() {
 
                     <div className="mb-6">
                       <span className="text-5xl font-bold text-foreground">
-                        ${plan.price[billingCycle]}
+                        ${displayedPrice}
                       </span>
                       <span className="text-muted-foreground">/month</span>
                       {billingCycle === "annual" && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          Billed annually (${plan.price.annual * 12}/year)
+                          Billed annually (${annualMonthlyPrice * 12}/year)
                         </p>
                       )}
                     </div>
@@ -217,7 +181,7 @@ export default function PricingPage() {
                           <span className="text-sm text-foreground">{feature}</span>
                         </li>
                       ))}
-                      {plan.limitations.map((limitation) => (
+                      {limitations.map((limitation) => (
                         <li key={limitation} className="flex items-start gap-3 opacity-50">
                           <span className="w-5 h-5 flex items-center justify-center shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
@@ -229,15 +193,15 @@ export default function PricingPage() {
 
                     <Button
                       className="w-full rounded-xl"
-                      variant={plan.popular ? "default" : "outline"}
+                      variant={plan.isPopular ? "default" : "outline"}
                       asChild
                     >
-                      <Link href="/signup">{plan.cta}</Link>
+                      <Link href="/signup">{plan.contactSalesIfMissingPrice ? "Contact sales" : "Start free trial"}</Link>
                     </Button>
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+            )})}
           </div>
 
           {/* FAQ Section */}

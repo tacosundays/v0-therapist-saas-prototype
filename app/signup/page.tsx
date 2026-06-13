@@ -10,6 +10,12 @@ import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2, Mail } from "lucide-reac
 import { getClient } from "@/lib/supabase/client"
 import { hashInviteToken, normalizeInviteEmail } from "@/lib/invitations"
 
+interface ClientInviteLookup {
+  id: string
+  therapist_id: string
+  email: string | null
+}
+
 export default function SignupPage() {
   const isRedirecting = useRef(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -84,6 +90,7 @@ export default function SignupPage() {
     }
 
     const supabase = getClient()
+    const supabaseAny = supabase as any
     
     // For clients, validate by checking if they exist in clients table by email
     let therapistId: string | null = null
@@ -92,19 +99,19 @@ export default function SignupPage() {
       const normalizedEmail = normalizeInviteEmail(email)
 
       const clientLookup = inviteToken
-        ? await supabase.rpc("verify_client_invite", {
+        ? await supabaseAny.rpc("verify_client_invite", {
             client_email: normalizedEmail,
             token_hash: await hashInviteToken(inviteToken),
           })
-        : await supabase
+        : await supabaseAny
             .from("clients")
             .select("id, therapist_id, email")
             .eq("email", normalizedEmail)
             .maybeSingle()
 
-      const clientData = Array.isArray(clientLookup.data)
+      const clientData = (Array.isArray(clientLookup.data)
         ? clientLookup.data[0]
-        : clientLookup.data
+        : clientLookup.data) as ClientInviteLookup | null
       const clientLookupError = clientLookup.error
 
       if (clientLookupError) {
@@ -162,7 +169,9 @@ export default function SignupPage() {
           credentials: credentials.trim() || null,
           practice_name: practiceName || null,
           email: email,
+          plan: "free",
           trial_end_date: trialEndDate.toISOString(),
+          trial_ends_at: trialEndDate.toISOString(),
           subscription_status: 'trialing',
         })
 

@@ -57,6 +57,9 @@ function billingUpdateData(subscription: Stripe.Subscription, customerId: string
     stripe_customer_id: customerId,
     subscription_end_date: currentPeriodEnd,
     trial_end_date: trialEnd,
+    plan: normalizedProductId || 'free',
+    current_period_end: currentPeriodEnd,
+    trial_ends_at: trialEnd,
   }
 }
 
@@ -168,7 +171,7 @@ export async function getSubscriptionStatus(userData?: UserData) {
   const supabase = getSupabaseAdmin()
   const { data: therapist } = await supabase
     .from('therapists')
-    .select('subscription_status, subscription_plan, subscription_end_date, trial_end_date')
+    .select('subscription_status, subscription_plan, subscription_end_date, trial_end_date, plan, current_period_end, trial_ends_at')
     .eq('id', userData.id)
     .single()
 
@@ -178,17 +181,19 @@ export async function getSubscriptionStatus(userData?: UserData) {
 
   // Check trial status
   const now = new Date()
-  const trialEndDate = therapist.trial_end_date ? new Date(therapist.trial_end_date) : null
+  const trialEndValue = therapist.trial_ends_at || therapist.trial_end_date
+  const currentPeriodEndValue = therapist.current_period_end || therapist.subscription_end_date
+  const trialEndDate = trialEndValue ? new Date(trialEndValue) : null
   const isInTrial = trialEndDate && trialEndDate > now && therapist.subscription_status !== 'active'
 
-  const normalizedPlan = normalizeProductId(therapist.subscription_plan) || 'free'
+  const normalizedPlan = normalizeProductId(therapist.plan || therapist.subscription_plan) || 'free'
 
   return {
     status: therapist.subscription_status || (isInTrial ? 'trialing' : 'inactive'),
     subscription: {
       plan: normalizedPlan,
-      endDate: therapist.subscription_end_date,
-      trialEndDate: therapist.trial_end_date,
+      endDate: currentPeriodEndValue,
+      trialEndDate: trialEndValue,
       isInTrial: Boolean(isInTrial),
     },
   }

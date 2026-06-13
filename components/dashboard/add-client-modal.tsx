@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
-import { buildClientInviteLink, createInviteToken, hashInviteToken, normalizeInviteEmail } from "@/lib/invitations"
+import { normalizeInviteEmail } from "@/lib/invitations"
 import { CheckCircle2, Copy, Loader2, Mail } from "lucide-react"
 import { UpgradeModal } from "./upgrade-modal"
 import { canAddClient, getPlanLimits } from "@/lib/plan-limits"
@@ -68,7 +68,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       // Get therapist subscription info
       const { data: therapist } = await supabase
         .from("therapists")
-        .select("subscription_plan")
+        .select("plan, subscription_plan")
         .eq("id", therapistId)
         .single()
 
@@ -78,7 +78,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         .select("*", { count: "exact", head: true })
         .eq("therapist_id", therapistId)
 
-      const currentPlan = therapist?.subscription_plan || null
+      const currentPlan = therapist?.plan || therapist?.subscription_plan || null
       const currentCount = count || 0
       
       setPlanId(currentPlan)
@@ -116,14 +116,6 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         return
       }
 
-      // Resolve therapist id by email (therapists.id may != auth.user.id)
-      const { therapistId } = await getTherapistId()
-
-      if (!therapistId) {
-        setError("No therapist account found for your email.")
-        return
-      }
-
       const normalizedEmail = normalizeInviteEmail(email)
 
       if (!normalizedEmail) {
@@ -131,52 +123,40 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         return
       }
 
-      const inviteToken = createInviteToken()
-      const inviteTokenHash = await hashInviteToken(inviteToken)
-
-      const { data: existingClient, error: lookupError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("therapist_id", therapistId)
-        .eq("email", normalizedEmail)
-        .maybeSingle()
-
-      if (lookupError) {
-        setError(lookupError.message)
-        return
-      }
-
-      const clientPayload = {
-        therapist_id: therapistId,
-        full_name: name.trim(),
-        email: normalizedEmail,
-        status: "invited",
-        invite_token_hash: inviteTokenHash,
-        invite_sent_at: null,
-        invite_accepted_at: null,
-      }
-      
-      const { data: savedClient, error: saveError } = existingClient
-        ? await supabase.from("clients").update(clientPayload).eq("id", existingClient.id).select("id").single()
-        : await supabase.from("clients").insert(clientPayload).select("id").single()
-
-      if (saveError) {
-        setError(saveError.message)
-        return
-      }
-
-      const origin = typeof window !== "undefined" ? window.location.origin : ""
-      const generatedInviteLink = buildClientInviteLink(origin, normalizedEmail, inviteToken)
-      setInviteLink(generatedInviteLink)
-
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session?.access_token) {
-        setEmailDeliveryFailed(true)
-        setSuccessMessage("Client created. Email delivery failed. Copy invite link manually.")
-        onClientAdded()
+        setError("You must be logged in to create an invite.")
         return
       }
+
+      const createResponse = await fetch("/api/client-invitations/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          fullName: name.trim(),
+          email: normalizedEmail,
+        }),
+      })
+
+      const createResult = await createResponse.json().catch(() => null)
+
+      if (!createResponse.ok) {
+        if (createResult?.code === "client_limit_reached") {
+          setPlanId(createResult.plan || planId)
+          setClientCount(createResult.currentClientCount || clientCount)
+          onOpenChange(false)
+          setShowUpgradeModal(true)
+        }
+        setError(createResult?.error || "Unable to create client invite.")
+        return
+      }
+
+      const generatedInviteLink = createResult.inviteLink
+      setInviteLink(generatedInviteLink)
 
       const emailResponse = await fetch("/api/client-invitations/send", {
         method: "POST",
@@ -185,7 +165,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          clientId: savedClient?.id || existingClient?.id,
+          clientId: createResult.clientId,
           inviteLink: generatedInviteLink,
         }),
       })

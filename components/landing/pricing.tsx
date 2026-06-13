@@ -4,53 +4,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Check } from "lucide-react"
 import Link from "next/link"
-
-const plans = [
-  {
-    name: "Solo Practice",
-    price: 29,
-    description: "Perfect for individual therapists",
-    features: [
-      "Up to 25 active clients",
-      "Full content library access",
-      "Client portal",
-      "Progress tracking",
-      "Email support"
-    ],
-    cta: "Start free trial",
-    popular: false
-  },
-  {
-    name: "Growing Practice",
-    price: 79,
-    description: "For therapists scaling their practice",
-    features: [
-      "Up to 75 active clients",
-      "Everything in Solo, plus:",
-      "AI homework suggestions",
-      "Custom worksheets",
-      "Priority support",
-      "Analytics dashboard"
-    ],
-    cta: "Start free trial",
-    popular: true
-  },
-  {
-    name: "Group Practice",
-    price: 199,
-    description: "For multi-therapist practices",
-    features: [
-      "Unlimited clients",
-      "Everything in Growing, plus:",
-      "Multiple therapist seats",
-      "Practice-wide analytics",
-      "Custom branding",
-      "Dedicated success manager"
-    ],
-    cta: "Contact sales",
-    popular: false
-  }
-]
+import { PRODUCTS } from "@/lib/products"
 
 export function Pricing() {
   return (
@@ -72,18 +26,18 @@ export function Pricing() {
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {plans.map((plan, index) => (
+          {PRODUCTS.map((plan, index) => (
             <motion.div
-              key={plan.name}
+              key={plan.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className={`relative bg-card p-8 rounded-2xl border ${
-                plan.popular ? "border-primary shadow-lg" : "border-border"
+                plan.isPopular ? "border-primary shadow-lg" : "border-border"
               }`}
             >
-              {plan.popular && (
+              {plan.isPopular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                   <span className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1 rounded-full">
                     Most Popular
@@ -97,7 +51,7 @@ export function Pricing() {
               </div>
 
               <div className="mb-6">
-                <span className="text-4xl font-bold text-foreground">${plan.price}</span>
+                <span className="text-4xl font-bold text-foreground">${plan.priceInCents / 100}</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
 
@@ -112,10 +66,10 @@ export function Pricing() {
 
               <Button
                 className="w-full"
-                variant={plan.popular ? "default" : "outline"}
+                variant={plan.isPopular ? "default" : "outline"}
                 asChild
               >
-                <Link href="/signup">{plan.cta}</Link>
+                <Link href="/signup">{plan.contactSalesIfMissingPrice ? "Contact sales" : "Start free trial"}</Link>
               </Button>
             </motion.div>
           ))}

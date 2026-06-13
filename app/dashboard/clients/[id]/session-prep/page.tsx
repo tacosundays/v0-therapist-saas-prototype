@@ -29,9 +29,6 @@ interface ClientRecord {
   user_id?: string | null
   invite_sent_at?: string | null
   invite_accepted_at?: string | null
-  last_login?: string | null
-  last_login_at?: string | null
-  last_seen_at?: string | null
 }
 
 interface AssignmentRecord {
@@ -709,7 +706,7 @@ export default function SessionPrepPage() {
     )
   }
 
-  const lastLogin = clientRecord?.last_login_at || clientRecord?.last_login || clientRecord?.last_seen_at || null
+  const lastLogin = null
 
   return (
     <div className="space-y-8 max-w-5xl">

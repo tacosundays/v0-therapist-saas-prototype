@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
     const { data: client, error: clientError } = await adminClient
       .from("clients")
-      .select("id, therapist_id, full_name, email, status, created_at, user_id, invite_sent_at, invite_accepted_at, last_login, last_login_at, last_seen_at")
+      .select("id, therapist_id, full_name, email, status, created_at, user_id, invite_sent_at, invite_accepted_at")
       .eq("id", clientId)
       .eq("therapist_id", therapist.id)
       .maybeSingle()

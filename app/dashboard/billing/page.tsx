@@ -403,6 +403,10 @@ export default function BillingPage() {
           ))}
         </div>
       </div>
+
+      <footer className="pt-2 text-center text-xs text-muted-foreground">
+        Checkout build: 06f215b
+      </footer>
     </div>
   )
 }

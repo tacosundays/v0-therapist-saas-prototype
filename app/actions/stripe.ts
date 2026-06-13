@@ -77,7 +77,7 @@ function getStripeSecretKeyPrefix() {
 }
 
 function logStripeCheckoutEnv(stage: string, productId: string, priceId: string) {
-  console.log(`[v0] Stripe checkout ${stage}`, {
+  console.error(`[v0] Stripe checkout ${stage}`, {
     stripeSecretKeyPrefix: getStripeSecretKeyPrefix(),
     stripeSoloPriceId: process.env.STRIPE_SOLO_PRICE_ID || null,
     stripeGrowingPriceId: process.env.STRIPE_GROWING_PRICE_ID || null,
@@ -85,31 +85,6 @@ function logStripeCheckoutEnv(stage: string, productId: string, priceId: string)
     selectedPlanId: productId,
     selectedPriceId: priceId,
   })
-}
-
-async function logAndVerifyStripeCheckoutConfig(productId: string, priceId: string) {
-  logStripeCheckoutEnv('before price retrieve', productId, priceId)
-
-  const account = await stripe.accounts.retrieve(null)
-  const price = await stripe.prices.retrieve(priceId)
-
-  console.log('[v0] Stripe checkout config', {
-    stripeAccountId: account.id,
-    stripeAccountCountry: account.country,
-    stripeAccountChargesEnabled: account.charges_enabled,
-    productId,
-    priceId,
-    stripeSoloPriceId: process.env.STRIPE_SOLO_PRICE_ID || null,
-    soloPriceMatchesExpected: process.env.STRIPE_SOLO_PRICE_ID === 'price_1ThywzQ73wnXTr0yEVh5VwC9',
-    priceLivemode: price.livemode,
-    priceActive: price.active,
-    priceCurrency: price.currency,
-    priceUnitAmount: price.unit_amount,
-    priceRecurringInterval: price.recurring?.interval || null,
-    priceProduct: typeof price.product === 'string' ? price.product : price.product.id,
-  })
-
-  return { account, price }
 }
 
 export async function startSubscriptionCheckout(productId: string, userData: UserData) {
@@ -174,8 +149,6 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const { account, price } = await logAndVerifyStripeCheckoutConfig(product.id, priceId)
-
     logStripeCheckoutEnv('before checkout session create', product.id, priceId)
 
     // Create redirect-based checkout session
@@ -202,11 +175,10 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
       return { error: 'Failed to create checkout session' }
     }
 
-    console.log('[v0] Stripe checkout session created', {
-      stripeAccountId: account.id,
+    console.error('[v0] Stripe checkout session created', {
       checkoutSessionId: session.id,
       productId: product.id,
-      priceId: price.id,
+      priceId,
     })
 
     return { url: session.url }

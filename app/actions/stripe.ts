@@ -69,11 +69,29 @@ export async function getCheckoutAvailability() {
   )
 }
 
+function getStripeSecretKeyPrefix() {
+  const secretKey = process.env.STRIPE_SECRET_KEY
+  if (!secretKey) return null
+
+  return secretKey.slice(0, 8)
+}
+
+function logStripeCheckoutEnv(stage: string, productId: string, priceId: string) {
+  console.log(`[v0] Stripe checkout ${stage}`, {
+    stripeSecretKeyPrefix: getStripeSecretKeyPrefix(),
+    stripeSoloPriceId: process.env.STRIPE_SOLO_PRICE_ID || null,
+    stripeGrowingPriceId: process.env.STRIPE_GROWING_PRICE_ID || null,
+    stripeGroupPriceId: process.env.STRIPE_GROUP_PRICE_ID || null,
+    selectedPlanId: productId,
+    selectedPriceId: priceId,
+  })
+}
+
 async function logAndVerifyStripeCheckoutConfig(productId: string, priceId: string) {
-  const [account, price] = await Promise.all([
-    stripe.accounts.retrieve(null),
-    stripe.prices.retrieve(priceId),
-  ])
+  logStripeCheckoutEnv('before price retrieve', productId, priceId)
+
+  const account = await stripe.accounts.retrieve(null)
+  const price = await stripe.prices.retrieve(priceId)
 
   console.log('[v0] Stripe checkout config', {
     stripeAccountId: account.id,
@@ -157,6 +175,8 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const { account, price } = await logAndVerifyStripeCheckoutConfig(product.id, priceId)
+
+    logStripeCheckoutEnv('before checkout session create', product.id, priceId)
 
     // Create redirect-based checkout session
     const session = await stripe.checkout.sessions.create({

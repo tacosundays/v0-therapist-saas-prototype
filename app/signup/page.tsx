@@ -34,6 +34,7 @@ export default function SignupPage() {
   const [inviteToken, setInviteToken] = useState<string | null>(null)
   const [inviteRole, setInviteRole] = useState<string | null>(null)
   const isInviteSignup = !!inviteToken && inviteRole === "client"
+  const isTeamInviteSignup = !!inviteToken && inviteRole === "therapist"
 
   // Check for existing session on page load - redirect once if already logged in
   useEffect(() => {
@@ -71,6 +72,8 @@ export default function SignupPage() {
 
     if (role === "client") {
       setUserType("client")
+    } else if (role === "therapist") {
+      setUserType("therapist")
     }
 
     if (invitedEmail) {
@@ -178,6 +181,26 @@ export default function SignupPage() {
       if (insertError) {
         console.error("Error inserting therapist:", insertError)
       }
+
+      if (isTeamInviteSignup && inviteToken) {
+        const acceptTeamResponse = await fetch("/api/team/invites/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: normalizeInviteEmail(email),
+            inviteToken,
+            therapistId: authData.user.id,
+          }),
+        })
+
+        if (!acceptTeamResponse.ok) {
+          const acceptTeamResult = await acceptTeamResponse.json().catch(() => null)
+          console.error("Error accepting therapist invite:", acceptTeamResult)
+          setError(acceptTeamResult?.error || "Unable to accept team invite. Please ask the practice owner for a new link.")
+          setIsLoading(false)
+          return
+        }
+      }
     }
 
     // If client, link the auth user to the existing invite record.
@@ -209,7 +232,7 @@ export default function SignupPage() {
     if (authData.session && !isRedirecting.current) {
       isRedirecting.current = true
       if (userType === "therapist") {
-        window.location.href = "/onboarding"
+        window.location.href = isTeamInviteSignup ? "/dashboard" : "/onboarding"
       } else {
         // Redirect client to their authenticated portal
         window.location.href = "/client-portal"
@@ -296,7 +319,11 @@ export default function SignupPage() {
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Create your account</h1>
           <p className="text-muted-foreground mb-8">
-            {isInviteSignup ? "Accept your client portal invitation." : "Start your 14-day free trial. No credit card required."}
+            {isInviteSignup
+              ? "Accept your client portal invitation."
+              : isTeamInviteSignup
+                ? "Accept your Group Practice team invitation."
+                : "Start your 14-day free trial. No credit card required."}
           </p>
 
           {/* Role Toggle */}
@@ -304,7 +331,7 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => setUserType("therapist")}
-              disabled={isInviteSignup}
+              disabled={isInviteSignup || isTeamInviteSignup}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 userType === "therapist"
                   ? "bg-card text-foreground shadow-sm"
@@ -316,7 +343,7 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => setUserType("client")}
-              disabled={isInviteSignup}
+              disabled={isInviteSignup || isTeamInviteSignup}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 userType === "client"
                   ? "bg-card text-foreground shadow-sm"
@@ -373,7 +400,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading || isInviteSignup}
+                disabled={isLoading || isInviteSignup || isTeamInviteSignup}
               />
             </div>
 
@@ -388,7 +415,7 @@ export default function SignupPage() {
                     className="h-12 rounded-xl"
                     value={practiceName}
                     onChange={(e) => setPracticeName(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isLoading || isTeamInviteSignup}
                   />
                 </div>
                 <div className="space-y-2">
@@ -412,6 +439,14 @@ export default function SignupPage() {
                   {isInviteSignup
                     ? "Create your account with the invited email address to access your client portal."
                     : "Your therapist must invite you first using your email address."}
+                </p>
+              </div>
+            )}
+
+            {isTeamInviteSignup && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Create your therapist account with the invited email address to join the practice team.
                 </p>
               </div>
             )}

@@ -7,7 +7,7 @@ import Link from "next/link"
 
 export function Hero() {
   return (
-    <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <section className="relative pt-28 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden sm:pt-32 sm:pb-20">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       
       <div className="max-w-7xl mx-auto relative">
@@ -25,16 +25,16 @@ export function Hero() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6"
             >
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Built for therapists, by therapists
+              Therapy homework that fits real practice
             </motion.div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-tight text-balance">
-              Keep therapy working{" "}
+              Keep therapy homework moving{" "}
               <span className="text-primary">between sessions.</span>
             </h1>
 
             <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 text-pretty">
-              Assign evidence-informed worksheets, exercises, and psychoeducation to clients — then track completion, reflections, and progress from one calm therapist dashboard.
+              ShrinkAid Homework helps therapists assign worksheets, collect client reflections, and review progress before the next appointment.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -45,12 +45,16 @@ export function Hero() {
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="text-base h-12 px-8" asChild>
-                <Link href="#features">See how it works</Link>
+                <Link href="#how-it-works">See how it works</Link>
               </Button>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 justify-center lg:justify-start text-sm text-muted-foreground">
-              {["No credit card required", "14-day free trial", "HIPAA compliant"].map((item) => (
+              {[
+                "Solo therapists and group practices with up to 5 seats",
+                "14-day free trial",
+                "Built with HIPAA-conscious security controls",
+              ].map((item) => (
                 <div key={item} className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-primary" />
                   <span>{item}</span>
@@ -89,23 +93,23 @@ function DashboardPreview() {
           </div>
         </div>
         
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-muted-foreground">Active Clients</div>
-              <div className="text-2xl font-bold text-foreground">24</div>
+              <div className="text-sm text-muted-foreground">Homework assigned</div>
+              <div className="text-2xl font-bold text-foreground">12</div>
             </div>
             <div className="text-right">
-              <div className="text-sm text-muted-foreground">Avg. Completion</div>
-              <div className="text-2xl font-bold text-primary">87%</div>
+              <div className="text-sm text-muted-foreground">Ready to review</div>
+              <div className="text-2xl font-bold text-primary">5</div>
             </div>
           </div>
           
           <div className="space-y-3">
             {[
-              { name: "Sarah M.", status: "Completed", progress: 100 },
-              { name: "James R.", status: "In Progress", progress: 60 },
-              { name: "Emily K.", status: "Assigned", progress: 0 },
+              { name: "Client A", status: "Worksheet completed", progress: 100 },
+              { name: "Client B", status: "Reflection submitted", progress: 70 },
+              { name: "Client C", status: "Assigned", progress: 0 },
             ].map((client) => (
               <div key={client.name} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
                 <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -121,8 +125,8 @@ function DashboardPreview() {
                       />
                     </div>
                     <span className={`text-xs font-medium ${
-                      client.status === "Completed" ? "text-primary" : 
-                      client.status === "In Progress" ? "text-chart-4" : "text-muted-foreground"
+                      client.status === "Worksheet completed" ? "text-primary" :
+                      client.status === "Reflection submitted" ? "text-chart-4" : "text-muted-foreground"
                     }`}>
                       {client.status}
                     </span>

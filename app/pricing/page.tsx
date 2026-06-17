@@ -50,8 +50,8 @@ const faqs = [
     answer: "An active client is anyone with at least one homework assignment in the last 90 days. Archived clients don't count toward your limit, and you can reactivate them anytime."
   },
   {
-    question: "Is ShrinkAid HIPAA compliant?",
-    answer: "Yes! We take security seriously. All data is encrypted at rest and in transit. We sign Business Associate Agreements (BAAs) with all paid plans, and we undergo regular security audits."
+    question: "How does ShrinkAid approach security?",
+    answer: "ShrinkAid is built with HIPAA-conscious security controls, including encrypted data in transit and authenticated access patterns. Business Associate Agreement availability depends on plan and operational setup."
   },
   {
     question: "Can clients use the portal on mobile?",

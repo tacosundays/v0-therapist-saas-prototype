@@ -26,14 +26,17 @@ export function Header() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
+            <Link href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              How it works
+            </Link>
             <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Features
             </Link>
             <Link href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
-            <Link href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Testimonials
+            <Link href="#practice-fit" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Practice fit
             </Link>
           </nav>
 
@@ -68,6 +71,13 @@ export function Header() {
         >
           <div className="px-4 py-4 space-y-4">
             <Link
+              href="#how-it-works"
+              className="block text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              How it works
+            </Link>
+            <Link
               href="#features"
               className="block text-sm text-muted-foreground hover:text-foreground"
               onClick={() => setMobileMenuOpen(false)}
@@ -82,11 +92,11 @@ export function Header() {
               Pricing
             </Link>
             <Link
-              href="#testimonials"
+              href="#practice-fit"
               className="block text-sm text-muted-foreground hover:text-foreground"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Testimonials
+              Practice fit
             </Link>
             <div className="pt-4 space-y-2">
               <Button variant="outline" className="w-full" asChild>

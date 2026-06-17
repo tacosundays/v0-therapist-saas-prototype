@@ -14,13 +14,18 @@ export function Footer() {
               <span className="font-semibold text-lg text-foreground">ShrinkAid</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
-              Helping therapists extend the impact of therapy beyond the session. Evidence-based homework that works.
+              Helping therapists assign homework, collect reflections, and review client progress between sessions.
             </p>
           </div>
 
           <div>
             <h4 className="font-semibold text-foreground mb-4">Product</h4>
             <ul className="space-y-2">
+              <li>
+                <Link href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  How it works
+                </Link>
+              </li>
               <li>
                 <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Features
@@ -54,7 +59,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  HIPAA Compliance
+                  Security
                 </Link>
               </li>
             </ul>

@@ -8,24 +8,24 @@ import { PRODUCTS } from "@/lib/products"
 
 export function Pricing() {
   return (
-    <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-muted/30">
+    <section id="pricing" className="py-16 px-4 sm:px-6 lg:px-8 bg-muted/30 sm:py-24">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-12 sm:mb-16"
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground text-balance">
-            Simple, transparent pricing
+            Plans for solo therapists and growing practices
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Choose the plan that fits your practice. All plans include a 14-day free trial.
+          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
+            Start with one caseload or support a group practice with up to 5 therapist seats. All plans include a 14-day free trial.
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid gap-6 md:grid-cols-3 lg:gap-8">
           {PRODUCTS.map((plan, index) => (
             <motion.div
               key={plan.id}
@@ -33,7 +33,7 @@ export function Pricing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`relative bg-card p-8 rounded-2xl border ${
+              className={`relative bg-card p-6 sm:p-8 rounded-2xl border ${
                 plan.isPopular ? "border-primary shadow-lg" : "border-border"
               }`}
             >

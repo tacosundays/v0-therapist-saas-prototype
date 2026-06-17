@@ -12,65 +12,122 @@ import {
   MessageSquare
 } from "lucide-react"
 
-const features = [
+const workflow = [
   {
     icon: BookOpen,
-    title: "Evidence-Based Library",
-    description: "Access 200+ curated worksheets and exercises based on CBT, DBT, ACT, and more therapeutic modalities."
-  },
-  {
-    icon: Sparkles,
-    title: "AI Homework Suggestions",
-    description: "Get personalized homework recommendations based on client notes, treatment goals, and progress patterns."
-  },
-  {
-    icon: BarChart3,
-    title: "Progress Tracking",
-    description: "Visual insights into client engagement, completion rates, and therapeutic progress over time."
+    title: "Assign homework",
+    description: "Choose a worksheet, custom exercise, or reflection prompt and send it to a client from the therapist dashboard."
   },
   {
     icon: Users,
-    title: "Client Portal",
-    description: "Clean, distraction-free interface for clients to access assignments and submit reflections."
+    title: "Client completes between sessions",
+    description: "Clients open their portal, complete assigned work, add reflections, and submit responses before the next appointment."
+  },
+  {
+    icon: BarChart3,
+    title: "Review progress before next session",
+    description: "See completion status, submitted reflections, mood check-ins, and recent activity in one place before session prep."
+  }
+]
+
+const features = [
+  {
+    icon: BookOpen,
+    title: "Homework library",
+    description: "Assign structured worksheets, psychoeducation, and between-session exercises without rebuilding materials each week."
+  },
+  {
+    icon: Sparkles,
+    title: "Session summary support",
+    description: "Use real client activity, reflections, and completed homework to prepare a focused review before the next session."
+  },
+  {
+    icon: BarChart3,
+    title: "Completion tracking",
+    description: "Track assigned, started, and completed homework so follow-through is visible before clients arrive."
+  },
+  {
+    icon: Users,
+    title: "Client portal",
+    description: "Give clients a simple place to complete worksheets, write reflections, and check in between appointments."
   },
   {
     icon: MessageSquare,
-    title: "Reflection Prompts",
-    description: "Capture meaningful insights with guided reflection questions attached to every assignment."
+    title: "Reflections and mood check-ins",
+    description: "Collect between-session notes and simple mood ratings that therapists can review without searching through messages."
   },
   {
     icon: Clock,
-    title: "Session Continuity",
-    description: "Pick up where you left off with homework summaries and client progress ready for each session."
+    title: "Session continuity",
+    description: "Bring homework responses, recent activity, and therapist notes into session prep so care picks up where it left off."
   },
   {
     icon: Brain,
-    title: "Treatment Integration",
-    description: "Align homework with treatment plans and therapeutic goals for cohesive care delivery."
+    title: "Solo and group practice fit",
+    description: "Support solo therapists and group practices with up to 5 seats while keeping each therapist's client work private."
   },
   {
     icon: Shield,
-    title: "HIPAA Compliant",
-    description: "Enterprise-grade security with encrypted data storage and compliant data handling practices."
+    title: "HIPAA-conscious security",
+    description: "Built with HIPAA-conscious security controls, including authenticated access patterns and protected client workspaces."
   }
 ]
 
 export function Features() {
   return (
-    <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-muted/30">
+    <section id="how-it-works" className="py-16 px-4 sm:px-6 lg:px-8 bg-muted/30 sm:py-24">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-12 sm:mb-16"
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground text-balance">
-            Everything you need to extend therapy
+            How ShrinkAid Homework works
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
-            Powerful tools designed to make homework assignment effortless and client engagement seamless.
+            A simple loop for between-session care: assign work, collect responses, and review progress before the next appointment.
+          </p>
+        </motion.div>
+
+        <div className="grid gap-6 md:grid-cols-3 mb-16">
+          {workflow.map((step, index) => (
+            <motion.div
+              key={step.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className="bg-card p-6 rounded-2xl border border-border"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                  {index + 1}
+                </div>
+                <step.icon className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">{step.title}</h3>
+              <p className="text-sm text-muted-foreground">{step.description}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      <div id="features" className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12 sm:mb-16"
+        >
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground text-balance">
+            Built for the homework workflow therapists actually use
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
+            Assignments, reflections, mood check-ins, session prep, and team support stay connected around each therapist's own clients.
           </p>
         </motion.div>
 

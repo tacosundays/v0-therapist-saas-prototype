@@ -17,11 +17,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  CreditCard
+  CreditCard,
+  ShieldCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState, useEffect, useRef } from "react"
 import { getClient } from "@/lib/supabase/client"
+import { logClientAuditEvent } from "@/lib/audit-client"
 import type { User } from "@supabase/supabase-js"
 
 const navItems = [
@@ -34,6 +36,7 @@ const navItems = [
   { href: "/dashboard/ai-suggestions", label: "AI Suggestions", icon: Sparkles },
   { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+  { href: "/dashboard/security", label: "Security", icon: ShieldCheck },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
@@ -76,6 +79,13 @@ export function DashboardSidebar() {
   const handleSignOut = async () => {
     setIsSigningOut(true)
     const supabase = getClient()
+    await logClientAuditEvent({
+      action: "logout",
+      resourceType: "auth",
+      details: {
+        area: "dashboard",
+      },
+    })
     await supabase.auth.signOut()
     window.location.href = "/"
   }

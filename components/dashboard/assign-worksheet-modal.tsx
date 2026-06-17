@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
+import { logClientAuditEvent } from "@/lib/audit-client"
 import { Loader2, FileText, Calendar } from "lucide-react"
 
 interface AssignWorksheetModalProps {
@@ -141,7 +142,7 @@ export function AssignWorksheetModal({
         return
       }
 
-      const { error: insertError } = await supabase
+      const { data: assignmentData, error: insertError } = await supabase
         .from("worksheet_assignments")
         .insert({
           therapist_id: therapistId,
@@ -151,8 +152,22 @@ export function AssignWorksheetModal({
           status: "assigned",
           assigned_at: new Date().toISOString(),
         })
+        .select("id")
+        .single()
 
       if (insertError) throw insertError
+
+      await logClientAuditEvent({
+        action: "assignment.create",
+        resourceType: "worksheet_assignment",
+        resourceId: assignmentData?.id || null,
+        details: {
+          clientId: selectedClient,
+          worksheetTemplateId: selectedTemplate,
+          dueDate: dueDate || null,
+          assignmentType: "worksheet",
+        },
+      })
 
       // Reset form
       setSelectedClient(preselectedClientId || "")

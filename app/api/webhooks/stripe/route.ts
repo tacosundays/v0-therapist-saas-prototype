@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import { normalizeProductId } from '@/lib/products'
+import { writeAuditLog } from '@/lib/audit-log'
 
 type StripeSubscriptionWithPeriod = Stripe.Subscription & {
   current_period_end?: number | null
@@ -129,6 +130,20 @@ export async function POST(req: NextRequest) {
               console.error('[v0] Webhook: Failed to update therapist', error)
             } else {
               console.log('[v0] Webhook: Therapist updated successfully')
+              await writeAuditLog({
+                therapistId,
+                actorRole: 'system',
+                action: 'subscription.changed',
+                resourceType: 'stripe_subscription',
+                resourceId: null,
+                details: {
+                  eventType: event.type,
+                  stripeSubscriptionId: subscription.id,
+                  stripeCustomerId: session.customer,
+                  status: subscription.status,
+                  plan: productId,
+                },
+              })
             }
           } else {
             console.error('[v0] Webhook: No therapist_id in subscription metadata')
@@ -146,6 +161,20 @@ export async function POST(req: NextRequest) {
             .from('therapists')
             .update(buildSubscriptionUpdate(subscription))
             .eq('id', therapistId)
+
+          await writeAuditLog({
+            therapistId,
+            actorRole: 'system',
+            action: 'subscription.changed',
+            resourceType: 'stripe_subscription',
+            resourceId: null,
+            details: {
+              eventType: event.type,
+              stripeSubscriptionId: subscription.id,
+              status: subscription.status,
+              plan: normalizeProductId(subscription.metadata.product_id),
+            },
+          })
         }
         break
       }
@@ -166,6 +195,20 @@ export async function POST(req: NextRequest) {
               current_period_end: null,
             })
             .eq('id', therapistId)
+
+          await writeAuditLog({
+            therapistId,
+            actorRole: 'system',
+            action: 'subscription.changed',
+            resourceType: 'stripe_subscription',
+            resourceId: null,
+            details: {
+              eventType: event.type,
+              stripeSubscriptionId: subscription.id,
+              status: 'canceled',
+              plan: 'free',
+            },
+          })
         }
         break
       }
@@ -186,6 +229,20 @@ export async function POST(req: NextRequest) {
                 subscription_status: 'past_due',
               })
               .eq('id', therapistId)
+
+            await writeAuditLog({
+              therapistId,
+              actorRole: 'system',
+              action: 'subscription.changed',
+              resourceType: 'stripe_invoice',
+              resourceId: null,
+              details: {
+                eventType: event.type,
+                stripeInvoiceId: invoice.id,
+                stripeSubscriptionId: subscription.id,
+                status: 'past_due',
+              },
+            })
           }
         }
         break

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { getClient } from "@/lib/supabase/client"
+import { logClientAuditEvent } from "@/lib/audit-client"
 
 interface ClientRecord {
   id: string
@@ -124,6 +125,16 @@ export default function ReflectionJournalPage() {
       setTitle("")
       setReflectionText("")
       setMoodRating(5)
+      await logClientAuditEvent({
+        action: "reflection.submitted",
+        resourceType: "client_reflection",
+        resourceId: data.id,
+        details: {
+          clientId: clientRecord.id,
+          moodRating,
+          hasTitle: !!title.trim(),
+        },
+      })
       setSuccess("Reflection saved.")
     } catch (err) {
       console.error("[v0] Reflection Journal: failed to save", err)

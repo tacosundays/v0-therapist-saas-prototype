@@ -27,6 +27,7 @@ import { getClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { WorksheetForm } from "@/components/client-portal/worksheet-form"
 import { checkUserRole } from "@/lib/auth/check-user-role"
+import { logClientAuditEvent } from "@/lib/audit-client"
 
 interface Assignment {
   id: string
@@ -261,6 +262,17 @@ function ClientPortalContent() {
       return
     }
 
+    await logClientAuditEvent({
+      action: "assignment.update",
+      resourceType: "assignment",
+      resourceId: selectedAssignment,
+      details: {
+        status: "completed",
+        clientId: currentAssignment?.client_id || null,
+        hasReflection: !!reflection.trim(),
+      },
+    })
+
     // Update local state
     setAssignments(prev => prev.map(a => 
       a.id === selectedAssignment 
@@ -304,6 +316,16 @@ function ClientPortalContent() {
       console.error("Error marking assignment started:", updateError)
       return
     }
+
+    await logClientAuditEvent({
+      action: "assignment.update",
+      resourceType: "assignment",
+      resourceId: assignment.id,
+      details: {
+        status: "started",
+        clientId: assignment.client_id,
+      },
+    })
 
     setAssignments(prev => prev.map(a => (
       a.id === assignment.id ? { ...a, status: "started", started_at: startedAt } : a

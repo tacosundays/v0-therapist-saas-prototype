@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react"
 import { getClient } from "@/lib/supabase/client"
 import { checkUserRole } from "@/lib/auth/check-user-role"
+import { logClientAuditEvent } from "@/lib/audit-client"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -92,6 +93,14 @@ export default function LoginPage() {
         role: result.role,
         hasTherapistRecord: !!result.therapistRecord,
         hasClientRecord: !!result.clientRecord
+      })
+
+      await logClientAuditEvent({
+        action: "login",
+        resourceType: "auth",
+        details: {
+          role: result.role,
+        },
       })
       
       if (result.role === "client") {

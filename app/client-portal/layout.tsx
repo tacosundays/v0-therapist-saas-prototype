@@ -5,6 +5,7 @@ import { getClient } from "@/lib/supabase/client"
 import { Loader2, Brain, LogOut, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { checkUserRole } from "@/lib/auth/check-user-role"
+import { logClientAuditEvent } from "@/lib/audit-client"
 
 export default function ClientPortalLayout({
   children,
@@ -62,6 +63,13 @@ export default function ClientPortalLayout({
 
   const handleSignOut = async () => {
     const supabase = getClient()
+    await logClientAuditEvent({
+      action: "logout",
+      resourceType: "auth",
+      details: {
+        area: "client_portal",
+      },
+    })
     await supabase.auth.signOut()
     window.location.href = "/login"
   }

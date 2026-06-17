@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { getClient } from "@/lib/supabase/client"
 import { getClientRecord } from "@/lib/auth/check-user-role"
+import { logClientAuditEvent } from "@/lib/audit-client"
 import { 
   Loader2, 
   CheckCircle2,
@@ -41,6 +42,7 @@ interface Question {
 
 interface Assignment {
   id: string
+  client_id: string
   worksheet_template_id: string
   status: string
   due_date: string | null
@@ -209,9 +211,18 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
           `)
           .single()
 
-        if (startError) throw startError
-        loadedAssignment = startedAssignment as Assignment
-      }
+      if (startError) throw startError
+      loadedAssignment = startedAssignment as Assignment
+      await logClientAuditEvent({
+        action: "assignment.update",
+        resourceType: "worksheet_assignment",
+        resourceId: assignmentId,
+        details: {
+          status: "started",
+          clientId: loadedAssignment.client_id,
+        },
+      })
+    }
 
       setAssignment(loadedAssignment)
 
@@ -339,6 +350,16 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         .eq("id", assignmentId)
 
       if (updateError) throw updateError
+
+      await logClientAuditEvent({
+        action: "assignment.update",
+        resourceType: "worksheet_assignment",
+        resourceId: assignmentId,
+        details: {
+          status: "completed",
+          clientId: assignment?.client_id || null,
+        },
+      })
 
       setSubmitSuccess(true)
       setTimeout(() => {

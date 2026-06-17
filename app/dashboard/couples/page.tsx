@@ -43,6 +43,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClient } from "@/lib/supabase/client"
+import { logClientAuditEvent } from "@/lib/audit-client"
 
 interface ClientRecord {
   id: string
@@ -327,8 +328,24 @@ export default function CouplesPage() {
         assigned_at: assignedAt,
       }))
 
-      const { error: insertError } = await supabase.from("assignments").insert(payload)
+      const { data: insertedAssignments, error: insertError } = await supabase
+        .from("assignments")
+        .insert(payload)
+        .select("id, client_id")
       if (insertError) throw insertError
+
+      await logClientAuditEvent({
+        action: "assignment.create",
+        resourceType: "assignment",
+        resourceId: insertedAssignments?.[0]?.id || null,
+        details: {
+          assignmentType: "couples_homework",
+          coupleId: selectedCouple.id,
+          targetClientIds,
+          assignmentIds: (insertedAssignments || []).map((assignment: { id: string }) => assignment.id),
+          title: assignmentTitle.trim(),
+        },
+      })
 
       setAssignmentTitle("")
       setAssignmentDescription("")

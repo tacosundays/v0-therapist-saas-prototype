@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
+import { logClientAuditEvent } from "@/lib/audit-client"
 import { Loader2, Calendar } from "lucide-react"
 
 interface Client {
@@ -135,7 +136,7 @@ export function AssignHomeworkModal({
       }
 
       // Insert assignment
-      const { error: insertError } = await supabase
+      const { data: assignmentData, error: insertError } = await supabase
         .from("assignments")
         .insert({
           therapist_id: therapistId,
@@ -147,12 +148,26 @@ export function AssignHomeworkModal({
           status: "assigned",
           assigned_at: new Date().toISOString(),
         })
+        .select("id")
+        .single()
 
       if (insertError) {
         console.error("Error creating assignment:", insertError)
         setError(insertError.message)
         return
       }
+
+      await logClientAuditEvent({
+        action: "assignment.create",
+        resourceType: "assignment",
+        resourceId: assignmentData?.id || null,
+        details: {
+          clientId: selectedClientId,
+          title: title.trim(),
+          dueDate: dueDate || null,
+          assignmentType: "homework",
+        },
+      })
 
       console.log("Assignment created successfully")
       setSuccess(true)

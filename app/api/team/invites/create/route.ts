@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { renderTherapistInviteEmail } from "@/components/emails/therapist-invite-email"
 import { normalizeProductId } from "@/lib/products"
+import { writeAuditLog } from "@/lib/audit-log"
 
 const resendApiUrl = "https://api.resend.com/emails"
 const defaultFromEmail = "ShrinkAid <onboarding@resend.dev>"
@@ -30,6 +31,12 @@ function buildTherapistInviteLink(origin: string, email: string, token: string) 
   url.searchParams.set("email", normalizeEmail(email))
   url.searchParams.set("invite", token)
   return url.toString()
+}
+
+function getRequestIp(request: Request) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || null
 }
 
 export async function POST(request: Request) {
@@ -187,6 +194,24 @@ export async function POST(request: Request) {
     }
 
     if (!resendApiKey) {
+      await writeAuditLog({
+        therapistId: owner.id,
+        userId: user.id,
+        userEmail: normalizeEmail(user.email),
+        actorRole: "therapist",
+        action: "team.invite_sent",
+        resourceType: "therapist_invite",
+        resourceId: invite.id,
+        details: {
+          invitedEmail: normalizedInviteEmail,
+          practiceId: practice.id,
+          emailSent: false,
+          reason: "RESEND_API_KEY not configured",
+        },
+        ipAddress: getRequestIp(request),
+        userAgent: request.headers.get("user-agent"),
+      })
+
       return NextResponse.json({
         success: true,
         emailSent: false,
@@ -220,6 +245,24 @@ export async function POST(request: Request) {
     const resendResult = await resendResponse.json().catch(() => null)
 
     if (!resendResponse.ok) {
+      await writeAuditLog({
+        therapistId: owner.id,
+        userId: user.id,
+        userEmail: normalizeEmail(user.email),
+        actorRole: "therapist",
+        action: "team.invite_sent",
+        resourceType: "therapist_invite",
+        resourceId: invite.id,
+        details: {
+          invitedEmail: normalizedInviteEmail,
+          practiceId: practice.id,
+          emailSent: false,
+          resendError: resendResult?.message || resendResult?.error || "Email delivery failed",
+        },
+        ipAddress: getRequestIp(request),
+        userAgent: request.headers.get("user-agent"),
+      })
+
       return NextResponse.json({
         success: true,
         emailSent: false,
@@ -228,6 +271,23 @@ export async function POST(request: Request) {
         message: resendResult?.message || resendResult?.error || "Invite created. Email delivery failed. Copy invite link manually.",
       })
     }
+
+    await writeAuditLog({
+      therapistId: owner.id,
+      userId: user.id,
+      userEmail: normalizeEmail(user.email),
+      actorRole: "therapist",
+      action: "team.invite_sent",
+      resourceType: "therapist_invite",
+      resourceId: invite.id,
+      details: {
+        invitedEmail: normalizedInviteEmail,
+        practiceId: practice.id,
+        emailSent: true,
+      },
+      ipAddress: getRequestIp(request),
+      userAgent: request.headers.get("user-agent"),
+    })
 
     return NextResponse.json({
       success: true,

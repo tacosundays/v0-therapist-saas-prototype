@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { writeAuditLog } from "@/lib/audit-log"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -8,6 +9,12 @@ function normalizeEmail(email: string) {
 function getBearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || ""
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : null
+}
+
+function getRequestIp(request: Request) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || null
 }
 
 export async function POST(request: Request) {
@@ -101,6 +108,22 @@ export async function POST(request: Request) {
     if (removeError) {
       return NextResponse.json({ error: removeError.message }, { status: 500 })
     }
+
+    await writeAuditLog({
+      therapistId: owner.id,
+      userId: user.id,
+      userEmail: normalizeEmail(user.email),
+      actorRole: "therapist",
+      action: "team.member_removed",
+      resourceType: "practice_member",
+      resourceId: member.id,
+      details: {
+        practiceId: ownerMembership.practice_id,
+        removedTherapistId: member.therapist_id,
+      },
+      ipAddress: getRequestIp(request),
+      userAgent: request.headers.get("user-agent"),
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

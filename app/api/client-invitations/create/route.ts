@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getPlanLimits } from "@/lib/plan-limits"
 import { normalizeProductId } from "@/lib/products"
+import { writeAuditLog } from "@/lib/audit-log"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -27,6 +28,12 @@ function buildClientInviteLink(origin: string, email: string, token: string) {
   url.searchParams.set("email", normalizeEmail(email))
   url.searchParams.set("invite", token)
   return url.toString()
+}
+
+function getRequestIp(request: Request) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || null
 }
 
 export async function POST(request: Request) {
@@ -146,6 +153,23 @@ export async function POST(request: Request) {
     if (saveResult.error) {
       return NextResponse.json({ error: saveResult.error.message }, { status: 500 })
     }
+
+    await writeAuditLog({
+      therapistId: therapist.id,
+      userId: user.id,
+      userEmail: normalizedTherapistEmail,
+      actorRole: "therapist",
+      action: existingClient ? "client.update" : "client.create",
+      resourceType: "client",
+      resourceId: saveResult.data.id,
+      details: {
+        clientEmail: normalizedClientEmail,
+        clientName,
+        inviteCreated: true,
+      },
+      ipAddress: getRequestIp(request),
+      userAgent: request.headers.get("user-agent"),
+    })
 
     const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
     const inviteLink = buildClientInviteLink(origin, normalizedClientEmail, inviteToken)

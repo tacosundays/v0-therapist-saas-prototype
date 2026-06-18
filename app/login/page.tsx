@@ -16,6 +16,11 @@ export default function LoginPage() {
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [mfaCode, setMfaCode] = useState("")
+  const [mfaRecoveryCode, setMfaRecoveryCode] = useState("")
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null)
+  const [isMfaStep, setIsMfaStep] = useState(false)
+  const [mfaMode, setMfaMode] = useState<"totp" | "recovery">("totp")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
@@ -102,6 +107,38 @@ export default function LoginPage() {
           role: result.role,
         },
       })
+
+      if (result.role === "therapist" && result.therapistRecord) {
+        const supabaseAny = supabase as any
+        const { data: factorsData, error: factorsError } = await supabaseAny.auth.mfa.listFactors()
+
+        if (factorsError) {
+          console.error("[v0] Login: MFA factors error:", factorsError.message)
+          setError(factorsError.message)
+          setIsLoading(false)
+          return
+        }
+
+        const verifiedTotp = (factorsData?.totp || []).find((factor: { id: string; status: string }) => factor.status === "verified")
+
+        if (verifiedTotp) {
+          const { data: aalData, error: aalError } = await supabaseAny.auth.mfa.getAuthenticatorAssuranceLevel()
+
+          if (aalError) {
+            console.error("[v0] Login: MFA AAL error:", aalError.message)
+            setError(aalError.message)
+            setIsLoading(false)
+            return
+          }
+
+          if (aalData?.currentLevel !== "aal2" && aalData?.nextLevel === "aal2") {
+            setMfaFactorId(verifiedTotp.id)
+            setIsMfaStep(true)
+            setIsLoading(false)
+            return
+          }
+        }
+      }
       
       if (result.role === "client") {
         console.log("[v0] Login: Redirecting to /client-portal")
@@ -117,6 +154,68 @@ export default function LoginPage() {
     }
   }
 
+  const handleVerifyMfa = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      const supabase = getClient() as any
+
+      if (mfaMode === "recovery") {
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!session?.access_token) {
+          setError("Your login session expired. Please sign in again.")
+          setIsLoading(false)
+          return
+        }
+
+        const response = await fetch("/api/mfa/recovery-codes", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ code: mfaRecoveryCode }),
+        })
+        const result = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          setError(result?.error || "Invalid recovery code")
+          setIsLoading(false)
+          return
+        }
+
+        window.location.href = "/dashboard"
+        return
+      }
+
+      if (!mfaFactorId) {
+        setError("No MFA factor found. Please sign in again.")
+        setIsLoading(false)
+        return
+      }
+
+      const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: mfaFactorId,
+        code: mfaCode.trim(),
+      })
+
+      if (verifyError) {
+        setError(verifyError.message)
+        setIsLoading(false)
+        return
+      }
+
+      window.location.href = "/dashboard"
+    } catch (err) {
+      console.error("[v0] Login: MFA verification error:", err)
+      setError(err instanceof Error ? err.message : "Unable to verify MFA code")
+      setIsLoading(false)
+    }
+  }
+
   // Show loading screen while checking session
   if (isCheckingSession) {
     return (
@@ -125,6 +224,103 @@ export default function LoginPage() {
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (isMfaStep) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8 bg-background">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="flex items-center gap-2 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+              <Brain className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <span className="font-semibold text-xl text-foreground">ShrinkAid</span>
+          </div>
+
+          <h1 className="text-2xl font-bold text-foreground mb-2">Verify your login</h1>
+          <p className="text-muted-foreground mb-6">Enter the code from your authenticator app to continue.</p>
+
+          <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
+            <button
+              type="button"
+              onClick={() => setMfaMode("totp")}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                mfaMode === "totp" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Authenticator
+            </button>
+            <button
+              type="button"
+              onClick={() => setMfaMode("recovery")}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                mfaMode === "recovery" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Recovery code
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyMfa} className="space-y-4">
+            {mfaMode === "totp" ? (
+              <div className="space-y-2">
+                <Label htmlFor="mfaCode">Authenticator code</Label>
+                <Input
+                  id="mfaCode"
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value)}
+                  inputMode="numeric"
+                  maxLength={8}
+                  placeholder="123456"
+                  className="h-12 rounded-xl"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="mfaRecoveryCode">Recovery code</Label>
+                <Input
+                  id="mfaRecoveryCode"
+                  value={mfaRecoveryCode}
+                  onChange={(event) => setMfaRecoveryCode(event.target.value)}
+                  placeholder="ABCD-1234-EFGH"
+                  className="h-12 rounded-xl uppercase"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl text-base"
+              disabled={isLoading || (mfaMode === "totp" ? !mfaCode.trim() : !mfaRecoveryCode.trim())}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify and continue"
+              )}
+            </Button>
+          </form>
+        </motion.div>
       </div>
     )
   }

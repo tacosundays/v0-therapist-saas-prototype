@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { 
@@ -20,7 +27,8 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Upload
+  Upload,
+  Copy
 } from "lucide-react"
 
 type TherapistRecord = Record<string, unknown> & {
@@ -33,6 +41,22 @@ type TherapistRecord = Record<string, unknown> & {
   profile_photo_url?: string | null
   avatar_url?: string | null
   photo_url?: string | null
+}
+
+type MfaFactor = {
+  id: string
+  factor_type: string
+  status: string
+  friendly_name?: string | null
+}
+
+type MfaEnrollment = {
+  id: string
+  totp: {
+    qr_code: string
+    secret: string
+    uri: string
+  }
 }
 
 function splitFullName(fullName: string | null | undefined) {
@@ -60,6 +84,16 @@ export default function SettingsPage() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [mfaFactors, setMfaFactors] = useState<MfaFactor[]>([])
+  const [mfaRecoveryCount, setMfaRecoveryCount] = useState(0)
+  const [mfaEnrollment, setMfaEnrollment] = useState<MfaEnrollment | null>(null)
+  const [mfaCode, setMfaCode] = useState("")
+  const [mfaDisableCode, setMfaDisableCode] = useState("")
+  const [mfaRecoveryCodes, setMfaRecoveryCodes] = useState<string[]>([])
+  const [isMfaDialogOpen, setIsMfaDialogOpen] = useState(false)
+  const [isManagingMfa, setIsManagingMfa] = useState(false)
+  const [mfaError, setMfaError] = useState<string | null>(null)
+  const [mfaSuccess, setMfaSuccess] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -100,6 +134,7 @@ export default function SettingsPage() {
         setEmail(record?.email || userEmail || "")
         setCredentials(record?.credentials || "")
         setProfilePhotoUrl(getPhotoUrl(record))
+        await loadMfaStatus()
       } catch (err) {
         console.error("[v0] Settings: failed to load therapist", err)
         setError(err instanceof Error ? err.message : "Failed to load settings")
@@ -110,6 +145,203 @@ export default function SettingsPage() {
 
     loadTherapist()
   }, [])
+
+  const getAuthHeader = async () => {
+    const supabase = getClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : null
+  }
+
+  const loadMfaStatus = async () => {
+    try {
+      const supabase = getClient() as any
+      const { data, error: factorsError } = await supabase.auth.mfa.listFactors()
+
+      if (factorsError) {
+        console.error("[v0] Settings: failed to load MFA factors", factorsError)
+        return
+      }
+
+      const factors = [
+        ...(data?.totp || []),
+        ...(data?.phone || []),
+        ...(data?.webauthn || []),
+      ] as MfaFactor[]
+      setMfaFactors(factors)
+
+      const authHeader = await getAuthHeader()
+      if (!authHeader) return
+
+      const response = await fetch("/api/mfa/recovery-codes", {
+        headers: authHeader,
+      })
+      const result = await response.json().catch(() => null)
+
+      if (response.ok) {
+        setMfaRecoveryCount(result?.unusedCount || 0)
+      }
+    } catch (err) {
+      console.error("[v0] Settings: failed to load MFA status", err)
+    }
+  }
+
+  const generateRecoveryCodes = async () => {
+    const authHeader = await getAuthHeader()
+    if (!authHeader) throw new Error("You must be logged in to generate recovery codes.")
+
+    const response = await fetch("/api/mfa/recovery-codes", {
+      method: "POST",
+      headers: authHeader,
+    })
+    const result = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      throw new Error(result?.error || "Failed to generate recovery codes.")
+    }
+
+    setMfaRecoveryCodes(result.codes || [])
+    setMfaRecoveryCount(result.codes?.length || 0)
+  }
+
+  const beginMfaEnrollment = async () => {
+    setIsManagingMfa(true)
+    setMfaError(null)
+    setMfaSuccess(null)
+    setMfaRecoveryCodes([])
+    setMfaCode("")
+
+    try {
+      const supabase = getClient() as any
+      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: "ShrinkAid",
+        issuer: "ShrinkAid Homework",
+      })
+
+      if (enrollError) {
+        setMfaError(enrollError.message)
+        return
+      }
+
+      setMfaEnrollment(data as MfaEnrollment)
+      setIsMfaDialogOpen(true)
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : "Failed to start MFA setup.")
+    } finally {
+      setIsManagingMfa(false)
+    }
+  }
+
+  const verifyMfaEnrollment = async () => {
+    if (!mfaEnrollment || !mfaCode.trim()) return
+
+    setIsManagingMfa(true)
+    setMfaError(null)
+    setMfaSuccess(null)
+
+    try {
+      const supabase = getClient() as any
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: mfaEnrollment.id,
+      })
+
+      if (challengeError) {
+        setMfaError(challengeError.message)
+        return
+      }
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: mfaEnrollment.id,
+        challengeId: challenge.id,
+        code: mfaCode.trim(),
+      })
+
+      if (verifyError) {
+        setMfaError(verifyError.message)
+        return
+      }
+
+      await generateRecoveryCodes()
+      await loadMfaStatus()
+      setMfaEnrollment(null)
+      setMfaCode("")
+      setMfaSuccess("Two-factor authentication is enabled. Save these recovery codes now; they will not be shown again.")
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : "Failed to verify MFA code.")
+    } finally {
+      setIsManagingMfa(false)
+    }
+  }
+
+  const regenerateRecoveryCodes = async () => {
+    setIsManagingMfa(true)
+    setMfaError(null)
+    setMfaSuccess(null)
+
+    try {
+      await generateRecoveryCodes()
+      setMfaSuccess("New recovery codes generated. Save them now; old recovery codes no longer work.")
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : "Failed to regenerate recovery codes.")
+    } finally {
+      setIsManagingMfa(false)
+    }
+  }
+
+  const disableMfa = async () => {
+    const verifiedTotp = mfaFactors.find((factor) => factor.factor_type === "totp" && factor.status === "verified")
+    if (!verifiedTotp || !mfaDisableCode.trim()) return
+
+    setIsManagingMfa(true)
+    setMfaError(null)
+    setMfaSuccess(null)
+
+    try {
+      const supabase = getClient() as any
+      const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: verifiedTotp.id,
+        code: mfaDisableCode.trim(),
+      })
+
+      if (verifyError) {
+        setMfaError(verifyError.message)
+        return
+      }
+
+      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+        factorId: verifiedTotp.id,
+      })
+
+      if (unenrollError) {
+        setMfaError(unenrollError.message)
+        return
+      }
+
+      const authHeader = await getAuthHeader()
+      if (authHeader) {
+        await fetch("/api/mfa/recovery-codes", {
+          method: "DELETE",
+          headers: authHeader,
+        })
+      }
+
+      setMfaDisableCode("")
+      setMfaRecoveryCodes([])
+      setMfaRecoveryCount(0)
+      await loadMfaStatus()
+      setMfaSuccess("Two-factor authentication is disabled.")
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : "Failed to disable MFA.")
+    } finally {
+      setIsManagingMfa(false)
+    }
+  }
+
+  const copyRecoveryCodes = async () => {
+    if (mfaRecoveryCodes.length === 0) return
+    await navigator.clipboard.writeText(mfaRecoveryCodes.join("\n"))
+    setMfaSuccess("Recovery codes copied.")
+  }
 
   const handleSave = async () => {
     if (!therapistId || !therapist) return
@@ -228,6 +460,11 @@ export default function SettingsPage() {
   }
 
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "--"
+  const verifiedTotpFactor = mfaFactors.find((factor) => factor.factor_type === "totp" && factor.status === "verified")
+  const isMfaEnabled = !!verifiedTotpFactor
+  const qrCodeSrc = mfaEnrollment?.totp.qr_code?.startsWith("data:")
+    ? mfaEnrollment.totp.qr_code
+    : `data:image/svg+xml;utf-8,${encodeURIComponent(mfaEnrollment?.totp.qr_code || "")}`
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -406,12 +643,97 @@ export default function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">Two-factor authentication</p>
-                <p className="text-xs text-muted-foreground">Add an extra layer of security to your account</p>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Two-factor authentication</p>
+                  <p className="text-xs text-muted-foreground">
+                    Use Google Authenticator, Authy, or another TOTP app after password login.
+                  </p>
+                </div>
+                {isMfaEnabled ? (
+                  <div className="text-sm font-medium text-primary">Enabled</div>
+                ) : (
+                  <Button variant="outline" className="rounded-xl" onClick={beginMfaEnrollment} disabled={isManagingMfa}>
+                    {isManagingMfa ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Enable
+                  </Button>
+                )}
               </div>
-              <Button variant="outline" className="rounded-xl">Enable</Button>
+
+              {mfaError && (
+                <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {mfaError}
+                </div>
+              )}
+              {mfaSuccess && (
+                <div className="p-3 bg-primary/10 text-primary text-sm rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {mfaSuccess}
+                </div>
+              )}
+
+              {isMfaEnabled && (
+                <div className="space-y-4 rounded-xl border border-border p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Recovery codes</p>
+                      <p className="text-xs text-muted-foreground">{mfaRecoveryCount} unused recovery codes available.</p>
+                    </div>
+                    <Button variant="outline" className="rounded-xl" onClick={regenerateRecoveryCodes} disabled={isManagingMfa}>
+                      Regenerate Codes
+                    </Button>
+                  </div>
+
+                  {mfaRecoveryCodes.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="grid gap-2 rounded-xl bg-muted/40 p-3 sm:grid-cols-2">
+                        {mfaRecoveryCodes.map((code) => (
+                          <code key={code} className="rounded-lg bg-background px-3 py-2 text-sm">
+                            {code}
+                          </code>
+                        ))}
+                      </div>
+                      <Button variant="outline" className="rounded-xl" onClick={copyRecoveryCodes}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy Recovery Codes
+                      </Button>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Disable two-factor authentication</p>
+                      <p className="text-xs text-muted-foreground">Enter a current authenticator code to remove MFA from this account.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        value={mfaDisableCode}
+                        onChange={(event) => setMfaDisableCode(event.target.value)}
+                        inputMode="numeric"
+                        maxLength={8}
+                        placeholder="123456"
+                        className="rounded-xl"
+                      />
+                      <Button
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={disableMfa}
+                        disabled={isManagingMfa || !mfaDisableCode.trim()}
+                      >
+                        Disable
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
+                Group Practice owners will be able to enforce MFA for team members from team policy controls in a later release.
+              </div>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -475,6 +797,81 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog open={isMfaDialogOpen} onOpenChange={setIsMfaDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Set up two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Scan the QR code with Google Authenticator, Authy, or another TOTP app, then enter the 6-digit code.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {mfaEnrollment && (
+              <>
+                <div className="flex justify-center rounded-xl border border-border bg-white p-4">
+                  <img src={qrCodeSrc} alt="Authenticator QR code" className="h-48 w-48" />
+                </div>
+                <div className="rounded-xl bg-muted/40 p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Manual setup key</p>
+                  <code className="break-all text-sm text-foreground">{mfaEnrollment.totp.secret}</code>
+                </div>
+              </>
+            )}
+
+            {mfaError && (
+              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {mfaError}
+              </div>
+            )}
+            {mfaSuccess && (
+              <div className="p-3 bg-primary/10 text-primary text-sm rounded-xl flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                {mfaSuccess}
+              </div>
+            )}
+
+            {mfaRecoveryCodes.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid gap-2 rounded-xl bg-muted/40 p-3 sm:grid-cols-2">
+                  {mfaRecoveryCodes.map((code) => (
+                    <code key={code} className="rounded-lg bg-background px-3 py-2 text-sm">
+                      {code}
+                    </code>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full rounded-xl" onClick={copyRecoveryCodes}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Recovery Codes
+                </Button>
+                <Button className="w-full rounded-xl" onClick={() => setIsMfaDialogOpen(false)}>
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Label htmlFor="mfaCode">Authenticator code</Label>
+                <Input
+                  id="mfaCode"
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value)}
+                  inputMode="numeric"
+                  maxLength={8}
+                  placeholder="123456"
+                  className="h-11 rounded-xl"
+                  disabled={isManagingMfa}
+                />
+                <Button className="w-full rounded-xl" onClick={verifyMfaEnrollment} disabled={isManagingMfa || !mfaCode.trim()}>
+                  {isManagingMfa ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Verify and Enable
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

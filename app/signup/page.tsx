@@ -183,13 +183,21 @@ export default function SignupPage() {
       }
 
       if (isTeamInviteSignup && inviteToken) {
+        if (!authData.session?.access_token) {
+          setError("Please confirm your email, then use the invite link again to finish joining the team.")
+          setIsLoading(false)
+          return
+        }
+
         const acceptTeamResponse = await fetch("/api/team/invites/accept", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${authData.session.access_token}`,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             email: normalizeInviteEmail(email),
             inviteToken,
-            therapistId: authData.user.id,
           }),
         })
 
@@ -205,15 +213,23 @@ export default function SignupPage() {
 
     // If client, link the auth user to the existing invite record.
     if (userType === "client" && authData.user && existingClientId && therapistId && inviteToken) {
+      if (!authData.session?.access_token) {
+        setError("Please confirm your email, then use the invite link again to finish setting up your portal.")
+        setIsLoading(false)
+        return
+      }
+
       const acceptResponse = await fetch("/api/client-invitations/accept", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${authData.session.access_token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           clientId: existingClientId,
           email: normalizeInviteEmail(email),
           fullName: `${firstName} ${lastName}`,
           inviteToken,
-          userId: authData.user.id,
         }),
       })
 

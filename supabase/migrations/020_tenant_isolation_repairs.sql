@@ -33,24 +33,8 @@ AS $$
   LIMIT 1
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_current_therapist_for_client(target_client_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.clients c
-    WHERE c.id = target_client_id
-      AND c.therapist_id = public.current_therapist_id()
-  )
-$$;
-
 GRANT EXECUTE ON FUNCTION public.current_therapist_id() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.current_client_id() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_current_therapist_for_client(uuid) TO authenticated;
 
 DO $$
 DECLARE

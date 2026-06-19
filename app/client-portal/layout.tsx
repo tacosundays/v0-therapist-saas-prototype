@@ -6,6 +6,7 @@ import { Loader2, Brain, LogOut, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
+import { SessionTimeout } from "@/components/auth/session-timeout"
 
 export default function ClientPortalLayout({
   children,
@@ -110,6 +111,7 @@ export default function ClientPortalLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      <SessionTimeout />
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

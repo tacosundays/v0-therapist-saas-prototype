@@ -6,6 +6,7 @@ import { Brain, LogOut, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
+import { SessionTimeout } from "@/components/auth/session-timeout"
 
 export default function PortalLayout({
   children,
@@ -70,6 +71,7 @@ export default function PortalLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      <SessionTimeout />
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

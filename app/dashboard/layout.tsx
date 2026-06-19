@@ -8,6 +8,7 @@ import { checkUserRole } from "@/lib/auth/check-user-role"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getClient } from "@/lib/supabase/client"
+import { SessionTimeout } from "@/components/auth/session-timeout"
 
 export default function DashboardLayout({
   children,
@@ -101,6 +102,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      <SessionTimeout />
       <DashboardSidebar />
       <div className="pl-64 transition-all duration-300">
         <SubscriptionBanner />

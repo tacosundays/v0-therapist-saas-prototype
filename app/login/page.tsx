@@ -26,6 +26,24 @@ function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   })
 }
 
+function getSupabaseEnvError() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return "Supabase is not configured for this deployment. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel."
+  }
+
+  return null
+}
+
+function getAuthErrorMessage(err: unknown, stage: string) {
+  const message = err instanceof Error ? err.message : String(err || "Unknown error")
+
+  if (message.toLowerCase().includes("failed to fetch")) {
+    return `${stage} could not reach Supabase Auth. Check the Supabase project URL, anon key, browser network access, and allowed site URL/CORS settings.`
+  }
+
+  return `${stage} failed: ${message}`
+}
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
@@ -94,12 +112,22 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
+    let authStage = "Login"
 
     try {
+      const envError = getSupabaseEnvError()
+
+      if (envError) {
+        setError(envError)
+        setIsLoading(false)
+        return
+      }
+
       const supabase = getClient()
       
       console.log("[v0] Login: Attempting sign in for email:", email)
       
+      authStage = "Sign in"
       const { data, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({
           email,
@@ -119,45 +147,11 @@ export default function LoginPage() {
       console.log("[v0] Login: User email:", data.user?.email)
       console.log("[v0] Login: User role from metadata:", data.user?.user_metadata?.role)
 
-      const supabaseAny = supabase as any
-      const { data: factorsData, error: factorsError } = await withTimeout<any>(
-        supabaseAny.auth.mfa.listFactors(),
-        "MFA check"
-      )
-
-      if (factorsError) {
-        console.error("[v0] Login: MFA factors error:", factorsError.message)
-        setError(factorsError.message)
-        setIsLoading(false)
-        return
-      }
-
-      const verifiedTotp = (factorsData?.totp || []).find((factor: { id: string; status: string }) => factor.status === "verified")
-
-      if (verifiedTotp) {
-        const { data: aalData, error: aalError } = await withTimeout<any>(
-          supabaseAny.auth.mfa.getAuthenticatorAssuranceLevel(),
-          "MFA assurance check"
-        )
-
-        if (aalError) {
-          console.error("[v0] Login: MFA AAL error:", aalError.message)
-          setError(aalError.message)
-          setIsLoading(false)
-          return
-        }
-
-        if (aalData?.currentLevel !== "aal2" && aalData?.nextLevel === "aal2") {
-          setMfaFactorId(verifiedTotp.id)
-          setIsMfaStep(true)
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // Use the auth utility to determine role and redirect after MFA is satisfied.
+      // Resolve account type first. This keeps client login away from therapist-only
+      // MFA checks and gives Supabase Auth a settled session before listing factors.
+      authStage = "Account lookup"
       const result = await withTimeout(checkUserRole(), "Account lookup")
-      
+
       console.log("[v0] Login: Role check result:", {
         role: result.role,
         hasTherapistRecord: !!result.therapistRecord,
@@ -170,6 +164,47 @@ export default function LoginPage() {
         return
       }
 
+      if (result.role === "therapist" && result.therapistRecord) {
+        const supabaseAny = supabase as any
+        authStage = "MFA check"
+        const { data: factorsData, error: factorsError } = await withTimeout<any>(
+          supabaseAny.auth.mfa.listFactors(),
+          "MFA check"
+        )
+
+        if (factorsError) {
+          console.error("[v0] Login: MFA factors error:", factorsError.message)
+          setError(factorsError.message)
+          setIsLoading(false)
+          return
+        }
+
+        const verifiedTotp = (factorsData?.totp || []).find((factor: { id: string; status: string }) => factor.status === "verified")
+
+        if (verifiedTotp) {
+          authStage = "MFA assurance check"
+          const { data: aalData, error: aalError } = await withTimeout<any>(
+            supabaseAny.auth.mfa.getAuthenticatorAssuranceLevel(),
+            "MFA assurance check"
+          )
+
+          if (aalError) {
+            console.error("[v0] Login: MFA AAL error:", aalError.message)
+            setError(aalError.message)
+            setIsLoading(false)
+            return
+          }
+
+          if (aalData?.currentLevel !== "aal2" && aalData?.nextLevel === "aal2") {
+            setMfaFactorId(verifiedTotp.id)
+            setIsMfaStep(true)
+            setIsLoading(false)
+            return
+          }
+        }
+      }
+
+      authStage = "Audit logging"
       await logClientAuditEvent({
         action: "login",
         resourceType: "auth",
@@ -187,7 +222,7 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error("[v0] Login: Unexpected error:", err)
-      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+      setError(getAuthErrorMessage(err, authStage))
       setIsLoading(false)
     }
   }
@@ -196,11 +231,21 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
+    let authStage = "MFA verification"
 
     try {
+      const envError = getSupabaseEnvError()
+
+      if (envError) {
+        setError(envError)
+        setIsLoading(false)
+        return
+      }
+
       const supabase = getClient() as any
 
       if (mfaMode === "recovery") {
+        authStage = "MFA recovery session check"
         const { data: { session } } = await withTimeout<any>(
           supabase.auth.getSession(),
           "MFA recovery session check"
@@ -212,6 +257,7 @@ export default function LoginPage() {
           return
         }
 
+        authStage = "Recovery code verification"
         const response = await fetch("/api/mfa/recovery-codes", {
           method: "PATCH",
           headers: {
@@ -238,6 +284,7 @@ export default function LoginPage() {
         return
       }
 
+      authStage = "MFA verification"
       const { error: verifyError } = await withTimeout<any>(
         supabase.auth.mfa.challengeAndVerify({
           factorId: mfaFactorId,
@@ -252,6 +299,7 @@ export default function LoginPage() {
         return
       }
 
+      authStage = "Account lookup"
       const result = await withTimeout(checkUserRole(), "Account lookup")
 
       if (result.role === "client") {
@@ -264,7 +312,7 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error("[v0] Login: MFA verification error:", err)
-      setError(err instanceof Error ? err.message : "Unable to verify MFA code")
+      setError(getAuthErrorMessage(err, authStage))
       setIsLoading(false)
     }
   }

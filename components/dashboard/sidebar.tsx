@@ -105,24 +105,27 @@ export function DashboardSidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 z-40",
+        "fixed left-0 top-0 z-40 flex h-full flex-col border-r border-slate-200/80 bg-white/90 shadow-[12px_0_40px_rgba(15,23,42,0.04)] backdrop-blur-xl transition-all duration-300",
         collapsed ? "w-20" : "w-64"
       )}
     >
       {/* Logo */}
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="border-b border-slate-200/80 p-4">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center shrink-0">
-            <Brain className="w-6 h-6 text-sidebar-primary-foreground" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary shadow-[0_12px_28px_rgba(109,94,245,0.30)]">
+            <Brain className="h-6 w-6 text-white" />
           </div>
           {!collapsed && (
-            <span className="font-semibold text-lg text-sidebar-foreground">ShrinkAid</span>
+            <div>
+              <span className="block text-lg font-bold tracking-tight text-slate-950">ShrinkAid</span>
+              <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Homework</span>
+            </div>
           )}
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
           return (
@@ -130,13 +133,13 @@ export function DashboardSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
+                "group flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  ? "bg-primary text-white shadow-[0_12px_28px_rgba(109,94,245,0.25)]"
+                  : "text-slate-500 hover:bg-slate-100/90 hover:text-slate-950"
               )}
             >
-              <item.icon className="w-5 h-5 shrink-0" />
+              <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-slate-400 group-hover:text-primary")} />
               {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
             </Link>
           )
@@ -146,7 +149,7 @@ export function DashboardSidebar() {
       {/* Collapse Button */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-sidebar-accent border border-sidebar-border flex items-center justify-center text-sidebar-foreground hover:bg-sidebar-accent/80 transition-colors"
+        className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-primary"
       >
         {collapsed ? (
           <ChevronRight className="w-4 h-4" />
@@ -156,15 +159,15 @@ export function DashboardSidebar() {
       </button>
 
       {/* User Section */}
-      <div className="p-4 border-t border-sidebar-border">
-        <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-          <div className="w-10 h-10 rounded-full bg-sidebar-primary/20 flex items-center justify-center shrink-0">
-            <span className="text-sm font-medium text-sidebar-primary">{initials}</span>
+      <div className="border-t border-slate-200/80 p-4">
+        <div className={cn("flex items-center gap-3 rounded-2xl bg-slate-50 p-2", collapsed && "justify-center bg-transparent p-0")}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+            <span className="text-sm font-bold text-primary">{initials}</span>
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{displayName}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email || ''}</p>
+              <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
+              <p className="truncate text-xs text-slate-500">{user?.email || ''}</p>
             </div>
           )}
         </div>
@@ -172,7 +175,7 @@ export function DashboardSidebar() {
           onClick={handleSignOut}
           disabled={isSigningOut}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 mt-3 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all w-full",
+            "mt-3 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-950",
             collapsed && "justify-center px-0"
           )}
         >

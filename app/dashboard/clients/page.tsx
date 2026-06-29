@@ -386,23 +386,24 @@ export default function ClientsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="saas-page-header flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
+          <p className="saas-eyebrow mb-2">Client operations</p>
           <motion.h1
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold text-foreground"
+            className="text-3xl font-bold tracking-tight text-slate-950"
           >
             Clients
           </motion.h1>
-          <p className="text-muted-foreground mt-1">Manage your client list and assignments</p>
+          <p className="mt-2 text-sm text-slate-500">Manage your client list and assignments</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl" onClick={() => openAssignModal()}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => openAssignModal()}>
             <FileText className="w-4 h-4 mr-2" />
             Assign Homework
           </Button>
-          <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
+          <Button onClick={() => setIsAddModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Invite Client
           </Button>
@@ -410,23 +411,23 @@ export default function ClientsPage() {
       </div>
 
       {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="saas-soft-panel flex flex-col gap-4 p-4 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search clients..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11 rounded-xl"
+            className="h-11 rounded-2xl border-slate-200 bg-white pl-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(["all", "invited", "email_sent", "registered", "active"] as const).map((status) => (
             <Button
               key={status}
               variant={filterStatus === status ? "default" : "outline"}
               onClick={() => setFilterStatus(status)}
-              className="rounded-xl capitalize"
+              className="capitalize"
             >
               {status.replace("_", " ")}
             </Button>
@@ -456,16 +457,16 @@ export default function ClientsPage() {
 
       {/* Empty State */}
       {!isLoading && !error && clients.length === 0 && (
-        <Card className="rounded-2xl">
+        <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10">
               <Plus className="w-8 h-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">No clients yet</h3>
             <p className="text-muted-foreground text-center mb-4">
               Get started by inviting your first client
             </p>
-            <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
+            <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Invite Your First Client
             </Button>
@@ -475,7 +476,7 @@ export default function ClientsPage() {
 
       {/* Clients Grid */}
       {!isLoading && !error && filteredClients.length > 0 && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {filteredClients.map((client, index) => {
             const stats = getClientStats(client.id)
             const inviteStatus = getClientInviteStatus(client)
@@ -487,31 +488,31 @@ export default function ClientsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="rounded-2xl hover:shadow-lg transition-shadow h-full flex flex-col">
+                <Card className="h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_65px_rgba(15,23,42,0.10)]">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                          <span className="text-lg font-medium text-primary">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+                          <span className="text-lg font-bold text-primary">
                             {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                           </span>
                         </div>
                         <div>
-                          <CardTitle className="text-base">{client.full_name}</CardTitle>
+                          <CardTitle className="text-base tracking-tight text-slate-950">{client.full_name}</CardTitle>
                           {client.email && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                               <Mail className="w-3 h-3" />
                               {client.email}
                             </p>
                           )}
-                          <Badge variant="outline" className={`mt-2 ${inviteStatus.className}`}>
+                          <Badge variant="outline" className={`mt-2 rounded-full px-2.5 py-0.5 ${inviteStatus.className}`}>
                             {inviteStatus.label}
                           </Badge>
                         </div>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -554,16 +555,18 @@ export default function ClientsPage() {
                     <div className="space-y-4 flex-1">
                       {/* Progress Bar */}
                       {stats.total > 0 && (
-                        <div className="space-y-1.5">
+                        <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3">
+                          <div className="space-y-1.5">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">Progress</span>
                             <span className="font-medium text-foreground">{stats.completed}/{stats.total}</span>
                           </div>
                           <div className="h-2 bg-muted rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-primary rounded-full transition-all duration-300"
+                              className="h-full rounded-full bg-primary transition-all duration-300"
                               style={{ width: `${stats.completionRate || 0}%` }}
                             />
+                          </div>
                           </div>
                         </div>
                       )}
@@ -571,25 +574,25 @@ export default function ClientsPage() {
                       {/* Status Badges */}
                       <div className="flex flex-wrap gap-2">
                         {stats.completed > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                             <CheckCircle2 className="w-3 h-3" />
                             {stats.completed} completed
                           </span>
                         )}
                         {stats.started > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-blue-500/10 text-blue-700">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-700">
                             <Clock className="w-3 h-3" />
                             {stats.started} started
                           </span>
                         )}
                         {stats.assigned > 0 && stats.overdue === 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600">
                             <Clock className="w-3 h-3" />
                             {stats.assigned} assigned
                           </span>
                         )}
                         {stats.overdue > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-destructive/10 text-destructive">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
                             <AlertTriangle className="w-3 h-3" />
                             {stats.overdue} overdue
                           </span>
@@ -638,7 +641,7 @@ export default function ClientsPage() {
 
                       {/* Latest Reflection */}
                       {stats.latestReflection && (
-                        <div className="p-3 bg-muted/30 rounded-xl space-y-1">
+                        <div className="space-y-1 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3">
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <MessageSquare className="w-3 h-3" />
                             Latest reflection
@@ -675,8 +678,8 @@ export default function ClientsPage() {
                           )}
                         </div>
 
-                    <div className="pt-5 mt-5 border-t border-border">
-                      <Button size="sm" className="w-full rounded-xl" onClick={() => openAssignModal(client.id)}>
+                    <div className="mt-5 border-t border-slate-200/80 pt-5">
+                      <Button size="sm" className="w-full" onClick={() => openAssignModal(client.id)}>
                         Assign
                       </Button>
                     </div>

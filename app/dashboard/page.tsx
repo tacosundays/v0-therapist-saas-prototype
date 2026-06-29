@@ -423,23 +423,24 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="saas-page-header flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
+          <p className="saas-eyebrow mb-2">Therapist workspace</p>
           <motion.h1
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold text-foreground"
+            className="text-3xl font-bold tracking-tight text-slate-950"
           >
             {getGreeting()}, {displayName}
           </motion.h1>
-          <p className="text-muted-foreground mt-1">{"Here's what's happening with your clients today"}</p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">{"Here's what's happening with your clients today"}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl" onClick={() => setIsAssignModalOpen(true)}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setIsAssignModalOpen(true)}>
             <FileText className="w-4 h-4 mr-2" />
             Assign Homework
           </Button>
-          <Button className="rounded-xl" onClick={() => setIsAddModalOpen(true)}>
+          <Button onClick={() => setIsAddModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Invite Client
           </Button>
@@ -447,7 +448,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -455,15 +456,15 @@ export default function DashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card className="rounded-2xl">
+            <Card className="group overflow-hidden">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    <p className="text-3xl font-bold text-foreground mt-1">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground mt-2">{stat.change}</p>
+                    <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{stat.value}</p>
+                    <p className="mt-2 text-xs text-slate-500">{stat.change}</p>
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 transition-colors group-hover:bg-primary group-hover:text-white">
                     <stat.icon className="w-6 h-6 text-primary" />
                   </div>
                 </div>
@@ -473,7 +474,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Client Activity */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -481,9 +482,9 @@ export default function DashboardPage() {
           transition={{ delay: 0.4 }}
           className="lg:col-span-2"
         >
-          <Card className="rounded-2xl">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Recent Clients</CardTitle>
+              <CardTitle className="text-lg tracking-tight">Recent Clients</CardTitle>
               <Button variant="ghost" size="sm" className="rounded-xl" asChild>
                 <Link href="/dashboard/clients">
                   View all
@@ -527,10 +528,10 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={client.id}
-                        className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl"
+                        className="flex items-center gap-4 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 transition-colors hover:bg-white"
                       >
-                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-medium text-primary">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+                          <span className="text-sm font-bold text-primary">
                             {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                           </span>
                         </div>
@@ -578,7 +579,7 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <Card className="rounded-2xl">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
@@ -602,10 +603,10 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={assignment.id}
-                        className="p-4 bg-primary/5 rounded-xl border border-primary/20"
+                        className="rounded-2xl border border-primary/15 bg-primary/5 p-4"
                       >
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15">
                             <CheckCircle2 className="w-3 h-3 text-primary" />
                           </div>
                           <span className="text-sm font-medium text-foreground">{client?.full_name || "Unknown"}</span>

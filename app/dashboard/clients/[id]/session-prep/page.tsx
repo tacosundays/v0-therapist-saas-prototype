@@ -751,25 +751,26 @@ export default function SessionPrepPage() {
   const lastLogin = null
 
   return (
-    <div className="space-y-8 max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
+    <div className="max-w-6xl space-y-8">
+      <div className="saas-page-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <Button variant="ghost" className="rounded-xl mb-3" asChild>
+          <Button variant="ghost" className="mb-3" asChild>
             <Link href="/dashboard/clients">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to clients
             </Link>
           </Button>
+          <p className="saas-eyebrow mb-2">Client intelligence</p>
           <motion.h1
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold text-foreground"
+            className="text-3xl font-bold tracking-tight text-slate-950"
           >
             Session Prep
           </motion.h1>
-          <p className="text-muted-foreground mt-1">One-page pre-session summary from real client activity</p>
+          <p className="mt-2 text-sm text-slate-500">One-page pre-session summary from real client activity</p>
         </div>
-        <Button className="rounded-xl" onClick={openProgressNoteForm}>
+        <Button onClick={openProgressNoteForm}>
           <Plus className="w-4 h-4 mr-2" />
           Write Progress Note
         </Button>
@@ -782,7 +783,7 @@ export default function SessionPrepPage() {
         <div className="p-4 rounded-xl bg-primary/10 text-primary text-sm">{success}</div>
       )}
 
-      <Card className="rounded-2xl">
+      <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <UserRound className="w-5 h-5 text-primary" />
@@ -790,36 +791,36 @@ export default function SessionPrepPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Name</p>
               <p className="font-medium text-foreground">{clientRecord?.full_name}</p>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Status</p>
               <Badge variant="outline" className="mt-1">{getClientStatus(clientRecord)}</Badge>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Registered date</p>
               <p className="font-medium text-foreground">{formatDate(clientRecord?.invite_accepted_at)}</p>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Last login</p>
               <p className="font-medium text-foreground">{formatDate(lastLogin)}</p>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Total assignments</p>
               <p className="text-2xl font-bold text-foreground">{totalAssignments}</p>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Completed assignments</p>
               <p className="text-2xl font-bold text-foreground">{completedAssignments}</p>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Completion rate</p>
               <p className="text-2xl font-bold text-foreground">{totalAssignments > 0 ? `${completionRate}%` : "--"}</p>
             </div>
-            <div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
               <p className="text-xs text-muted-foreground">Current status</p>
               <p className="font-medium text-foreground">{assignedAssignments} assigned, {startedAssignments} started</p>
             </div>

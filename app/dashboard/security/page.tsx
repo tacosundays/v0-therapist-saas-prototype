@@ -100,16 +100,17 @@ export default function SecurityPage() {
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="saas-page-header">
+        <p className="saas-eyebrow mb-2">Workspace security</p>
         <motion.h1
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-bold text-foreground flex items-center gap-2"
+          className="text-3xl font-bold tracking-tight text-slate-950 flex items-center gap-2"
         >
           <ShieldCheck className="w-6 h-6 text-primary" />
           Security
         </motion.h1>
-        <p className="text-muted-foreground mt-1">Review audit events for your therapist workspace.</p>
+        <p className="mt-2 text-sm text-slate-500">Review audit events for your therapist workspace.</p>
       </div>
 
       {error && (
@@ -119,7 +120,7 @@ export default function SecurityPage() {
         </div>
       )}
 
-      <Card className="rounded-2xl">
+      <Card>
         <CardHeader>
           <CardTitle className="text-lg">Audit Log</CardTitle>
         </CardHeader>
@@ -134,7 +135,7 @@ export default function SecurityPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
+                  <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="py-3 pr-4 font-medium">Date</th>
                     <th className="py-3 pr-4 font-medium">User</th>
                     <th className="py-3 pr-4 font-medium">Action</th>
@@ -144,7 +145,7 @@ export default function SecurityPage() {
                 </thead>
                 <tbody>
                   {logs.map((log) => (
-                    <tr key={log.id} className="border-b border-border/60 align-top">
+                    <tr key={log.id} className="border-b border-slate-200/70 align-top transition-colors hover:bg-slate-50/70">
                       <td className="py-4 pr-4 whitespace-nowrap text-muted-foreground">{formatDate(log.created_at)}</td>
                       <td className="py-4 pr-4">
                         <div className="font-medium text-foreground">{log.user_email || "System"}</div>

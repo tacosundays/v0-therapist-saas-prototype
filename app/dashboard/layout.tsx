@@ -101,12 +101,12 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(109,94,245,0.10),transparent_34rem),linear-gradient(180deg,#F8FAFC_0%,#EEF2FF_100%)]">
       <SessionTimeout />
       <DashboardSidebar />
       <div className="pl-64 transition-all duration-300">
         <SubscriptionBanner />
-        <main className="p-8">
+        <main className="mx-auto w-full max-w-[1500px] p-8 xl:p-10">
           {children}
         </main>
       </div>

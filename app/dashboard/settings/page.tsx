@@ -467,16 +467,17 @@ export default function SettingsPage() {
     : `data:image/svg+xml;utf-8,${encodeURIComponent(mfaEnrollment?.totp.qr_code || "")}`
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <div>
+    <div className="max-w-4xl space-y-8">
+      <div className="saas-page-header">
+        <p className="saas-eyebrow mb-2">Workspace preferences</p>
         <motion.h1
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-bold text-foreground"
+          className="text-3xl font-bold tracking-tight text-slate-950"
         >
           Settings
         </motion.h1>
-        <p className="text-muted-foreground mt-1">Manage your account and preferences</p>
+        <p className="mt-2 text-sm text-slate-500">Manage your account and preferences</p>
       </div>
 
       <motion.div
@@ -484,7 +485,7 @@ export default function SettingsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="rounded-2xl">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <User className="w-5 h-5 text-primary" />
@@ -499,11 +500,11 @@ export default function SettingsPage() {
             ) : (
               <>
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-3xl bg-primary/10 ring-1 ring-primary/15">
                     {profilePhotoUrl ? (
                       <img src={profilePhotoUrl} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xl font-medium text-primary">{initials}</span>
+                      <span className="text-xl font-bold text-primary">{initials}</span>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -587,7 +588,7 @@ export default function SettingsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="rounded-2xl">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Bell className="w-5 h-5 text-primary" />
@@ -635,7 +636,7 @@ export default function SettingsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className="rounded-2xl">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />

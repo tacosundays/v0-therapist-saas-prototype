@@ -211,9 +211,10 @@ export default function BillingPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Billing</h1>
-        <p className="text-muted-foreground mt-1">Manage your subscription and billing</p>
+      <div className="saas-page-header">
+        <p className="saas-eyebrow mb-2">Subscription</p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-950">Billing</h1>
+        <p className="mt-2 text-sm text-slate-500">Manage your subscription and billing</p>
       </div>
 
       {/* Success Message */}
@@ -269,10 +270,10 @@ export default function BillingPage() {
         className="grid gap-6 md:grid-cols-2"
       >
         {/* Usage Card */}
-        <Card className="rounded-2xl">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="w-5 h-5" />
+              <Users className="w-5 h-5 text-primary" />
               Usage
             </CardTitle>
           </CardHeader>
@@ -318,10 +319,10 @@ export default function BillingPage() {
         </Card>
 
         {/* Subscription Card */}
-        <Card className="rounded-2xl">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <CreditCard className="w-5 h-5" />
+              <CreditCard className="w-5 h-5 text-primary" />
               Current Plan
             </CardTitle>
           </CardHeader>
@@ -386,7 +387,7 @@ export default function BillingPage() {
 
       {/* Pricing Plans */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="mb-4 text-xl font-semibold tracking-tight text-slate-950">
           {isActive ? "Change Plan" : "Choose a Plan"}
         </h2>
         <div className="grid gap-6 md:grid-cols-3">
@@ -427,17 +428,17 @@ function PlanCard({ product, isCurrentPlan, isLoading, canCheckout, onSelect, de
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
     >
-      <Card className={`rounded-2xl relative h-full flex flex-col ${product.isPopular ? "border-primary shadow-lg" : ""}`}>
+      <Card className={`relative flex h-full flex-col overflow-hidden ${product.isPopular ? "border-primary/50 shadow-[0_24px_65px_rgba(109,94,245,0.16)]" : ""}`}>
         {product.isPopular && (
           <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-            <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
+            <Badge className="rounded-full bg-primary px-3 py-1 text-primary-foreground">Most Popular</Badge>
           </div>
         )}
         <CardHeader className="pb-4">
-          <CardTitle>{product.name}</CardTitle>
+          <CardTitle className="text-xl tracking-tight text-slate-950">{product.name}</CardTitle>
           <CardDescription>{product.description}</CardDescription>
           <div className="pt-2">
-            <span className="text-3xl font-bold">${(product.priceInCents / 100).toFixed(0)}</span>
+            <span className="text-4xl font-bold tracking-tight text-slate-950">${(product.priceInCents / 100).toFixed(0)}</span>
             <span className="text-muted-foreground">/{product.interval}</span>
           </div>
         </CardHeader>
@@ -445,7 +446,7 @@ function PlanCard({ product, isCurrentPlan, isLoading, canCheckout, onSelect, de
           <ul className="space-y-3 flex-1">
             {product.features.map((feature, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
-                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <Check className="w-4 h-4 text-[#18B7A0] mt-0.5 flex-shrink-0" />
                 <span>{feature}</span>
               </li>
             ))}

@@ -198,19 +198,20 @@ export default function TeamPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="saas-page-header flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
+          <p className="saas-eyebrow mb-2">Group practice</p>
           <motion.h1
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold text-foreground"
+            className="text-3xl font-bold tracking-tight text-slate-950"
           >
             Team
           </motion.h1>
-          <p className="text-muted-foreground mt-1">Manage therapist seats for your Group Practice account</p>
+          <p className="mt-2 text-sm text-slate-500">Manage therapist seats for your Group Practice account</p>
         </div>
         {teamData && (
-          <Badge variant="outline" className="w-fit rounded-xl px-3 py-1">
+          <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 px-3 py-1 text-primary">
             {teamData.seatsUsed} / {teamData.maxSeats} seats used
           </Badge>
         )}
@@ -239,7 +240,7 @@ export default function TeamPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card className="rounded-2xl">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Users className="h-5 w-5 text-primary" />
@@ -251,13 +252,13 @@ export default function TeamPage() {
               <p className="text-sm text-muted-foreground">No active team members yet.</p>
             ) : (
               activeMembers.map((member) => (
-                <div key={member.id} className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div key={member.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-foreground">
                         {member.therapists?.full_name || member.therapists?.email || "Therapist"}
                       </p>
-                      <Badge variant={member.role === "owner" ? "default" : "secondary"} className="rounded-lg capitalize">
+                      <Badge variant={member.role === "owner" ? "default" : "secondary"} className="rounded-full capitalize">
                         {member.role}
                       </Badge>
                     </div>
@@ -287,7 +288,7 @@ export default function TeamPage() {
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Mail className="h-5 w-5 text-primary" />
@@ -304,7 +305,7 @@ export default function TeamPage() {
                     value={inviteEmail}
                     onChange={(event) => setInviteEmail(event.target.value)}
                     placeholder="therapist@example.com"
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-2xl border-slate-200 bg-white"
                     disabled={!canInvite || isInviting}
                     required
                   />
@@ -347,7 +348,7 @@ export default function TeamPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Shield className="h-5 w-5 text-primary" />
@@ -359,7 +360,7 @@ export default function TeamPage() {
                 <p className="text-sm text-muted-foreground">No pending therapist invites.</p>
               ) : (
                 teamData?.invites.map((invite) => (
-                  <div key={invite.id} className="rounded-xl border border-border p-3">
+                  <div key={invite.id} className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3">
                     <p className="text-sm font-medium text-foreground">{invite.email}</p>
                     <p className="text-xs text-muted-foreground">Invited {formatDate(invite.created_at)}</p>
                     <p className="text-xs text-muted-foreground">Expires {formatDate(invite.expires_at)}</p>

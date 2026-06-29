@@ -8,6 +8,7 @@ import {
   Users, 
   UserPlus,
   HeartHandshake,
+  ClipboardCheck,
   BookOpen, 
   Sparkles, 
   BarChart3, 
@@ -26,18 +27,39 @@ import { getClient } from "@/lib/supabase/client"
 import { logClientAuditEvent } from "@/lib/audit-client"
 import type { User } from "@supabase/supabase-js"
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/clients", label: "Clients", icon: Users },
-  { href: "/dashboard/team", label: "Team", icon: UserPlus },
-  { href: "/dashboard/couples", label: "Couples", icon: HeartHandshake },
-  { href: "/dashboard/reflections", label: "Reflections", icon: MessageSquare },
-  { href: "/dashboard/library", label: "Content Library", icon: BookOpen },
-  { href: "/dashboard/ai-suggestions", label: "AI Suggestions", icon: Sparkles },
-  { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
-  { href: "/dashboard/security", label: "Security", icon: ShieldCheck },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+const navSections = [
+  {
+    label: "Workspace",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/dashboard/clients", label: "Clients", icon: Users },
+      { href: "/dashboard/couples", label: "Couples", icon: HeartHandshake },
+      { href: "/dashboard/library", label: "Content Library", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Between Sessions",
+    items: [
+      { href: "/dashboard/clients", label: "Homework", icon: ClipboardCheck, neverActive: true },
+      { href: "/dashboard/reflections", label: "Reflections", icon: MessageSquare },
+      { href: "/dashboard/ai-suggestions", label: "AI Suggestions", icon: Sparkles },
+    ],
+  },
+  {
+    label: "Practice",
+    items: [
+      { href: "/dashboard/team", label: "Team", icon: UserPlus },
+      { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
+      { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+      { href: "/dashboard/security", label: "Security", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ]
 
 type TherapistProfile = {
@@ -128,13 +150,16 @@ export function DashboardSidebar() {
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
     : user?.email?.split('@')[0] || 'User')
   const accountEmail = therapistProfile?.email || user?.email || ""
-  const planValue = therapistProfile?.plan || therapistProfile?.subscription_plan || "therapist"
+  const planValue = therapistProfile?.plan || therapistProfile?.subscription_plan || null
   const planLabel = planValue
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ")
-  const statusLabel = therapistProfile?.subscription_status
-    ? therapistProfile.subscription_status.charAt(0).toUpperCase() + therapistProfile.subscription_status.slice(1)
+    ? planValue
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+    : null
+  const roleValue = (therapistProfile as any)?.practice_role || (therapistProfile as any)?.role || user?.user_metadata?.practice_role || user?.user_metadata?.role
+  const statusLabel = typeof roleValue === "string" && roleValue.toLowerCase() === "owner"
+    ? "Owner"
     : "Therapist"
   
   const initials = displayName
@@ -167,25 +192,49 @@ export function DashboardSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="space-y-5">
+          {navSections.map((section, sectionIndex) => (
+            <div
+              key={section.label}
               className={cn(
-                "group flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all",
-                isActive
-                  ? "bg-primary text-white shadow-[0_12px_28px_rgba(109,94,245,0.25)]"
-                  : "text-slate-500 hover:bg-slate-100/90 hover:text-slate-950"
+                "space-y-2",
+                sectionIndex > 0 && "border-t border-slate-200/70 pt-5"
               )}
             >
-              <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-slate-400 group-hover:text-primary")} />
-              {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-            </Link>
-          )
-        })}
+              {!collapsed && (
+                <p className="px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {section.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive = "neverActive" in item && item.neverActive
+                    ? false
+                    : "exact" in item && item.exact
+                    ? pathname === item.href
+                    : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
+                  return (
+                    <Link
+                      key={`${section.label}-${item.label}`}
+                      href={item.href}
+                      className={cn(
+                        "group flex h-10 items-center gap-3 rounded-2xl px-3 text-sm transition-all",
+                        collapsed && "justify-center px-0",
+                        isActive
+                          ? "bg-primary text-white shadow-[0_12px_28px_rgba(109,94,245,0.24)]"
+                          : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-900"
+                      )}
+                    >
+                      <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-slate-400 group-hover:text-primary")} />
+                      {!collapsed && <span className="truncate font-medium">{item.label}</span>}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </nav>
 
       {/* Collapse Button */}
@@ -202,30 +251,39 @@ export function DashboardSidebar() {
 
       {/* User Section */}
       <div className="border-t border-slate-200/80 p-4">
-        <div className={cn("flex items-center gap-3 rounded-2xl bg-slate-50 p-2", collapsed && "justify-center bg-transparent p-0")}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
-            <span className="text-sm font-bold text-primary">{initials}</span>
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
-              <p className="truncate text-xs text-slate-500">{accountEmail}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
-                  {statusLabel}
-                </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
-                  {planLabel}
-                </span>
-              </div>
+        {!collapsed && (
+          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Account
+          </p>
+        )}
+        <div className={cn("rounded-3xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-sm", collapsed && "border-0 bg-transparent p-0 shadow-none")}>
+          <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+              <span className="text-sm font-bold text-primary">{initials}</span>
             </div>
-          )}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
+                <p className="truncate text-xs text-slate-500">{accountEmail}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                    {statusLabel}
+                  </span>
+                  {planLabel && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                      {planLabel}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <button
           onClick={handleSignOut}
           disabled={isSigningOut}
           className={cn(
-            "mt-3 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-950",
+            "mt-3 flex h-10 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-950",
             collapsed && "justify-center px-0"
           )}
         >

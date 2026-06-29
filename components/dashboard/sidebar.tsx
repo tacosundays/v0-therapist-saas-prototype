@@ -40,15 +40,45 @@ const navItems = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
+type TherapistProfile = {
+  full_name: string | null
+  email: string | null
+  plan?: string | null
+  subscription_plan?: string | null
+  subscription_status?: string | null
+}
+
 export function DashboardSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [therapistProfile, setTherapistProfile] = useState<TherapistProfile | null>(null)
   const isRedirecting = useRef(false)
 
   useEffect(() => {
     const supabase = getClient()
+
+    const loadTherapistProfile = async (sessionUser: User | null | undefined) => {
+      if (!sessionUser?.email) {
+        setTherapistProfile(null)
+        return
+      }
+
+      const { data, error } = await (supabase as any)
+        .from("therapists")
+        .select("*")
+        .ilike("email", sessionUser.email)
+        .maybeSingle()
+
+      if (error) {
+        console.log("[v0] Sidebar: therapist profile lookup skipped", error.message)
+        setTherapistProfile(null)
+        return
+      }
+
+      setTherapistProfile(data || null)
+    }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,6 +88,7 @@ export function DashboardSidebar() {
         return
       }
       setUser(session?.user ?? null)
+      void loadTherapistProfile(session?.user)
     })
 
     // Listen for sign out events only
@@ -69,6 +100,7 @@ export function DashboardSidebar() {
       }
       // Only update user state, no redirects
       setUser(session?.user ?? null)
+      void loadTherapistProfile(session?.user)
     })
 
     return () => {
@@ -91,9 +123,19 @@ export function DashboardSidebar() {
   }
 
   // Get user display name from metadata or email
-  const displayName = user?.user_metadata?.first_name 
+  const displayName = therapistProfile?.full_name
+    || (user?.user_metadata?.first_name
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
-    : user?.email?.split('@')[0] || 'User'
+    : user?.email?.split('@')[0] || 'User')
+  const accountEmail = therapistProfile?.email || user?.email || ""
+  const planValue = therapistProfile?.plan || therapistProfile?.subscription_plan || "therapist"
+  const planLabel = planValue
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+  const statusLabel = therapistProfile?.subscription_status
+    ? therapistProfile.subscription_status.charAt(0).toUpperCase() + therapistProfile.subscription_status.slice(1)
+    : "Therapist"
   
   const initials = displayName
     .split(' ')
@@ -167,7 +209,15 @@ export function DashboardSidebar() {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
-              <p className="truncate text-xs text-slate-500">{user?.email || ''}</p>
+              <p className="truncate text-xs text-slate-500">{accountEmail}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                  {statusLabel}
+                </span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                  {planLabel}
+                </span>
+              </div>
             </div>
           )}
         </div>

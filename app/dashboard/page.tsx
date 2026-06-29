@@ -18,6 +18,7 @@ import {
   MessageSquare,
   AlertTriangle,
   Sparkles,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
@@ -94,6 +95,17 @@ interface MoodCheckIn {
   mood_rating: number
   anxiety_rating: number | null
   created_at: string
+}
+
+type ClientWorkspaceSummary = {
+  client: Client
+  homeworkStatus: string
+  reflectionStatus: string
+  moodStatus: string
+  lastActivity: string
+  lastActivityAt: string | null
+  attentionReasons: string[]
+  completionRate: number | null
 }
 
 export default function DashboardPage() {
@@ -306,6 +318,9 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     .slice(0, 3)
 
+  const submittedReflections = clientReflections.length + latestReflections.length
+  const homeworkWaitingCount = recentlyCompletedWorksheets.length + latestReflections.length
+
   const getLatestActivityAt = (client: Client, clientAssignments: Assignment[], clientWorksheetAssignments: WorksheetAssignment[]) => {
     const activityDates = [
       client.created_at,
@@ -322,6 +337,16 @@ export default function DashboardPage() {
     ].filter(Boolean) as string[]
 
     return activityDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null
+  }
+
+  const formatShortDate = (date: string | null) => {
+    if (!date) return "No activity yet"
+
+    const days = Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
+    if (days <= 0) return "Today"
+    if (days === 1) return "Yesterday"
+    if (days < 14) return `${days} days ago`
+    return new Date(date).toLocaleDateString()
   }
 
   const clientsNeedingAttention = clients
@@ -415,7 +440,7 @@ export default function DashboardPage() {
     ...recentlyCompletedWorksheets.map((assignment) => ({
       id: assignment.id,
       clientId: assignment.client_id,
-      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Unknown client",
+      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Client unavailable",
       title: assignment.worksheet_templates?.title || "Worksheet",
       type: "Online worksheet",
       date: assignment.completed_at,
@@ -423,18 +448,59 @@ export default function DashboardPage() {
     ...latestReflections.map((assignment) => ({
       id: assignment.id,
       clientId: assignment.client_id,
-      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Unknown client",
+      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Client unavailable",
       title: assignment.title,
       type: "Homework reflection",
       date: assignment.completed_at,
     })),
   ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()).slice(0, 5)
 
+  const clientWorkspaceSummaries: ClientWorkspaceSummary[] = clients
+    .map((client) => {
+      const clientAssignments = assignments.filter(a => a.client_id === client.id)
+      const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === client.id)
+      const clientReflectionsForClient = clientReflections.filter((reflection) => reflection.client_id === client.id)
+      const clientMoodCheckIns = moodCheckIns.filter((checkIn) => checkIn.client_id === client.id)
+      const latestMoodCheckIn = clientMoodCheckIns[0] || null
+      const clientTotal = clientAssignments.length + clientWorksheetAssignments.length
+      const clientCompleted = clientAssignments.filter(a => a.completed || a.status === "completed").length
+        + clientWorksheetAssignments.filter(a => a.status === "completed").length
+      const pendingHomework = clientTotal - clientCompleted
+      const completedHomework = clientCompleted
+      const latestActivityAt = getLatestActivityAt(client, clientAssignments, clientWorksheetAssignments)
+      const attention = clientsNeedingAttention.find((item) => item.client.id === client.id)
+
+      return {
+        client,
+        homeworkStatus: pendingHomework > 0
+          ? `${pendingHomework} assigned`
+          : completedHomework > 0
+            ? "Ready to review"
+            : "No homework assigned",
+        reflectionStatus: clientReflectionsForClient.length > 0
+          ? `${clientReflectionsForClient.length} submitted`
+          : "No reflections yet",
+        moodStatus: latestMoodCheckIn
+          ? `Mood ${latestMoodCheckIn.mood_rating}/10`
+          : "No mood check-in",
+        lastActivity: formatShortDate(latestActivityAt),
+        lastActivityAt: latestActivityAt,
+        attentionReasons: attention?.reasons || [],
+        completionRate: attention?.completionRate ?? (clientTotal > 0 ? Math.round((clientCompleted / clientTotal) * 100) : null),
+      }
+    })
+    .sort((a, b) => {
+      const aAttention = a.attentionReasons.length > 0 ? 1 : 0
+      const bAttention = b.attentionReasons.length > 0 ? 1 : 0
+      if (aAttention !== bAttention) return bAttention - aAttention
+      return new Date(b.lastActivityAt || b.client.created_at).getTime() - new Date(a.lastActivityAt || a.client.created_at).getTime()
+    })
+
   const recentActivity = [
     ...clientReflections.map((reflection) => ({
       id: reflection.id,
       clientId: reflection.client_id,
-      clientName: clients.find(c => c.id === reflection.client_id)?.full_name || "Unknown client",
+      clientName: clients.find(c => c.id === reflection.client_id)?.full_name || "Client unavailable",
       label: reflection.title || "Reflection submitted",
       detail: reflection.reflection_text,
       date: reflection.created_at,
@@ -444,7 +510,7 @@ export default function DashboardPage() {
     ...moodCheckIns.slice(0, 5).map((checkIn) => ({
       id: checkIn.id,
       clientId: checkIn.client_id,
-      clientName: clients.find(c => c.id === checkIn.client_id)?.full_name || "Unknown client",
+      clientName: clients.find(c => c.id === checkIn.client_id)?.full_name || "Client unavailable",
       label: "Mood check-in",
       detail: `Mood ${checkIn.mood_rating}/10${checkIn.anxiety_rating ? `, anxiety ${checkIn.anxiety_rating}/10` : ""}`,
       date: checkIn.created_at,
@@ -454,7 +520,7 @@ export default function DashboardPage() {
     ...recentlyCompletedWorksheets.map((assignment) => ({
       id: assignment.id,
       clientId: assignment.client_id,
-      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Unknown client",
+      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Client unavailable",
       label: "Worksheet completed",
       detail: assignment.worksheet_templates?.title || "Online worksheet",
       date: assignment.completed_at || "",
@@ -463,23 +529,25 @@ export default function DashboardPage() {
     })),
   ].filter((item) => item.date).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6)
 
-  const sessionPrepQueue = [
-    ...clientsNeedingAttention.map((item) => ({
-      client: item.client,
-      reason: item.reasons[0] || "Needs review",
-      detail: item.reasons.slice(1, 3).join(" · ") || (item.completionRate !== null ? `${item.completionRate}% completion` : "Review client activity"),
+  const sessionPrepQueue = clientWorkspaceSummaries
+    .filter((item) => item.attentionReasons.length > 0 || item.reflectionStatus !== "No reflections yet" || item.homeworkStatus === "Ready to review")
+    .slice(0, 4)
+
+  const attentionItems = [
+    ...clientWorkspaceSummaries
+      .filter((item) => item.attentionReasons.length > 0)
+      .map((item) => ({
+        id: item.client.id,
+        title: item.client.full_name,
+        detail: item.attentionReasons.slice(0, 2).join(" · "),
+        href: `/dashboard/clients/${item.client.id}/session-prep`,
+      })),
+    ...couplesNeedingAttention.map((item) => ({
+      id: item.couple.id,
+      title: item.couple.relationship_name,
+      detail: item.reasons.slice(0, 2).join(" · "),
+      href: "/dashboard/couples",
     })),
-    ...clientReflections
-      .filter((reflection) => !clientsNeedingAttention.some((item) => item.client.id === reflection.client_id))
-      .map((reflection) => {
-        const client = clients.find(c => c.id === reflection.client_id)
-        return client ? {
-          client,
-          reason: "Reflection waiting",
-          detail: reflection.title || "Recent client reflection",
-        } : null
-      })
-      .filter((item): item is { client: Client; reason: string; detail: string } => Boolean(item)),
   ].slice(0, 4)
 
   const nextBestAction = homeworkWaitingForReview.length > 0
@@ -500,31 +568,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="saas-page-header flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="saas-eyebrow mb-2">Therapist workspace</p>
-          <motion.h1
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl font-bold tracking-tight text-slate-950"
-          >
-            {getGreeting()}, {displayName}
-          </motion.h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">Start with what needs attention, then move into homework review and session prep.</p>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            <Sparkles className="h-3.5 w-3.5" />
-            Next best action: {nextBestAction}
+      <div className="saas-page-header p-5 lg:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="saas-eyebrow mb-2">Therapist workspace</p>
+            <motion.h1
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-2xl font-bold tracking-tight text-slate-950"
+            >
+              {getGreeting()}, {displayName}
+            </motion.h1>
+            <p className="mt-1 text-sm text-slate-500">Next best action: <span className="font-semibold text-primary">{nextBestAction}</span></p>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setIsAssignModalOpen(true)}>
-            <FileText className="w-4 h-4 mr-2" />
-            Assign Homework
-          </Button>
-          <Button onClick={() => setIsAddModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Invite Client
-          </Button>
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
+            <SummaryPill label="Homework waiting" value={homeworkWaitingCount} />
+            <SummaryPill label="Reflections submitted" value={submittedReflections} />
+            <SummaryPill label="Need attention" value={attentionItems.length} />
+          </div>
         </div>
       </div>
 
@@ -533,40 +594,63 @@ export default function DashboardPage() {
           <p className="saas-eyebrow">Quick Actions</p>
         </div>
         <div className="grid gap-4 md:grid-cols-4">
-        <Button className="h-auto justify-start p-5 text-left" onClick={() => setIsAssignModalOpen(true)}>
-          <FileText className="h-5 w-5" />
-          <span>
-            <span className="block text-sm">Assign Homework</span>
-            <span className="block text-xs font-medium opacity-75">Send between-session work</span>
-          </span>
-        </Button>
-        <Button className="h-auto justify-start p-5 text-left" variant="outline" onClick={() => setIsAddModalOpen(true)}>
-          <Plus className="h-5 w-5" />
-          <span>
-            <span className="block text-sm">Invite Client</span>
-            <span className="block text-xs font-medium opacity-75">Add someone to portal</span>
-          </span>
-        </Button>
-        <Button className="h-auto justify-start p-5 text-left" variant="outline" asChild>
-          <Link href="/dashboard/reflections">
-            <MessageSquare className="h-5 w-5" />
-            <span>
-              <span className="block text-sm">Review Reflections</span>
-              <span className="block text-xs font-medium opacity-75">{clientReflections.length} recent entries</span>
-            </span>
-          </Link>
-        </Button>
-        <Button className="h-auto justify-start p-5 text-left" variant="outline" asChild>
-          <Link href="/dashboard/clients">
-            <Users className="h-5 w-5" />
-            <span>
-              <span className="block text-sm">Open Clients</span>
-              <span className="block text-xs font-medium opacity-75">{clients.length} active records</span>
-            </span>
-          </Link>
-        </Button>
+          <QuickActionCard
+            icon={FileText}
+            title="Assign Homework"
+            detail={clients.length === 0 ? "Invite a client first" : "Send between-session work"}
+            count={clients.length}
+            countLabel={clients.length === 0 ? "No clients yet" : "clients available"}
+            onClick={() => setIsAssignModalOpen(true)}
+          />
+          <QuickActionCard
+            icon={Plus}
+            title="Invite Client"
+            detail="Create a secure portal invite"
+            count={clients.length}
+            countLabel="active clients"
+            onClick={() => setIsAddModalOpen(true)}
+          />
+          <QuickActionCard
+            icon={MessageSquare}
+            title="Review Reflections"
+            detail={clientReflections.length === 0 ? "Nothing to review" : "New writing to review"}
+            count={clientReflections.length}
+            countLabel={clientReflections.length === 0 ? "Nothing to review" : "waiting"}
+            href="/dashboard/reflections"
+          />
+          <QuickActionCard
+            icon={ClipboardCheck}
+            title="Homework Review"
+            detail={homeworkWaitingCount === 0 ? "Nothing to review" : "Completed work is ready"}
+            count={homeworkWaitingCount}
+            countLabel={homeworkWaitingCount === 0 ? "Nothing to review" : "ready"}
+            href="/dashboard/clients"
+          />
         </div>
       </section>
+
+      <Card className="overflow-hidden border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Needs Attention
+          </CardTitle>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+            {attentionItems.length === 0 ? "All clear" : `${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"}`}
+          </span>
+        </CardHeader>
+        <CardContent>
+          {attentionItems.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="No clients need attention today." description="Clients with inactivity, overdue work, mood drops, or review-ready homework will appear here." />
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {attentionItems.map((item) => (
+                <AttentionRow key={item.id} clientName={item.title} detail={item.detail} href={item.href} />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <Card className="overflow-hidden">
@@ -592,14 +676,18 @@ export default function DashboardPage() {
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {sessionPrepQueue.map((item) => (
-                  <div key={`${item.client.id}-${item.reason}`} className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
+                  <div key={item.client.id} className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
                     <div className="flex items-start gap-3">
                       <ClientAvatar name={item.client.full_name} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-slate-950">{item.client.full_name}</p>
-                        <p className="mt-1 text-xs font-medium text-primary">{item.reason}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.detail}</p>
+                        <p className="mt-1 text-xs text-slate-500">Last activity: {item.lastActivity}</p>
                       </div>
+                    </div>
+                    <div className="mt-4 grid gap-2">
+                      <StatusLine label="Homework" value={item.homeworkStatus} />
+                      <StatusLine label="Reflection" value={item.reflectionStatus} />
+                      <StatusLine label="Mood" value={item.moodStatus} />
                     </div>
                     <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
                       <Link href={`/dashboard/clients/${item.client.id}/session-prep`}>
@@ -622,15 +710,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm leading-6 text-white/65">
-              Generate a therapist-facing session briefing from real homework, reflections, mood check-ins, and notes on each client&apos;s Session Prep page.
+              Create a therapist-facing briefing that summarizes homework, reflections, mood trends, and previous notes from real client data.
             </p>
             <div className="mt-5 rounded-2xl bg-white/10 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Available data</p>
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-2xl font-bold text-white">{clientReflections.length}</span><span className="block text-white/55">reflections</span></div>
-                <div><span className="text-2xl font-bold text-white">{moodCheckIns.length}</span><span className="block text-white/55">mood check-ins</span></div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Briefing inputs</p>
+              <div className="mt-3 space-y-2 text-sm text-white/70">
+                <StatusLine label="Homework" value={`${totalAssignments} assignments`} dark />
+                <StatusLine label="Reflections" value={`${clientReflections.length} recent`} dark />
+                <StatusLine label="Mood trends" value={`${moodCheckIns.length} check-ins`} dark />
+                <StatusLine label="Previous notes" value="Included when available" dark />
               </div>
             </div>
+            <p className="mt-4 text-xs font-medium text-[#18B7A0]">Estimated summary: 30 seconds</p>
             <Button className="mt-5 w-full bg-white text-slate-950 hover:bg-white/90" asChild>
               <Link href={sessionPrepQueue[0] ? `/dashboard/clients/${sessionPrepQueue[0].client.id}/session-prep` : "/dashboard/clients"}>
                 Open Session Prep
@@ -684,7 +775,7 @@ export default function DashboardPage() {
             {recentActivity.length === 0 ? (
               <EmptyState icon={Clock} title="No recent activity" description="Client reflections, mood check-ins, and completed worksheets will appear here." />
             ) : (
-              <div className="space-y-3">
+              <div className="relative space-y-0">
                 {recentActivity.map((item) => (
                   <ActivityRow key={`${item.label}-${item.id}`} item={item} />
                 ))}
@@ -876,6 +967,76 @@ export default function DashboardPage() {
   )
 }
 
+function SummaryPill({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
+    </div>
+  )
+}
+
+function QuickActionCard({
+  icon: Icon,
+  title,
+  detail,
+  count,
+  countLabel,
+  href,
+  onClick,
+}: {
+  icon: LucideIcon
+  title: string
+  detail: string
+  count: number
+  countLabel: string
+  href?: string
+  onClick?: () => void
+}) {
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+          {count === 0 ? countLabel : `${count} ${countLabel}`}
+          {count > 0 && <ArrowRight className="h-3.5 w-3.5" />}
+        </div>
+      </div>
+      <div className="mt-5 text-left">
+        <p className="text-sm font-semibold text-slate-950">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
+      </div>
+    </>
+  )
+
+  const className = "group block rounded-3xl border border-slate-200/80 bg-white/80 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {content}
+    </button>
+  )
+}
+
+function StatusLine({ label, value, dark = false }: { label: string; value: string; dark?: boolean }) {
+  return (
+    <div className={dark ? "flex items-center justify-between gap-3 text-xs" : "flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-3 py-2 text-xs"}>
+      <span className={dark ? "font-medium text-white/45" : "font-medium text-slate-400"}>{label}</span>
+      <span className={dark ? "text-right font-semibold text-white" : "text-right font-semibold text-slate-700"}>{value}</span>
+    </div>
+  )
+}
+
 function ClientAvatar({ name }: { name: string }) {
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
@@ -952,11 +1113,12 @@ function ActivityRow({
   const Icon = item.icon
 
   return (
-    <div className="flex items-start gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white">
+    <div className="group relative flex items-start gap-3 pb-5 last:pb-0">
+      <div className="absolute left-5 top-11 h-[calc(100%-2.75rem)] w-px bg-slate-200 group-last:hidden" />
+      <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
         <Icon className={`h-5 w-5 ${item.tone}`} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-3">
         <div className="flex items-center justify-between gap-3">
           <p className="truncate text-sm font-semibold text-slate-950">{item.label}</p>
           <p className="shrink-0 text-xs text-slate-400">{new Date(item.date).toLocaleDateString()}</p>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { getClient, getSupabaseBrowserConfigStatus } from "@/lib/supabase/client"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
 
@@ -27,8 +27,14 @@ function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
 }
 
 function getSupabaseEnvError() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  const config = getSupabaseBrowserConfigStatus()
+
+  if (!config.hasUrl || !config.hasAnonKey) {
     return "Supabase is not configured for this deployment. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel."
+  }
+
+  if (!config.urlValid) {
+    return "NEXT_PUBLIC_SUPABASE_URL is not a valid URL in this deployment."
   }
 
   return null
@@ -42,6 +48,13 @@ function getAuthErrorMessage(err: unknown, stage: string) {
   }
 
   return `${stage} failed: ${message}`
+}
+
+function logLoginStage(stage: string, details?: Record<string, unknown>) {
+  console.info(`[v0] Login debug: ${stage}`, {
+    ...details,
+    timestamp: new Date().toISOString(),
+  })
 }
 
 export default function LoginPage() {
@@ -66,10 +79,20 @@ export default function LoginPage() {
       console.log("[v0] Login page: Checking existing session")
 
       try {
+        logLoginStage("session-check:start", {
+          supabaseConfig: getSupabaseBrowserConfigStatus(),
+        })
         const result = await withTimeout(checkUserRole(), "Session check")
 
         if (!isMounted) return
 
+        logLoginStage("session-check:result", {
+          isAuthenticated: result.isAuthenticated,
+          role: result.role,
+          hasTherapistRecord: Boolean(result.therapistRecord),
+          hasClientRecord: Boolean(result.clientRecord),
+          error: result.error,
+        })
         console.log("[v0] Login page: Session check result:", {
           isAuthenticated: result.isAuthenticated,
           role: result.role,
@@ -96,7 +119,7 @@ export default function LoginPage() {
       } catch (err) {
         if (!isMounted) return
         console.error("[v0] Login page: Session check failed:", err)
-        setError(err instanceof Error ? err.message : "Unable to check your session. Please try signing in.")
+        setError(getAuthErrorMessage(err, "Session check"))
         setIsCheckingSession(false)
       }
     }
@@ -115,7 +138,13 @@ export default function LoginPage() {
     let authStage = "Login"
 
     try {
+      logLoginStage("env-check:start")
       const envError = getSupabaseEnvError()
+      const supabaseConfig = getSupabaseBrowserConfigStatus()
+      logLoginStage("env-check:result", {
+        ...supabaseConfig,
+        hasError: Boolean(envError),
+      })
 
       if (envError) {
         setError(envError)
@@ -123,11 +152,18 @@ export default function LoginPage() {
         return
       }
 
+      authStage = "Supabase client creation"
+      logLoginStage("supabase-client:start")
       const supabase = getClient()
-      
-      console.log("[v0] Login: Attempting sign in for email:", email)
-      
+      logLoginStage("supabase-client:result", {
+        created: Boolean(supabase),
+        supabaseConfig: getSupabaseBrowserConfigStatus(),
+      })
+
       authStage = "Sign in"
+      logLoginStage("signInWithPassword:start", {
+        email,
+      })
       const { data, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({
           email,
@@ -138,11 +174,24 @@ export default function LoginPage() {
 
       if (signInError) {
         console.error("[v0] Login: Sign in error:", signInError.message)
-        setError(signInError.message)
+        logLoginStage("signInWithPassword:result", {
+          success: false,
+          errorName: signInError.name,
+          errorMessage: signInError.message,
+          status: "status" in signInError ? signInError.status : undefined,
+        })
+        setError(getAuthErrorMessage(signInError, authStage))
         setIsLoading(false)
         return
       }
 
+      logLoginStage("signInWithPassword:result", {
+        success: true,
+        hasUser: Boolean(data.user),
+        hasSession: Boolean(data.session),
+        userId: data.user?.id,
+        email: data.user?.email,
+      })
       console.log("[v0] Login: Sign in success, user id:", data.user?.id)
       console.log("[v0] Login: User email:", data.user?.email)
       console.log("[v0] Login: User role from metadata:", data.user?.user_metadata?.role)
@@ -150,8 +199,28 @@ export default function LoginPage() {
       // Resolve account type first. This keeps client login away from therapist-only
       // MFA checks and gives Supabase Auth a settled session before listing factors.
       authStage = "Account lookup"
+      logLoginStage("account-lookup:start")
       const result = await withTimeout(checkUserRole(), "Account lookup")
 
+      logLoginStage("account-lookup:result", {
+        role: result.role,
+        isAuthenticated: result.isAuthenticated,
+        therapistId: result.therapistRecord?.id ?? null,
+        clientId: result.clientRecord?.id ?? null,
+        clientTherapistId: result.clientRecord?.therapist_id ?? null,
+        hasTherapistRecord: Boolean(result.therapistRecord),
+        hasClientRecord: Boolean(result.clientRecord),
+        error: result.error,
+      })
+      logLoginStage("therapist-lookup:result", {
+        found: Boolean(result.therapistRecord),
+        therapistId: result.therapistRecord?.id ?? null,
+      })
+      logLoginStage("client-lookup:result", {
+        found: Boolean(result.clientRecord),
+        clientId: result.clientRecord?.id ?? null,
+        therapistId: result.clientRecord?.therapist_id ?? null,
+      })
       console.log("[v0] Login: Role check result:", {
         role: result.role,
         hasTherapistRecord: !!result.therapistRecord,
@@ -167,6 +236,9 @@ export default function LoginPage() {
       if (result.role === "therapist" && result.therapistRecord) {
         const supabaseAny = supabase as any
         authStage = "MFA check"
+        logLoginStage("mfa-check:start", {
+          therapistId: result.therapistRecord.id,
+        })
         const { data: factorsData, error: factorsError } = await withTimeout<any>(
           supabaseAny.auth.mfa.listFactors(),
           "MFA check"
@@ -174,15 +246,25 @@ export default function LoginPage() {
 
         if (factorsError) {
           console.error("[v0] Login: MFA factors error:", factorsError.message)
-          setError(factorsError.message)
+          logLoginStage("mfa-check:result", {
+            success: false,
+            errorMessage: factorsError.message,
+          })
+          setError(getAuthErrorMessage(factorsError, authStage))
           setIsLoading(false)
           return
         }
 
         const verifiedTotp = (factorsData?.totp || []).find((factor: { id: string; status: string }) => factor.status === "verified")
+        logLoginStage("mfa-check:result", {
+          success: true,
+          totpCount: factorsData?.totp?.length ?? 0,
+          hasVerifiedTotp: Boolean(verifiedTotp),
+        })
 
         if (verifiedTotp) {
           authStage = "MFA assurance check"
+          logLoginStage("mfa-assurance:start")
           const { data: aalData, error: aalError } = await withTimeout<any>(
             supabaseAny.auth.mfa.getAuthenticatorAssuranceLevel(),
             "MFA assurance check"
@@ -190,10 +272,20 @@ export default function LoginPage() {
 
           if (aalError) {
             console.error("[v0] Login: MFA AAL error:", aalError.message)
-            setError(aalError.message)
+            logLoginStage("mfa-assurance:result", {
+              success: false,
+              errorMessage: aalError.message,
+            })
+            setError(getAuthErrorMessage(aalError, authStage))
             setIsLoading(false)
             return
           }
+
+          logLoginStage("mfa-assurance:result", {
+            success: true,
+            currentLevel: aalData?.currentLevel,
+            nextLevel: aalData?.nextLevel,
+          })
 
           if (aalData?.currentLevel !== "aal2" && aalData?.nextLevel === "aal2") {
             setMfaFactorId(verifiedTotp.id)
@@ -205,6 +297,9 @@ export default function LoginPage() {
       }
 
       authStage = "Audit logging"
+      logLoginStage("audit-log:start", {
+        role: result.role,
+      })
       await logClientAuditEvent({
         action: "login",
         resourceType: "auth",
@@ -212,11 +307,17 @@ export default function LoginPage() {
           role: result.role,
         },
       })
-      
+
       if (result.role === "client") {
+        logLoginStage("redirect:target", {
+          target: "/client-portal",
+        })
         console.log("[v0] Login: Redirecting to /client-portal")
         window.location.href = "/client-portal"
       } else {
+        logLoginStage("redirect:target", {
+          target: "/dashboard",
+        })
         console.log("[v0] Login: Redirecting to /dashboard")
         window.location.href = "/dashboard"
       }
@@ -234,7 +335,12 @@ export default function LoginPage() {
     let authStage = "MFA verification"
 
     try {
+      logLoginStage("mfa-env-check:start")
       const envError = getSupabaseEnvError()
+      logLoginStage("mfa-env-check:result", {
+        ...getSupabaseBrowserConfigStatus(),
+        hasError: Boolean(envError),
+      })
 
       if (envError) {
         setError(envError)
@@ -242,10 +348,16 @@ export default function LoginPage() {
         return
       }
 
+      authStage = "Supabase client creation"
+      logLoginStage("mfa-supabase-client:start")
       const supabase = getClient() as any
+      logLoginStage("mfa-supabase-client:result", {
+        created: Boolean(supabase),
+      })
 
       if (mfaMode === "recovery") {
         authStage = "MFA recovery session check"
+        logLoginStage("mfa-recovery-session:start")
         const { data: { session } } = await withTimeout<any>(
           supabase.auth.getSession(),
           "MFA recovery session check"
@@ -258,6 +370,7 @@ export default function LoginPage() {
         }
 
         authStage = "Recovery code verification"
+        logLoginStage("mfa-recovery-code:start")
         const response = await fetch("/api/mfa/recovery-codes", {
           method: "PATCH",
           headers: {
@@ -269,11 +382,22 @@ export default function LoginPage() {
         const result = await response.json().catch(() => null)
 
         if (!response.ok) {
+          logLoginStage("mfa-recovery-code:result", {
+            success: false,
+            status: response.status,
+            error: result?.error,
+          })
           setError(result?.error || "Invalid recovery code")
           setIsLoading(false)
           return
         }
 
+        logLoginStage("mfa-recovery-code:result", {
+          success: true,
+        })
+        logLoginStage("redirect:target", {
+          target: "/dashboard",
+        })
         window.location.href = "/dashboard"
         return
       }
@@ -285,6 +409,7 @@ export default function LoginPage() {
       }
 
       authStage = "MFA verification"
+      logLoginStage("mfa-verification:start")
       const { error: verifyError } = await withTimeout<any>(
         supabase.auth.mfa.challengeAndVerify({
           factorId: mfaFactorId,
@@ -294,17 +419,37 @@ export default function LoginPage() {
       )
 
       if (verifyError) {
+        logLoginStage("mfa-verification:result", {
+          success: false,
+          errorMessage: verifyError.message,
+        })
         setError(verifyError.message)
         setIsLoading(false)
         return
       }
 
+      logLoginStage("mfa-verification:result", {
+        success: true,
+      })
       authStage = "Account lookup"
+      logLoginStage("post-mfa-account-lookup:start")
       const result = await withTimeout(checkUserRole(), "Account lookup")
+      logLoginStage("post-mfa-account-lookup:result", {
+        role: result.role,
+        therapistId: result.therapistRecord?.id ?? null,
+        clientId: result.clientRecord?.id ?? null,
+        error: result.error,
+      })
 
       if (result.role === "client") {
+        logLoginStage("redirect:target", {
+          target: "/client-portal",
+        })
         window.location.href = "/client-portal"
       } else if (result.role === "therapist") {
+        logLoginStage("redirect:target", {
+          target: "/dashboard",
+        })
         window.location.href = "/dashboard"
       } else {
         setError(result.error || "Unable to determine your account type. Please contact support.")

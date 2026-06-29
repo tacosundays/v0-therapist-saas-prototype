@@ -11,6 +11,21 @@ import { getClient } from "@/lib/supabase/client"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
 
+const AUTH_TIMEOUT_MS = 15000
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out. Please check your connection and try again.`))
+    }, AUTH_TIMEOUT_MS)
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timer))
+  })
+}
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState<"therapist" | "client">("therapist")
@@ -31,31 +46,41 @@ export default function LoginPage() {
     
     const checkSession = async () => {
       console.log("[v0] Login page: Checking existing session")
-      
-      const result = await checkUserRole()
-      
-      if (!isMounted) return
-      
-      console.log("[v0] Login page: Session check result:", {
-        isAuthenticated: result.isAuthenticated,
-        role: result.role,
-        userId: result.user?.id,
-        email: result.user?.email
-      })
-      
-      if (result.isAuthenticated) {
-        if (result.role === "client") {
-          console.log("[v0] Login page: Already logged in as client, redirecting to /client-portal")
-          window.location.href = "/client-portal"
-        } else {
-          console.log("[v0] Login page: Already logged in as therapist, redirecting to /dashboard")
-          window.location.href = "/dashboard"
+
+      try {
+        const result = await withTimeout(checkUserRole(), "Session check")
+
+        if (!isMounted) return
+
+        console.log("[v0] Login page: Session check result:", {
+          isAuthenticated: result.isAuthenticated,
+          role: result.role,
+          userId: result.user?.id,
+          email: result.user?.email
+        })
+
+        if (result.isAuthenticated) {
+          if (result.role === "client") {
+            console.log("[v0] Login page: Already logged in as client, redirecting to /client-portal")
+            window.location.href = "/client-portal"
+          } else if (result.role === "therapist") {
+            console.log("[v0] Login page: Already logged in as therapist, redirecting to /dashboard")
+            window.location.href = "/dashboard"
+          } else {
+            setError(result.error || "Unable to determine your account type. Please sign out and try again.")
+            setIsCheckingSession(false)
+          }
+          return
         }
-        return
+
+        console.log("[v0] Login page: No existing session, showing login form")
+        setIsCheckingSession(false)
+      } catch (err) {
+        if (!isMounted) return
+        console.error("[v0] Login page: Session check failed:", err)
+        setError(err instanceof Error ? err.message : "Unable to check your session. Please try signing in.")
+        setIsCheckingSession(false)
       }
-      
-      console.log("[v0] Login page: No existing session, showing login form")
-      setIsCheckingSession(false)
     }
     
     checkSession()
@@ -75,10 +100,13 @@ export default function LoginPage() {
       
       console.log("[v0] Login: Attempting sign in for email:", email)
       
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { data, error: signInError } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email,
+          password,
+        }),
+        "Sign in"
+      )
 
       if (signInError) {
         console.error("[v0] Login: Sign in error:", signInError.message)
@@ -90,15 +118,57 @@ export default function LoginPage() {
       console.log("[v0] Login: Sign in success, user id:", data.user?.id)
       console.log("[v0] Login: User email:", data.user?.email)
       console.log("[v0] Login: User role from metadata:", data.user?.user_metadata?.role)
-      
-      // Use the auth utility to determine role and redirect
-      const result = await checkUserRole()
+
+      const supabaseAny = supabase as any
+      const { data: factorsData, error: factorsError } = await withTimeout<any>(
+        supabaseAny.auth.mfa.listFactors(),
+        "MFA check"
+      )
+
+      if (factorsError) {
+        console.error("[v0] Login: MFA factors error:", factorsError.message)
+        setError(factorsError.message)
+        setIsLoading(false)
+        return
+      }
+
+      const verifiedTotp = (factorsData?.totp || []).find((factor: { id: string; status: string }) => factor.status === "verified")
+
+      if (verifiedTotp) {
+        const { data: aalData, error: aalError } = await withTimeout<any>(
+          supabaseAny.auth.mfa.getAuthenticatorAssuranceLevel(),
+          "MFA assurance check"
+        )
+
+        if (aalError) {
+          console.error("[v0] Login: MFA AAL error:", aalError.message)
+          setError(aalError.message)
+          setIsLoading(false)
+          return
+        }
+
+        if (aalData?.currentLevel !== "aal2" && aalData?.nextLevel === "aal2") {
+          setMfaFactorId(verifiedTotp.id)
+          setIsMfaStep(true)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Use the auth utility to determine role and redirect after MFA is satisfied.
+      const result = await withTimeout(checkUserRole(), "Account lookup")
       
       console.log("[v0] Login: Role check result:", {
         role: result.role,
         hasTherapistRecord: !!result.therapistRecord,
         hasClientRecord: !!result.clientRecord
       })
+
+      if (!result.isAuthenticated || result.role === "unknown") {
+        setError(result.error || "Unable to determine your account type. Please contact support.")
+        setIsLoading(false)
+        return
+      }
 
       await logClientAuditEvent({
         action: "login",
@@ -107,38 +177,6 @@ export default function LoginPage() {
           role: result.role,
         },
       })
-
-      if (result.role === "therapist" && result.therapistRecord) {
-        const supabaseAny = supabase as any
-        const { data: factorsData, error: factorsError } = await supabaseAny.auth.mfa.listFactors()
-
-        if (factorsError) {
-          console.error("[v0] Login: MFA factors error:", factorsError.message)
-          setError(factorsError.message)
-          setIsLoading(false)
-          return
-        }
-
-        const verifiedTotp = (factorsData?.totp || []).find((factor: { id: string; status: string }) => factor.status === "verified")
-
-        if (verifiedTotp) {
-          const { data: aalData, error: aalError } = await supabaseAny.auth.mfa.getAuthenticatorAssuranceLevel()
-
-          if (aalError) {
-            console.error("[v0] Login: MFA AAL error:", aalError.message)
-            setError(aalError.message)
-            setIsLoading(false)
-            return
-          }
-
-          if (aalData?.currentLevel !== "aal2" && aalData?.nextLevel === "aal2") {
-            setMfaFactorId(verifiedTotp.id)
-            setIsMfaStep(true)
-            setIsLoading(false)
-            return
-          }
-        }
-      }
       
       if (result.role === "client") {
         console.log("[v0] Login: Redirecting to /client-portal")
@@ -163,7 +201,10 @@ export default function LoginPage() {
       const supabase = getClient() as any
 
       if (mfaMode === "recovery") {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await withTimeout<any>(
+          supabase.auth.getSession(),
+          "MFA recovery session check"
+        )
 
         if (!session?.access_token) {
           setError("Your login session expired. Please sign in again.")
@@ -197,10 +238,13 @@ export default function LoginPage() {
         return
       }
 
-      const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
-        factorId: mfaFactorId,
-        code: mfaCode.trim(),
-      })
+      const { error: verifyError } = await withTimeout<any>(
+        supabase.auth.mfa.challengeAndVerify({
+          factorId: mfaFactorId,
+          code: mfaCode.trim(),
+        }),
+        "MFA verification"
+      )
 
       if (verifyError) {
         setError(verifyError.message)
@@ -208,7 +252,16 @@ export default function LoginPage() {
         return
       }
 
-      window.location.href = "/dashboard"
+      const result = await withTimeout(checkUserRole(), "Account lookup")
+
+      if (result.role === "client") {
+        window.location.href = "/client-portal"
+      } else if (result.role === "therapist") {
+        window.location.href = "/dashboard"
+      } else {
+        setError(result.error || "Unable to determine your account type. Please contact support.")
+        setIsLoading(false)
+      }
     } catch (err) {
       console.error("[v0] Login: MFA verification error:", err)
       setError(err instanceof Error ? err.message : "Unable to verify MFA code")
@@ -223,6 +276,7 @@ export default function LoginPage() {
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
+          <p className="mt-2 text-xs text-muted-foreground">Checking your session</p>
         </div>
       </div>
     )

@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { 
+  BarChart3,
+  CalendarClock,
   Users, 
   CheckCircle2, 
   Clock, 
@@ -14,7 +16,9 @@ import {
   Loader2,
   FileText,
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { getClient } from "@/lib/supabase/client"
@@ -271,7 +275,6 @@ export default function DashboardPage() {
   // Calculate stats from real data (including worksheet assignments)
   const totalAssignments = assignments.length + worksheetAssignments.length
   const completedAssignments = assignments.filter(a => a.completed || a.status === "completed").length + worksheetAssignments.filter(a => a.status === "completed").length
-  const pendingAssignments = totalAssignments - completedAssignments
   const completionRate = totalAssignments > 0 
     ? Math.round((completedAssignments / totalAssignments) * 100) 
     : null
@@ -290,10 +293,6 @@ export default function DashboardPage() {
     if (!a.due_date || a.completed) return false
     return new Date(a.due_date) < new Date()
   }).length
-
-  // Count in-progress worksheets
-  const startedAssignments = assignments.filter(a => !a.completed && (a.status === "started" || a.started_at)).length
-  const inProgressWorksheets = worksheetAssignments.filter(a => a.status === "in_progress" || a.started_at).length
 
   // Get latest reflections
   const latestReflections = assignments
@@ -406,11 +405,90 @@ export default function DashboardPage() {
     .slice(0, 5)
 
   const stats = [
-    { label: "Total Assignments", value: totalAssignments.toString(), icon: FileText, change: pendingAssignments > 0 ? `${pendingAssignments} not completed` : "All caught up" },
-    { label: "Completed Assignments", value: completedAssignments.toString(), icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No assignments yet" },
+    { label: "Active Clients", value: clients.length.toString(), icon: Users, change: "Current caseload" },
+    { label: "Ready to Review", value: (recentlyCompletedWorksheets.length + latestReflections.length).toString(), icon: CheckCircle2, change: "Completed homework and reflections" },
     { label: "Completion Rate", value: completionRate !== null ? `${completionRate}%` : "--", icon: TrendingUp, change: totalAssignments > 0 ? "Across all homework" : "No assignments yet" },
-    { label: "Started", value: (startedAssignments + inProgressWorksheets).toString(), icon: Clock, change: overdueAssignments > 0 ? `${overdueAssignments} overdue` : `${assignmentsDueSoon} due this week` },
+    { label: "Needs Attention", value: (clientsNeedingAttention.length + couplesNeedingAttention.length).toString(), icon: AlertTriangle, change: overdueAssignments > 0 ? `${overdueAssignments} overdue` : `${assignmentsDueSoon} due this week` },
   ]
+
+  const homeworkWaitingForReview = [
+    ...recentlyCompletedWorksheets.map((assignment) => ({
+      id: assignment.id,
+      clientId: assignment.client_id,
+      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Unknown client",
+      title: assignment.worksheet_templates?.title || "Worksheet",
+      type: "Online worksheet",
+      date: assignment.completed_at,
+    })),
+    ...latestReflections.map((assignment) => ({
+      id: assignment.id,
+      clientId: assignment.client_id,
+      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Unknown client",
+      title: assignment.title,
+      type: "Homework reflection",
+      date: assignment.completed_at,
+    })),
+  ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()).slice(0, 5)
+
+  const recentActivity = [
+    ...clientReflections.map((reflection) => ({
+      id: reflection.id,
+      clientId: reflection.client_id,
+      clientName: clients.find(c => c.id === reflection.client_id)?.full_name || "Unknown client",
+      label: reflection.title || "Reflection submitted",
+      detail: reflection.reflection_text,
+      date: reflection.created_at,
+      icon: MessageSquare,
+      tone: "text-primary",
+    })),
+    ...moodCheckIns.slice(0, 5).map((checkIn) => ({
+      id: checkIn.id,
+      clientId: checkIn.client_id,
+      clientName: clients.find(c => c.id === checkIn.client_id)?.full_name || "Unknown client",
+      label: "Mood check-in",
+      detail: `Mood ${checkIn.mood_rating}/10${checkIn.anxiety_rating ? `, anxiety ${checkIn.anxiety_rating}/10` : ""}`,
+      date: checkIn.created_at,
+      icon: BarChart3,
+      tone: "text-[#18B7A0]",
+    })),
+    ...recentlyCompletedWorksheets.map((assignment) => ({
+      id: assignment.id,
+      clientId: assignment.client_id,
+      clientName: clients.find(c => c.id === assignment.client_id)?.full_name || "Unknown client",
+      label: "Worksheet completed",
+      detail: assignment.worksheet_templates?.title || "Online worksheet",
+      date: assignment.completed_at || "",
+      icon: CheckCircle2,
+      tone: "text-primary",
+    })),
+  ].filter((item) => item.date).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6)
+
+  const sessionPrepQueue = [
+    ...clientsNeedingAttention.map((item) => ({
+      client: item.client,
+      reason: item.reasons[0] || "Needs review",
+      detail: item.reasons.slice(1, 3).join(" · ") || (item.completionRate !== null ? `${item.completionRate}% completion` : "Review client activity"),
+    })),
+    ...clientReflections
+      .filter((reflection) => !clientsNeedingAttention.some((item) => item.client.id === reflection.client_id))
+      .map((reflection) => {
+        const client = clients.find(c => c.id === reflection.client_id)
+        return client ? {
+          client,
+          reason: "Reflection waiting",
+          detail: reflection.title || "Recent client reflection",
+        } : null
+      })
+      .filter((item): item is { client: Client; reason: string; detail: string } => Boolean(item)),
+  ].slice(0, 4)
+
+  const nextBestAction = homeworkWaitingForReview.length > 0
+    ? "Review completed homework"
+    : sessionPrepQueue.length > 0
+      ? "Open session prep"
+      : clients.length === 0
+        ? "Invite your first client"
+        : "Assign homework"
 
   // Calculate days since created
   const getDaysSinceCreated = (createdAt: string) => {
@@ -422,7 +500,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="saas-page-header flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="saas-eyebrow mb-2">Therapist workspace</p>
@@ -433,7 +510,11 @@ export default function DashboardPage() {
           >
             {getGreeting()}, {displayName}
           </motion.h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">{"Here's what's happening with your clients today"}</p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">Start with what needs attention, then move into homework review and session prep.</p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <Sparkles className="h-3.5 w-3.5" />
+            Next best action: {nextBestAction}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setIsAssignModalOpen(true)}>
@@ -447,35 +528,204 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Card className="group overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                    <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{stat.value}</p>
-                    <p className="mt-2 text-xs text-slate-500">{stat.change}</p>
+      <section className="space-y-3">
+        <div>
+          <p className="saas-eyebrow">Quick Actions</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-4">
+        <Button className="h-auto justify-start p-5 text-left" onClick={() => setIsAssignModalOpen(true)}>
+          <FileText className="h-5 w-5" />
+          <span>
+            <span className="block text-sm">Assign Homework</span>
+            <span className="block text-xs font-medium opacity-75">Send between-session work</span>
+          </span>
+        </Button>
+        <Button className="h-auto justify-start p-5 text-left" variant="outline" onClick={() => setIsAddModalOpen(true)}>
+          <Plus className="h-5 w-5" />
+          <span>
+            <span className="block text-sm">Invite Client</span>
+            <span className="block text-xs font-medium opacity-75">Add someone to portal</span>
+          </span>
+        </Button>
+        <Button className="h-auto justify-start p-5 text-left" variant="outline" asChild>
+          <Link href="/dashboard/reflections">
+            <MessageSquare className="h-5 w-5" />
+            <span>
+              <span className="block text-sm">Review Reflections</span>
+              <span className="block text-xs font-medium opacity-75">{clientReflections.length} recent entries</span>
+            </span>
+          </Link>
+        </Button>
+        <Button className="h-auto justify-start p-5 text-left" variant="outline" asChild>
+          <Link href="/dashboard/clients">
+            <Users className="h-5 w-5" />
+            <span>
+              <span className="block text-sm">Open Clients</span>
+              <span className="block text-xs font-medium opacity-75">{clients.length} active records</span>
+            </span>
+          </Link>
+        </Button>
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+              <CalendarClock className="h-5 w-5 text-primary" />
+              Today&apos;s Session Prep
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/clients">
+                Open clients
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : sessionPrepQueue.length === 0 ? (
+              <EmptyState icon={CheckCircle2} title="No session prep items yet" description="Completed homework, reflections, and attention flags will appear here." />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {sessionPrepQueue.map((item) => (
+                  <div key={`${item.client.id}-${item.reason}`} className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
+                    <div className="flex items-start gap-3">
+                      <ClientAvatar name={item.client.full_name} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-950">{item.client.full_name}</p>
+                        <p className="mt-1 text-xs font-medium text-primary">{item.reason}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.detail}</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
+                      <Link href={`/dashboard/clients/${item.client.id}/session-prep`}>
+                        Open Session Prep
+                      </Link>
+                    </Button>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 transition-colors group-hover:bg-primary group-hover:text-white">
-                    <stat.icon className="w-6 h-6 text-primary" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#0F172A] text-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg tracking-tight text-white">
+              <Sparkles className="h-5 w-5 text-[#18B7A0]" />
+              AI Session Prep
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-6 text-white/65">
+              Generate a therapist-facing session briefing from real homework, reflections, mood check-ins, and notes on each client&apos;s Session Prep page.
+            </p>
+            <div className="mt-5 rounded-2xl bg-white/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Available data</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-2xl font-bold text-white">{clientReflections.length}</span><span className="block text-white/55">reflections</span></div>
+                <div><span className="text-2xl font-bold text-white">{moodCheckIns.length}</span><span className="block text-white/55">mood check-ins</span></div>
+              </div>
+            </div>
+            <Button className="mt-5 w-full bg-white text-slate-950 hover:bg-white/90" asChild>
+              <Link href={sessionPrepQueue[0] ? `/dashboard/clients/${sessionPrepQueue[0].client.id}/session-prep` : "/dashboard/clients"}>
+                Open Session Prep
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Homework Waiting for Review
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/clients">
+                View clients
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {homeworkWaitingForReview.length === 0 ? (
+              <EmptyState icon={FileText} title="No homework waiting" description="Completed assignments and worksheet responses will appear here." />
+            ) : (
+              <div className="space-y-3">
+                {homeworkWaitingForReview.map((item) => (
+                  <ReviewRow key={`${item.type}-${item.id}`} item={item} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Recent Client Activity
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/reflections">
+                Reflections
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {recentActivity.length === 0 ? (
+              <EmptyState icon={Clock} title="No recent activity" description="Client reflections, mood check-ins, and completed worksheets will appear here." />
+            ) : (
+              <div className="space-y-3">
+                {recentActivity.map((item) => (
+                  <ActivityRow key={`${item.label}-${item.id}`} item={item} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <section className="space-y-3">
+        <div>
+          <p className="saas-eyebrow">Practice Metrics</p>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="group overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{stat.value}</p>
+                      <p className="mt-2 text-xs text-slate-500">{stat.change}</p>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 transition-colors group-hover:bg-primary">
+                      <stat.icon className="w-6 h-6 text-primary transition-colors group-hover:text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Client Activity */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -484,7 +734,7 @@ export default function DashboardPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg tracking-tight">Recent Clients</CardTitle>
+              <CardTitle className="text-lg tracking-tight">Client Snapshot</CardTitle>
               <Button variant="ghost" size="sm" className="rounded-xl" asChild>
                 <Link href="/dashboard/clients">
                   View all
@@ -573,7 +823,6 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
 
-        {/* AI Suggestions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -583,236 +832,32 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
-                Recent Activity
+                What Needs Attention
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {latestReflections.length === 0 && recentlyCompletedWorksheets.length === 0 ? (
+              {clientsNeedingAttention.length === 0 && couplesNeedingAttention.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
-                    <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                    <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-muted-foreground">No activity yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Activity will appear when clients complete assignments</p>
+                  <p className="text-sm text-muted-foreground">Nothing urgent right now</p>
+                  <p className="text-xs text-muted-foreground mt-1">Attention flags will appear when clients need follow-up.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Recently completed worksheets */}
-                  {recentlyCompletedWorksheets.map((assignment) => {
-                    const client = clients.find(c => c.id === assignment.client_id)
-                    return (
-                      <div
-                        key={assignment.id}
-                        className="rounded-2xl border border-primary/15 bg-primary/5 p-4"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15">
-                            <CheckCircle2 className="w-3 h-3 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium text-foreground">{client?.full_name || "Unknown"}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Worksheet</span>
-                        </div>
-                        <p className="text-sm text-foreground mb-1">Completed: {assignment.worksheet_templates?.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {assignment.completed_at ? new Date(assignment.completed_at).toLocaleDateString() : ""}
-                        </p>
-                      </div>
-                    )
-                  })}
-
-                  {/* Latest reflections */}
-                  {latestReflections.map((assignment) => {
-                    const client = clients.find(c => c.id === assignment.client_id)
-                    return (
-                      <div
-                        key={assignment.id}
-                        className="p-4 bg-muted/30 rounded-xl"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                            <span className="text-xs font-medium text-primary">
-                              {client?.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?"}
-                            </span>
-                          </div>
-                          <span className="text-sm font-medium text-foreground">{client?.full_name || "Unknown"}</span>
-                        </div>
-                        <p className="text-sm text-foreground line-clamp-3 mb-2">{assignment.reflection}</p>
-                        <p className="text-xs text-muted-foreground">
-                          on &quot;{assignment.title}&quot; · {assignment.completed_at ? new Date(assignment.completed_at).toLocaleDateString() : ""}
-                        </p>
-                      </div>
-                    )
-                  })}
+                  {clientsNeedingAttention.slice(0, 3).map((item) => (
+                    <AttentionRow key={item.client.id} clientName={item.client.full_name} detail={item.reasons.join(" · ")} href={`/dashboard/clients/${item.client.id}/session-prep`} />
+                  ))}
+                  {couplesNeedingAttention.slice(0, 2).map((item) => (
+                    <AttentionRow key={item.couple.id} clientName={item.couple.relationship_name} detail={item.reasons.join(" · ")} href="/dashboard/couples" />
+                  ))}
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-      >
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-primary" />
-              Clients Needing Attention
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="rounded-xl" asChild>
-              <Link href="/dashboard/clients">
-                View clients
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {clientsNeedingAttention.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
-                  <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-muted-foreground">No clients need attention right now.</p>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {clientsNeedingAttention.map((item) => (
-                  <div key={item.client.id} className="p-4 bg-muted/30 rounded-xl">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{item.client.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{item.client.email || "No email provided"}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground shrink-0">
-                        {item.completionRate !== null ? `${item.completionRate}%` : "--"}
-                      </p>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {item.reasons.map((reason) => (
-                        <span key={reason} className="text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700">
-                          {reason}
-                        </span>
-                      ))}
-                    </div>
-                    <Button variant="outline" size="sm" className="mt-4 rounded-lg text-xs" asChild>
-                      <Link href={`/dashboard/clients/${item.client.id}/session-prep`}>
-                        Session Prep
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.55 }}
-      >
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-primary" />
-              Recent Client Reflections
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="rounded-xl" asChild>
-              <Link href="/dashboard/reflections">
-                View all
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {clientReflections.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
-                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-muted-foreground">No client reflections yet.</p>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {clientReflections.map((reflection) => {
-                  const client = clients.find(c => c.id === reflection.client_id)
-                  return (
-                    <div key={reflection.id} className="p-4 bg-muted/30 rounded-xl">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{reflection.title || "Untitled reflection"}</p>
-                          <p className="text-xs text-muted-foreground truncate">{client?.full_name || "Unknown client"}</p>
-                        </div>
-                        {reflection.mood_rating && (
-                          <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0">
-                            {reflection.mood_rating}/10
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-foreground line-clamp-3 mt-3">{reflection.reflection_text}</p>
-                      <p className="text-xs text-muted-foreground mt-2">{new Date(reflection.created_at).toLocaleDateString()}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-primary" />
-              Couples Needing Attention
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="rounded-xl" asChild>
-              <Link href="/dashboard/couples">
-                View couples
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {couplesNeedingAttention.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
-                  <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-muted-foreground">No couples need attention right now.</p>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {couplesNeedingAttention.map((item) => (
-                  <div key={item.couple.id} className="p-4 bg-muted/30 rounded-xl">
-                    <p className="text-sm font-medium text-foreground">{item.couple.relationship_name}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {item.reasons.map((reason) => (
-                        <span key={reason} className="text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700">
-                          {reason}
-                        </span>
-                      ))}
-                    </div>
-                    <Button variant="outline" size="sm" className="mt-4 rounded-lg text-xs" asChild>
-                      <Link href="/dashboard/couples">
-                        Open Couples
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
 
       {/* Invite Client Modal */}
       <AddClientModal
@@ -827,6 +872,123 @@ export default function DashboardPage() {
         onOpenChange={setIsAssignModalOpen}
         onAssignmentCreated={handleAssignmentCreated}
       />
+    </div>
+  )
+}
+
+function ClientAvatar({ name }: { name: string }) {
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+      <span className="text-sm font-bold text-primary">
+        {name.split(" ").map((part) => part[0]).join("").slice(0, 2)}
+      </span>
+    </div>
+  )
+}
+
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon
+  title: string
+  description: string
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100">
+        <Icon className="h-5 w-5 text-slate-400" />
+      </div>
+      <p className="text-sm font-semibold text-slate-700">{title}</p>
+      <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">{description}</p>
+    </div>
+  )
+}
+
+function ReviewRow({
+  item,
+}: {
+  item: {
+    clientId: string
+    clientName: string
+    title: string
+    type: string
+    date: string | null
+  }
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-3 transition-colors hover:bg-white">
+      <ClientAvatar name={item.clientName} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
+        <p className="mt-0.5 truncate text-xs text-slate-500">{item.clientName} · {item.type}</p>
+      </div>
+      <div className="hidden text-right text-xs text-slate-400 sm:block">
+        {item.date ? new Date(item.date).toLocaleDateString() : "Ready"}
+      </div>
+      <Button variant="outline" size="sm" asChild>
+        <Link href={`/dashboard/clients/${item.clientId}/session-prep`}>
+          Review
+        </Link>
+      </Button>
+    </div>
+  )
+}
+
+function ActivityRow({
+  item,
+}: {
+  item: {
+    clientId: string
+    clientName: string
+    label: string
+    detail: string
+    date: string
+    icon: LucideIcon
+    tone: string
+  }
+}) {
+  const Icon = item.icon
+
+  return (
+    <div className="flex items-start gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white">
+        <Icon className={`h-5 w-5 ${item.tone}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3">
+          <p className="truncate text-sm font-semibold text-slate-950">{item.label}</p>
+          <p className="shrink-0 text-xs text-slate-400">{new Date(item.date).toLocaleDateString()}</p>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-slate-500">{item.clientName}</p>
+        <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-600">{item.detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function AttentionRow({
+  clientName,
+  detail,
+  href,
+}: {
+  clientName: string
+  detail: string
+  href: string
+}) {
+  return (
+    <div className="rounded-3xl border border-amber-200/80 bg-amber-50/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-950">{clientName}</p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-amber-700">{detail}</p>
+        </div>
+        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+      </div>
+      <Button variant="outline" size="sm" className="mt-4 w-full bg-white/80" asChild>
+        <Link href={href}>Open</Link>
+      </Button>
     </div>
   )
 }

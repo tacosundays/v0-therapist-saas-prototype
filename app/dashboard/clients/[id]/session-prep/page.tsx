@@ -4,7 +4,23 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Clock, FileText, Loader2, Plus, Save, Sparkles, UserRound } from "lucide-react"
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
+  CalendarClock,
+  CheckCircle2,
+  Circle,
+  Clock,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Plus,
+  Save,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -157,12 +173,32 @@ function formatDateTime(date: string | null | undefined) {
   })
 }
 
+function getRelativeDays(date: string | null | undefined) {
+  if (!date) return null
+  return Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24)))
+}
+
+function formatRelativeActivity(date: string | null | undefined) {
+  const days = getRelativeDays(date)
+  if (days === null) return "No activity yet"
+  if (days === 0) return "Today"
+  if (days === 1) return "Yesterday"
+  return `${days} days ago`
+}
+
 function getClientStatus(client: ClientRecord | null) {
   if (!client) return "Unknown"
   if (client.status === "active") return "Active"
   if (client.user_id || client.invite_accepted_at) return "Registered"
   if (client.invite_sent_at) return "Email Sent"
   return "Invited"
+}
+
+function getStatusTone(status: string | null | undefined) {
+  const normalized = (status || "").toLowerCase()
+  if (normalized === "completed") return "green"
+  if (normalized === "in_progress" || normalized === "started") return "amber"
+  return "slate"
 }
 
 function answerToText(response: WorksheetResponseRecord) {
@@ -379,13 +415,6 @@ export default function SessionPrepPage() {
   }, [worksheetAssignments])
 
   const journalReflectionCount = clientReflections.length
-  const moodRatings = clientReflections
-    .map((reflection) => reflection.mood_rating)
-    .filter((rating): rating is number => typeof rating === "number")
-  const averageMoodRating = moodRatings.length > 0
-    ? Number((moodRatings.reduce((sum, rating) => sum + rating, 0) / moodRatings.length).toFixed(1))
-    : null
-  const mostRecentReflectionDate = clientReflections[0]?.created_at || null
   const now = new Date()
   const moodLast30Days = moodCheckIns.filter((checkIn) => (
     now.getTime() - new Date(checkIn.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
@@ -748,415 +777,352 @@ export default function SessionPrepPage() {
     )
   }
 
-  const lastLogin = null
+  const activityDates = [
+    clientRecord?.created_at,
+    clientRecord?.invite_accepted_at,
+    ...assignments.flatMap((assignment) => [assignment.assigned_at, assignment.started_at, assignment.completed_at]),
+    ...worksheetAssignments.flatMap((assignment) => [assignment.assigned_at, assignment.started_at, assignment.completed_at]),
+    ...clientReflections.map((reflection) => reflection.created_at),
+    ...moodCheckIns.map((checkIn) => checkIn.created_at),
+    ...progressNotes.map((progressNote) => progressNote.created_at),
+    ...sessionSummaries.map((summary) => summary.created_at),
+  ].filter(Boolean) as string[]
+  const lastActivityAt = activityDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null
+  const daysSinceLastActivity = getRelativeDays(lastActivityAt)
+  const reflectionRate = totalAssignments > 0 ? Math.round((journalReflectionCount / totalAssignments) * 100) : null
+  const engagementScore = Math.min(
+    100,
+    Math.round(
+      (completionRate * 0.45)
+      + ((journalReflectionCount > 0 ? Math.min(journalReflectionCount, 5) / 5 : 0) * 25)
+      + ((moodCheckIns.length > 0 ? Math.min(moodCheckIns.length, 5) / 5 : 0) * 20)
+      + ((daysSinceLastActivity !== null && daysSinceLastActivity <= 7 ? 1 : 0) * 10)
+    )
+  )
+  const homeworkAvailable = totalAssignments > 0
+  const reflectionAvailable = clientReflections.length > 0 || assignments.some((assignment) => assignment.reflection)
+  const moodTrendAvailable = moodCheckIns.length > 0
+  const previousNotesAvailable = progressNotes.length > 0 || Boolean(note.trim())
+  const homeworkNeedsReview = assignments.some((assignment) => assignment.reflection && (assignment.completed || assignment.status === "completed"))
+    || worksheetResponses.length > 0
+    || worksheetAssignments.some((assignment) => assignment.status === "completed")
+  const attentionItems = [
+    homeworkNeedsReview ? "Homework needs review" : null,
+    moodTrend === "declining" ? "Mood declining" : null,
+    totalAssignments > 0 && journalReflectionCount === 0 ? "Reflection missing" : null,
+    daysSinceLastActivity !== null && daysSinceLastActivity >= 14 ? `Inactive ${daysSinceLastActivity} days` : null,
+    assignedAssignments > 0 && startedAssignments === 0 && completedAssignments === 0 ? "Homework not started" : null,
+  ].filter(Boolean) as string[]
+  const homeworkProgressItems = [
+    ...assignments.map((assignment) => ({
+      id: `assignment-${assignment.id}`,
+      title: assignment.title,
+      status: assignment.completed || assignment.status === "completed"
+        ? "Completed"
+        : assignment.status === "started" || assignment.started_at
+          ? "In Progress"
+          : "Assigned",
+      date: assignment.completed_at || assignment.started_at || assignment.assigned_at || assignment.created_at,
+      detail: assignment.reflection ? "Reflection submitted" : "Homework assignment",
+    })),
+    ...worksheetAssignments.map((assignment) => ({
+      id: `worksheet-${assignment.id}`,
+      title: assignment.worksheet_templates?.title || "Worksheet",
+      status: assignment.status === "completed"
+        ? "Completed"
+        : assignment.status === "in_progress" || assignment.started_at
+          ? "In Progress"
+          : "Assigned",
+      date: assignment.completed_at || assignment.started_at || assignment.assigned_at,
+      detail: worksheetResponses.some((response) => response.assignment_id === assignment.id) ? "Needs Review" : "Online worksheet",
+    })),
+  ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+  const latestReflection = clientReflections[0] || null
 
   return (
-    <div className="max-w-6xl space-y-8">
-      <div className="saas-page-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <Button variant="ghost" className="mb-3" asChild>
-            <Link href="/dashboard/clients">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to clients
-            </Link>
-          </Button>
-          <p className="saas-eyebrow mb-2">Client intelligence</p>
-          <motion.h1
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl font-bold tracking-tight text-slate-950"
-          >
-            Session Prep
-          </motion.h1>
-          <p className="mt-2 text-sm text-slate-500">One-page pre-session summary from real client activity</p>
-        </div>
-        <Button onClick={openProgressNoteForm}>
-          <Plus className="w-4 h-4 mr-2" />
-          Write Progress Note
-        </Button>
-      </div>
+    <div className="max-w-[1500px] space-y-6">
+      <Button variant="ghost" className="rounded-xl text-slate-500" asChild>
+        <Link href="/dashboard/clients">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to clients
+        </Link>
+      </Button>
 
       {error && (
-        <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>
       )}
       {success && (
-        <div className="p-4 rounded-xl bg-primary/10 text-primary text-sm">{success}</div>
+        <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm text-primary">{success}</div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <UserRound className="w-5 h-5 text-primary" />
-            Client Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Name</p>
-              <p className="font-medium text-foreground">{clientRecord?.full_name}</p>
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-[#18B7A0] to-primary/30" />
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-primary/10 ring-1 ring-primary/20">
+              <span className="text-xl font-bold text-primary">
+                {(clientRecord?.full_name || "Client").split(" ").map((part) => part[0]).join("").slice(0, 2)}
+              </span>
             </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Status</p>
-              <Badge variant="outline" className="mt-1">{getClientStatus(clientRecord)}</Badge>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Registered date</p>
-              <p className="font-medium text-foreground">{formatDate(clientRecord?.invite_accepted_at)}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Last login</p>
-              <p className="font-medium text-foreground">{formatDate(lastLogin)}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Total assignments</p>
-              <p className="text-2xl font-bold text-foreground">{totalAssignments}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Completed assignments</p>
-              <p className="text-2xl font-bold text-foreground">{completedAssignments}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Completion rate</p>
-              <p className="text-2xl font-bold text-foreground">{totalAssignments > 0 ? `${completionRate}%` : "--"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
-              <p className="text-xs text-muted-foreground">Current status</p>
-              <p className="font-medium text-foreground">{assignedAssignments} assigned, {startedAssignments} started</p>
+            <div className="min-w-0">
+              <p className="saas-eyebrow mb-2">Client command center</p>
+              <h1 className="truncate text-3xl font-bold tracking-tight text-slate-950">{clientRecord?.full_name}</h1>
+              <p className="mt-1 text-sm text-slate-500">{clientRecord?.email || "No email on file"}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge className="rounded-full bg-[#18B7A0]/10 text-[#0F8D7E] hover:bg-[#18B7A0]/10">{getClientStatus(clientRecord)}</Badge>
+                <Badge variant="outline" className="rounded-full">Last session: {progressNotes[0] ? formatDate(progressNotes[0].created_at) : "Not available"}</Badge>
+                <Badge variant="outline" className="rounded-full">Next session: Not scheduled</Badge>
+                <Badge variant="outline" className="rounded-full">Engagement {engagementScore}/100</Badge>
+              </div>
             </div>
           </div>
-          {lastCompletedAssignment && (
-            <div className="mt-5 p-4 rounded-xl bg-muted/30">
-              <p className="text-xs text-muted-foreground">Last completed assignment</p>
-              <p className="font-medium text-foreground">{lastCompletedAssignment.title}</p>
-              <p className="text-xs text-muted-foreground">{formatDateTime(lastCompletedAssignment.completedAt)}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="rounded-xl" asChild>
+              <Link href="/dashboard/clients">
+                <FileText className="w-4 h-4 mr-2" />
+                Assign Homework
+              </Link>
+            </Button>
+            <Button variant="outline" className="rounded-xl" onClick={openProgressNoteForm}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Note
+            </Button>
+            <Button className="rounded-xl" onClick={generateSessionSummary} disabled={isSummaryLoading}>
+              {isSummaryLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+              Generate AI Session Prep
+            </Button>
+          </div>
+        </div>
+      </section>
 
-      <Card className="rounded-2xl">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Session Summary
-          </CardTitle>
-          <Button className="rounded-xl" onClick={generateSessionSummary} disabled={isSummaryLoading}>
-            {isSummaryLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Summary
-              </>
-            )}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {!latestSessionSummary ? (
-            <div className="p-4 rounded-xl bg-muted/30">
-              <p className="text-sm text-muted-foreground">
-                No AI session summaries generated yet.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">Generated {formatDateTime(latestSessionSummary.created_at)}</Badge>
-                {latestSessionSummary.model && <Badge variant="outline">{latestSessionSummary.model}</Badge>}
-              </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Homework Completion" value={totalAssignments > 0 ? `${completionRate}%` : "--"} detail={`${completedAssignments}/${totalAssignments} completed`} icon={CheckCircle2} tone="green" progress={completionRate} />
+        <MetricCard title="Reflection Rate" value={reflectionRate !== null ? `${reflectionRate}%` : "--"} detail={`${journalReflectionCount} reflections submitted`} icon={MessageSquare} tone="purple" progress={reflectionRate || 0} />
+        <MetricCard title="Mood Trend" value={moodTrend} detail={mostRecentMood ? `Latest ${mostRecentMood.mood_rating}/10` : "No check-ins yet"} icon={moodTrend === "declining" ? TrendingDown : TrendingUp} tone={moodTrend === "declining" ? "red" : moodTrend === "improving" ? "green" : "amber"} />
+        <MetricCard title="Days Since Activity" value={daysSinceLastActivity !== null ? String(daysSinceLastActivity) : "--"} detail={formatRelativeActivity(lastActivityAt)} icon={Clock} tone={daysSinceLastActivity !== null && daysSinceLastActivity >= 14 ? "red" : "slate"} />
+      </div>
 
-              <div className="grid gap-4">
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-sm font-medium text-foreground mb-1">Client Overview</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {latestSessionSummary.summary_json?.clientOverview || "No client overview available."}
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-sm font-medium text-foreground mb-1">Progress Since Last Session</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {latestSessionSummary.summary_json?.progressSinceLastSession || "No progress summary available."}
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-sm font-medium text-foreground mb-1">Mood Trends</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {latestSessionSummary.summary_json?.moodTrends || "No mood trend summary available."}
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-sm font-medium text-foreground mb-1">Reflection Themes</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {latestSessionSummary.summary_json?.reflectionThemes || "No reflection theme summary available."}
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-sm font-medium text-foreground mb-1">Homework Progress</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {latestSessionSummary.summary_json?.homeworkProgress || "No homework progress summary available."}
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-sm font-medium text-foreground mb-2">Suggested Discussion Topics</p>
-                  {latestSessionSummary.summary_json?.suggestedDiscussionTopics?.length ? (
-                    <div className="space-y-2">
-                      {latestSessionSummary.summary_json.suggestedDiscussionTopics.map((topic, index) => (
-                        <p key={`${topic}-${index}`} className="text-sm text-muted-foreground">
-                          {index + 1}. {topic}
-                        </p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No discussion topics available.</p>
-                  )}
-                </div>
-              </div>
-
-              {latestSessionSummary.source_counts && (
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {Object.entries(latestSessionSummary.source_counts).map(([label, count]) => (
-                    <Badge key={label} variant="secondary" className="capitalize">
-                      {label.replace(/([A-Z])/g, " $1")}: {count}
-                    </Badge>
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.25fr_0.85fr]">
+        <div className="space-y-6">
+          <Card className="rounded-[1.75rem]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CalendarClock className="w-5 h-5 text-primary" />
+                Session Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {timeline.length === 0 ? (
+                <EmptyPanel icon={Clock} title="No client activity yet." description="Sessions, homework, reflections, mood check-ins, and summaries will appear here." />
+              ) : (
+                <div className="space-y-0">
+                  {timeline.slice(0, 12).map((item, index) => (
+                    <TimelineRow key={`${item.date}-${item.label}-${index}`} item={item} />
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
 
-              {sessionSummaries.length > 1 && (
-                <div>
-                  <p className="text-sm font-medium text-foreground mb-2">Summary History</p>
-                  <div className="space-y-2">
-                    {sessionSummaries.slice(1).map((summary) => (
-                      <div key={summary.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30">
-                        <p className="text-sm text-foreground">Generated summary</p>
-                        <p className="text-xs text-muted-foreground">{formatDateTime(summary.created_at)}</p>
-                      </div>
-                    ))}
-                  </div>
+        <div className="space-y-6">
+          <Card className="rounded-[1.75rem]">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="w-5 h-5 text-primary" />
+                Homework Progress
+              </CardTitle>
+              <Badge variant="outline" className="rounded-full">{assignedAssignments} assigned · {startedAssignments} in progress</Badge>
+            </CardHeader>
+            <CardContent>
+              {homeworkProgressItems.length === 0 ? (
+                <EmptyPanel icon={FileText} title="No homework assigned yet." description="Assigned homework and worksheet progress will appear here." />
+              ) : (
+                <div className="space-y-3">
+                  {homeworkProgressItems.slice(0, 7).map((item) => (
+                    <HomeworkCard key={item.id} item={item} />
+                  ))}
                 </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            Mood Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {moodCheckIns.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No mood check-ins submitted yet.</p>
-          ) : (
-            <div className="space-y-5">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="p-3 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground">30-day average</p>
-                  <p className="text-2xl font-bold text-foreground">{averageMood30 !== null ? `${averageMood30}/10` : "--"}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground">7-day average</p>
-                  <p className="text-2xl font-bold text-foreground">{averageMood7 !== null ? `${averageMood7}/10` : "--"}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground">Most recent</p>
-                  <p className="text-2xl font-bold text-foreground">{mostRecentMood ? `${mostRecentMood.mood_rating}/10` : "--"}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground">Check-ins</p>
-                  <p className="text-2xl font-bold text-foreground">{moodCheckIns.length}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground">Trend</p>
-                  <p className="font-semibold text-foreground capitalize">{moodTrend}</p>
-                </div>
-              </div>
-              {mostRecentMood?.note && (
-                <div className="p-4 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground">Most recent note</p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap mt-1">{mostRecentMood.note}</p>
-                  <p className="text-xs text-muted-foreground mt-2">{formatDateTime(mostRecentMood.created_at)}</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="rounded-[1.75rem]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <MessageSquare className="w-5 h-5 text-primary" />
+                  Reflection Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!latestReflection ? (
+                  <EmptyPanel icon={MessageSquare} title="No reflections yet." description="Client journal entries will appear here." compact />
+                ) : (
+                  <div className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950">{latestReflection.title || "Untitled reflection"}</p>
+                        <p className="text-xs text-slate-500">{formatDateTime(latestReflection.created_at)}</p>
+                      </div>
+                      {latestReflection.mood_rating && <Badge className="bg-primary/10 text-primary hover:bg-primary/10">Mood {latestReflection.mood_rating}/10</Badge>}
+                    </div>
+                    <p className="line-clamp-5 text-sm leading-6 text-slate-600">{latestReflection.reflection_text}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[1.75rem]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BarChart3 className="w-5 h-5 text-primary" />
+                  Latest Mood Check-In
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!mostRecentMood ? (
+                  <EmptyPanel icon={BarChart3} title="No mood check-ins yet." description="Client mood tracking will appear here." compact />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="text-4xl font-bold text-slate-950">{mostRecentMood.mood_rating}/10</p>
+                        <p className="text-xs text-slate-500">{formatDateTime(mostRecentMood.created_at)}</p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{moodTrend}</Badge>
+                    </div>
+                    <MoodBars items={moodCheckIns.slice(0, 8).reverse()} />
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <p className="text-slate-400">7-day avg</p>
+                        <p className="font-semibold text-slate-700">{averageMood7 !== null ? `${averageMood7}/10` : "--"}</p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <p className="text-slate-400">30-day avg</p>
+                        <p className="font-semibold text-slate-700">{averageMood30 !== null ? `${averageMood30}/10` : "--"}</p>
+                      </div>
+                    </div>
+                    {mostRecentMood.note && <p className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">{mostRecentMood.note}</p>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {latestSessionSummary && (
+            <Card className="rounded-[1.75rem]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Latest AI Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Badge variant="outline" className="rounded-full">Generated {formatDateTime(latestSessionSummary.created_at)}</Badge>
+                <SummaryBlock title="Client Overview" text={latestSessionSummary.summary_json?.clientOverview || "No client overview available."} />
+                <SummaryBlock title="Homework Progress" text={latestSessionSummary.summary_json?.homeworkProgress || "No homework progress summary available."} />
+                <SummaryBlock title="Suggested Discussion Topics" text={latestSessionSummary.summary_json?.suggestedDiscussionTopics?.join("\n") || "No discussion topics available."} />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <Card className="rounded-[1.75rem] border-amber-200/80 bg-gradient-to-br from-amber-50 to-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Needs Attention
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {attentionItems.length === 0 ? (
+                <EmptyPanel icon={CheckCircle2} title="No concerns detected" description="Nothing needs immediate review based on available client activity." compact />
+              ) : (
+                <div className="space-y-2">
+                  {attentionItems.map((item) => (
+                    <div key={item} className="flex items-center gap-2 rounded-2xl bg-white/80 p-3 text-sm font-medium text-amber-800 ring-1 ring-amber-200/70">
+                      <Circle className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                      {item}
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              Reflection Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-3 gap-4 mb-5">
-              <div className="p-3 rounded-xl bg-muted/30">
-                <p className="text-xs text-muted-foreground">Reflection count</p>
-                <p className="text-2xl font-bold text-foreground">{journalReflectionCount}</p>
+          <Card className="rounded-[1.75rem] bg-[#0F172A] text-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-white">
+                <Sparkles className="w-5 h-5 text-[#18B7A0]" />
+                AI Session Prep
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm leading-6 text-white/65">Generate a focused pre-session brief from real homework, reflections, mood trends, and prior notes.</p>
+              <div className="mt-5 space-y-2">
+                <AvailabilityRow label="Homework available" available={homeworkAvailable} />
+                <AvailabilityRow label="Reflection available" available={reflectionAvailable} />
+                <AvailabilityRow label="Mood trend available" available={moodTrendAvailable} />
+                <AvailabilityRow label="Previous notes available" available={previousNotesAvailable} />
               </div>
-              <div className="p-3 rounded-xl bg-muted/30">
-                <p className="text-xs text-muted-foreground">Average mood</p>
-                <p className="text-2xl font-bold text-foreground">{averageMoodRating !== null ? `${averageMoodRating}/10` : "--"}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-muted/30">
-                <p className="text-xs text-muted-foreground">Most recent</p>
-                <p className="font-medium text-foreground">{formatDate(mostRecentReflectionDate)}</p>
-              </div>
-            </div>
+              <p className="mt-4 text-xs font-semibold text-[#18B7A0]">Estimated time: ~30 seconds</p>
+              <Button className="mt-5 w-full rounded-xl bg-white text-slate-950 hover:bg-white/90" onClick={generateSessionSummary} disabled={isSummaryLoading}>
+                {isSummaryLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                Generate Summary
+              </Button>
+            </CardContent>
+          </Card>
 
-            {clientReflections.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No reflection journal submissions yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {clientReflections.slice(0, 10).map((reflection) => (
-                  <div key={reflection.id} className="p-4 rounded-xl bg-muted/30">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-sm font-medium text-foreground">{reflection.title || "Untitled reflection"}</p>
-                      {reflection.mood_rating && (
-                        <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0">
-                          Mood {reflection.mood_rating}/10
-                        </span>
-                      )}
+          <Card id="progress-notes" className="rounded-[1.75rem]">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-lg">Progress Notes</CardTitle>
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={openProgressNoteForm}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Note
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {progressNotes.length === 0 ? (
+                <p className="text-sm text-slate-500">No progress notes saved yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {progressNotes.slice(0, 3).map((progressNote) => (
+                    <div key={progressNote.id} className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <Badge variant="outline">{progressNote.note_type || "DAP"}</Badge>
+                        <p className="text-xs text-slate-500">{formatDate(progressNote.created_at)}</p>
+                      </div>
+                      <p className="line-clamp-3 text-sm text-slate-600">{progressNote.subjective || progressNote.private_note || progressNote.plan || "Progress note saved."}</p>
                     </div>
-                    <p className="text-sm text-foreground line-clamp-4 whitespace-pre-wrap">{reflection.reflection_text}</p>
-                    <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>Reflection Journal</span>
-                      <span>{formatDateTime(reflection.created_at)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              Activity Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {timeline.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No client activity yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {timeline.map((item, index) => (
-                  <div key={`${item.date}-${item.label}-${index}`} className="flex gap-3">
-                    <div className="mt-1 w-2 h-2 rounded-full bg-primary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{item.label}</p>
-                      <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
-                      <p className="text-xs text-muted-foreground">{formatDateTime(item.date)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card id="progress-notes" className="rounded-2xl">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            Progress Notes
-          </CardTitle>
-          <Button className="rounded-xl" onClick={openProgressNoteForm}>
-            <Plus className="w-4 h-4 mr-2" />
-            Write Progress Note
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {progressNotes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No progress notes saved yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {progressNotes.map((progressNote) => (
-                <div key={progressNote.id} className="p-4 rounded-xl bg-muted/30 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge variant="outline">{progressNote.note_type || "DAP"}</Badge>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(progressNote.created_at)}</p>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-3 text-sm">
-                    {progressNote.subjective && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          {progressNote.note_type === "SOAP" ? "Subjective" : "Data"}
-                        </p>
-                        <p className="text-foreground whitespace-pre-wrap">{progressNote.subjective}</p>
-                      </div>
-                    )}
-                    {progressNote.objective && progressNote.note_type === "SOAP" && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Objective</p>
-                        <p className="text-foreground whitespace-pre-wrap">{progressNote.objective}</p>
-                      </div>
-                    )}
-                    {progressNote.assessment && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Assessment</p>
-                        <p className="text-foreground whitespace-pre-wrap">{progressNote.assessment}</p>
-                      </div>
-                    )}
-                    {progressNote.plan && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Plan</p>
-                        <p className="text-foreground whitespace-pre-wrap">{progressNote.plan}</p>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
 
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-lg">Therapist Notes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            className="min-h-40 rounded-xl"
-            placeholder="Private notes for session prep..."
-          />
-          <Button className="rounded-xl" onClick={saveNote} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
+          <Card className="rounded-[1.75rem]">
+            <CardHeader>
+              <CardTitle className="text-lg">Therapist Notes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                className="min-h-36 rounded-xl"
+                placeholder="Private notes for session prep..."
+              />
+              <Button className="w-full rounded-xl" onClick={saveNote} disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Save Notes
-              </>
-            )}
-          </Button>
-          {noteSaveMessage && (
-            <p className="text-sm text-primary">{noteSaveMessage}</p>
-          )}
-          {noteSaveError && (
-            <p className="text-sm text-destructive">{noteSaveError}</p>
-          )}
-        </CardContent>
-      </Card>
+              </Button>
+              {noteSaveMessage && <p className="text-sm text-primary">{noteSaveMessage}</p>}
+              {noteSaveError && <p className="text-sm text-destructive">{noteSaveError}</p>}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <Dialog open={isProgressNoteOpen} onOpenChange={setIsProgressNoteOpen}>
         <DialogContent className="sm:max-w-3xl rounded-2xl max-h-[90vh] overflow-y-auto">
@@ -1263,6 +1229,165 @@ export default function SessionPrepPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function MetricCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  tone,
+  progress,
+}: {
+  title: string
+  value: string
+  detail: string
+  icon: typeof CheckCircle2
+  tone: "green" | "amber" | "red" | "purple" | "slate"
+  progress?: number
+}) {
+  const toneClass = {
+    green: "bg-[#18B7A0]/10 text-[#0F8D7E]",
+    amber: "bg-amber-500/10 text-amber-700",
+    red: "bg-red-500/10 text-red-700",
+    purple: "bg-primary/10 text-primary",
+    slate: "bg-slate-100 text-slate-600",
+  }[tone]
+
+  return (
+    <Card className="rounded-[1.5rem]">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-slate-500">{title}</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950 capitalize">{value}</p>
+            <p className="mt-1 text-xs text-slate-500">{detail}</p>
+          </div>
+          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${toneClass}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+        {typeof progress === "number" && (
+          <div className="mt-4 h-2 rounded-full bg-slate-100">
+            <div className={`h-full rounded-full ${tone === "green" ? "bg-[#18B7A0]" : "bg-primary"}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function EmptyPanel({
+  icon: Icon,
+  title,
+  description,
+  compact = false,
+}: {
+  icon: typeof CheckCircle2
+  title: string
+  description: string
+  compact?: boolean
+}) {
+  return (
+    <div className={`flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50/60 text-center ${compact ? "p-5" : "p-8"}`}>
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="text-sm font-semibold text-slate-700">{title}</p>
+      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{description}</p>
+    </div>
+  )
+}
+
+function TimelineRow({ item }: { item: TimelineItem }) {
+  return (
+    <div className="group relative flex gap-3 pb-5 last:pb-0">
+      <div className="absolute left-5 top-10 h-[calc(100%-2.5rem)] w-px bg-slate-200 group-last:hidden" />
+      <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-primary shadow-sm">
+        {item.label.toLowerCase().includes("mood") ? <BarChart3 className="h-4 w-4" /> : item.label.toLowerCase().includes("summary") ? <Sparkles className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+      </div>
+      <div className="min-w-0 flex-1 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+          <p className="shrink-0 text-xs text-slate-400">{formatDate(item.date)}</p>
+        </div>
+        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function HomeworkCard({
+  item,
+}: {
+  item: {
+    id: string
+    title: string
+    status: string
+    date: string | null
+    detail: string
+  }
+}) {
+  const tone = getStatusTone(item.status)
+
+  return (
+    <div className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4 transition-colors hover:bg-white">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
+          <p className="mt-1 text-xs text-slate-500">{item.detail} · {formatDate(item.date)}</p>
+        </div>
+        <StatusBadge status={item.status} tone={tone} />
+      </div>
+    </div>
+  )
+}
+
+function StatusBadge({ status, tone }: { status: string; tone: string }) {
+  const className = tone === "green"
+    ? "bg-[#18B7A0]/10 text-[#0F8D7E]"
+    : tone === "amber"
+      ? "bg-amber-500/10 text-amber-700"
+      : "bg-slate-100 text-slate-600"
+
+  return <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status}</span>
+}
+
+function MoodBars({ items }: { items: MoodCheckIn[] }) {
+  if (items.length === 0) return null
+
+  return (
+    <div className="flex h-16 items-end gap-1.5 rounded-2xl bg-slate-50 p-3">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="min-w-0 flex-1 rounded-t-lg bg-primary/70"
+          style={{ height: `${Math.max(12, item.mood_rating * 10)}%` }}
+          title={`${item.mood_rating}/10`}
+        />
+      ))}
+    </div>
+  )
+}
+
+function SummaryBlock({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-3xl bg-slate-50 p-4">
+      <p className="mb-1 text-sm font-semibold text-slate-950">{title}</p>
+      <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{text}</p>
+    </div>
+  )
+}
+
+function AvailabilityRow({ label, available }: { label: string; available: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/10 px-3 py-2 text-sm">
+      <span className="text-white/65">{label}</span>
+      <span className={available ? "font-semibold text-[#18B7A0]" : "font-semibold text-white/40"}>
+        {available ? "Available" : "Not yet"}
+      </span>
     </div>
   )
 }

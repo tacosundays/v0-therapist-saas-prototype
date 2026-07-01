@@ -15,6 +15,7 @@ import {
   Mail,
   MessageSquare,
   Sparkles,
+  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -95,7 +96,8 @@ type InboxItem = {
   actionLabel: string
   href: string
   icon: LucideIcon
-  tone: "purple" | "green" | "amber" | "red" | "teal" | "slate"
+  tone: "purple" | "green" | "amber" | "orange" | "red" | "teal" | "slate"
+  event?: string
 }
 
 const filters: { id: InboxFilter; label: string }[] = [
@@ -111,22 +113,26 @@ const toneClasses = {
   purple: "bg-[#6D5EF5]/10 text-[#6D5EF5]",
   green: "bg-emerald-50 text-emerald-600",
   amber: "bg-amber-50 text-amber-600",
+  orange: "bg-orange-50 text-orange-600",
   red: "bg-rose-50 text-rose-600",
   teal: "bg-[#18B7A0]/10 text-[#109986]",
   slate: "bg-slate-100 text-slate-600",
+}
+
+const softToneBorders = {
+  purple: "border-[#6D5EF5]/15 bg-[#6D5EF5]/5",
+  green: "border-emerald-200/70 bg-emerald-50/55",
+  amber: "border-amber-200/70 bg-amber-50/55",
+  orange: "border-orange-200/70 bg-orange-50/55",
+  red: "border-rose-200/70 bg-rose-50/55",
+  teal: "border-[#18B7A0]/15 bg-[#18B7A0]/5",
+  slate: "border-slate-200 bg-slate-50/70",
 }
 
 function parseDate(value: string | null | undefined) {
   if (!value) return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
-}
-
-function isToday(value: string) {
-  const date = parseDate(value)
-  if (!date) return false
-  const now = new Date()
-  return date.toDateString() === now.toDateString()
 }
 
 function daysSince(value: string | null | undefined) {
@@ -165,8 +171,9 @@ function templateTitle(record: WorksheetAssignmentRecord) {
 
 function EmptyState({ title, description, icon: Icon }: { title: string; description: string; icon: LucideIcon }) {
   return (
-    <div className="flex min-h-[168px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
+    <div className="relative flex min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-[28px] border border-dashed border-slate-200 bg-gradient-to-br from-slate-50 via-white to-[#6D5EF5]/[0.035] px-6 py-10 text-center">
+      <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#6D5EF5]/30 to-transparent" />
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
         <Icon className="h-5 w-5" />
       </div>
       <p className="font-semibold text-slate-950">{title}</p>
@@ -179,12 +186,14 @@ function InboxRow({ item }: { item: InboxItem }) {
   const Icon = item.icon
 
   return (
-    <div className="group flex flex-col gap-4 rounded-3xl border border-slate-200/75 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6D5EF5]/25 hover:shadow-[0_20px_48px_rgba(15,23,42,0.08)] sm:flex-row sm:items-center">
+    <div className={`group flex flex-col gap-4 rounded-3xl border p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6D5EF5]/25 hover:shadow-[0_20px_48px_rgba(15,23,42,0.08)] sm:flex-row sm:items-center ${softToneBorders[item.tone]}`}>
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${toneClasses[item.tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
+          {item.event && <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{item.event}</span>}
+          {item.event && <span className="h-1 w-1 rounded-full bg-slate-300" />}
           <p className="truncate font-semibold text-slate-950">{item.clientName}</p>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
           <span className="text-xs font-medium text-slate-500">{formatTimestamp(item.timestamp)}</span>
@@ -240,6 +249,71 @@ function InboxSection({
           </div>
         ) : (
           <EmptyState title={emptyTitle} description={emptyDescription} icon={Icon} />
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ActivityTimeline({
+  items,
+}: {
+  items: InboxItem[]
+}) {
+  return (
+    <Card className="overflow-hidden rounded-[28px] border-slate-200/75 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.06)]">
+      <CardContent className="p-5 sm:p-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Timeline</p>
+            <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">Recent Activity</h2>
+          </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-50 text-slate-500">
+            <InboxIcon className="h-5 w-5" />
+          </div>
+        </div>
+        {items.length > 0 ? (
+          <div className="relative space-y-4 before:absolute before:left-[21px] before:top-3 before:h-[calc(100%-24px)] before:w-px before:bg-slate-200">
+            {items.map((item) => {
+              const Icon = item.icon
+              return (
+                <div key={item.id} className="relative flex gap-4">
+                  <div className={`z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-4 ring-white ${toneClasses[item.tone]}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1 rounded-3xl border border-slate-200/75 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition-all hover:border-[#6D5EF5]/20 hover:shadow-[0_18px_46px_rgba(15,23,42,0.07)]">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{item.event || item.filter}</span>
+                          <span className="h-1 w-1 rounded-full bg-slate-300" />
+                          <span className="text-xs font-medium text-slate-500">{formatTimestamp(item.timestamp)}</span>
+                        </div>
+                        <p className="mt-1 font-semibold text-slate-950">{item.clientName}</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-600">{item.description}</p>
+                      </div>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="h-10 shrink-0 rounded-2xl border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:border-[#6D5EF5]/30 hover:bg-[#6D5EF5]/5 hover:text-[#6D5EF5]"
+                      >
+                        <Link href={item.href}>
+                          {item.actionLabel}
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            title="No recent activity"
+            description="Homework completions, reflections, mood check-ins, invitations, and AI summaries will appear here chronologically."
+            icon={InboxIcon}
+          />
         )}
       </CardContent>
     </Card>
@@ -360,6 +434,7 @@ export default function TherapistInboxPage() {
           href: sessionPrepHref(assignment.client_id),
           icon: ClipboardCheck,
           tone: "green" as const,
+          event: "Homework completed",
         }
       })
       .filter(Boolean) as InboxItem[]
@@ -382,6 +457,65 @@ export default function TherapistInboxPage() {
           href: sessionPrepHref(assignment.client_id),
           icon: ClipboardCheck,
           tone: "green" as const,
+          event: "Homework completed",
+        }
+      })
+      .filter(Boolean) as InboxItem[]
+
+    const overdueAssignmentItems: InboxItem[] = assignments
+      .filter((assignment) => {
+        if (assignment.completed || assignment.status === "completed") return false
+        const referenceDate = assignment.assigned_at || assignment.started_at || assignment.created_at
+        const age = daysSince(referenceDate)
+        return age !== null && age >= 7
+      })
+      .map((assignment) => {
+        const name = clientName(assignment.client_id)
+        const timestamp = assignment.assigned_at || assignment.started_at || assignment.created_at
+        const age = daysSince(timestamp)
+        if (!name || !timestamp || age === null) return null
+
+        return {
+          id: `overdue-assignment-${assignment.id}`,
+          filter: "homework" as const,
+          clientId: assignment.client_id,
+          clientName: name,
+          timestamp,
+          description: `${assignment.title || "Homework"} has been open for ${age} days.`,
+          actionLabel: "Review",
+          href: sessionPrepHref(assignment.client_id),
+          icon: Clock,
+          tone: "amber" as const,
+          event: "Homework overdue",
+        }
+      })
+      .filter(Boolean) as InboxItem[]
+
+    const overdueWorksheetItems: InboxItem[] = worksheetAssignments
+      .filter((assignment) => {
+        if (assignment.status === "completed" || assignment.completed_at) return false
+        const referenceDate = assignment.assigned_at || assignment.started_at
+        const age = daysSince(referenceDate)
+        return age !== null && age >= 7
+      })
+      .map((assignment) => {
+        const name = clientName(assignment.client_id)
+        const timestamp = assignment.assigned_at || assignment.started_at
+        const age = daysSince(timestamp)
+        if (!name || !timestamp || age === null) return null
+
+        return {
+          id: `overdue-worksheet-${assignment.id}`,
+          filter: "homework" as const,
+          clientId: assignment.client_id,
+          clientName: name,
+          timestamp,
+          description: `${templateTitle(assignment)} has been open for ${age} days.`,
+          actionLabel: "Review",
+          href: sessionPrepHref(assignment.client_id),
+          icon: Clock,
+          tone: "amber" as const,
+          event: "Homework overdue",
         }
       })
       .filter(Boolean) as InboxItem[]
@@ -403,7 +537,8 @@ export default function TherapistInboxPage() {
           actionLabel: "Read",
           href: "/dashboard/reflections",
           icon: MessageSquare,
-          tone: "purple" as const,
+          tone: "green" as const,
+          event: "Reflection ready",
         }
       })
       .filter(Boolean) as InboxItem[]
@@ -444,6 +579,7 @@ export default function TherapistInboxPage() {
           href: sessionPrepHref(clientId),
           icon: AlertTriangle,
           tone: "red" as const,
+          event: "Mood alert",
         }
       })
       .filter(Boolean) as InboxItem[]
@@ -455,7 +591,7 @@ export default function TherapistInboxPage() {
         filter: "team" as const,
         clientId: client.id,
         clientName: client.full_name,
-        timestamp: client.invite_sent_at || client.created_at,
+        timestamp: client.invite_accepted_at || client.invite_sent_at || client.created_at,
         description: client.user_id || client.invite_accepted_at
           ? "Invitation accepted and client account is connected."
           : client.invite_sent_at
@@ -465,6 +601,7 @@ export default function TherapistInboxPage() {
         href: clientHref(client.id),
         icon: Mail,
         tone: client.user_id || client.invite_accepted_at ? "teal" : "amber",
+        event: client.user_id || client.invite_accepted_at ? "Invitation accepted" : "Invitation sent",
       }))
 
     const aiItems: InboxItem[] = sessionSummaries
@@ -483,11 +620,12 @@ export default function TherapistInboxPage() {
           href: sessionPrepHref(summary.client_id),
           icon: Sparkles,
           tone: "purple" as const,
+          event: "AI summary generated",
         }
       })
       .filter(Boolean) as InboxItem[]
 
-    const activityItems = sortNewestFirst([
+    const recentActivityItems = sortNewestFirst([
       ...completedAssignmentItems,
       ...completedWorksheetItems,
       ...reflectionItems,
@@ -507,11 +645,13 @@ export default function TherapistInboxPage() {
             href: sessionPrepHref(checkIn.client_id),
             icon: BarChart3,
             tone: "teal" as const,
+            event: "Mood check-in",
           }
         })
         .filter(Boolean) as InboxItem[],
+      ...invitationItems,
       ...aiItems,
-    ]).filter((item) => isToday(item.timestamp)).slice(0, 8)
+    ]).slice(0, 14)
 
     const latestActivityByClient = new Map<string, string>()
     const recordActivity = (clientId: string, value: string | null | undefined) => {
@@ -550,27 +690,32 @@ export default function TherapistInboxPage() {
           actionLabel: "Open client",
           href: clientHref(client.id),
           icon: Clock,
-          tone: "amber" as const,
+          tone: "orange" as const,
+          event: "Inactive client",
         }
       })
       .filter(Boolean) as InboxItem[]
 
     const needsAttention = sortNewestFirst([
       ...moodAlertItems,
+      ...overdueAssignmentItems,
+      ...overdueWorksheetItems,
       ...completedAssignmentItems,
       ...completedWorksheetItems,
       ...inactiveItems,
     ]).slice(0, 8)
 
     return {
-      activityItems,
+      recentActivityItems,
       needsAttention,
       homeworkItems: sortNewestFirst([...completedAssignmentItems, ...completedWorksheetItems]).slice(0, 8),
       reflectionItems: sortNewestFirst(reflectionItems).slice(0, 8),
       moodAlertItems: sortNewestFirst(moodAlertItems).slice(0, 8),
       invitationItems: sortNewestFirst(invitationItems).slice(0, 8),
+      inactiveItems: sortNewestFirst(inactiveItems).slice(0, 8),
+      overdueHomeworkItems: sortNewestFirst([...overdueAssignmentItems, ...overdueWorksheetItems]).slice(0, 8),
       totalItems: [
-        ...activityItems,
+        ...recentActivityItems,
         ...needsAttention,
         ...completedAssignmentItems,
         ...completedWorksheetItems,
@@ -588,11 +733,18 @@ export default function TherapistInboxPage() {
   }
 
   const summaryStats = [
-    { label: "Homework ready", value: inboxData.homeworkItems.length, icon: ClipboardCheck, tone: "green" },
-    { label: "Reflections", value: inboxData.reflectionItems.length, icon: MessageSquare, tone: "purple" },
-    { label: "Mood alerts", value: inboxData.moodAlertItems.length, icon: AlertTriangle, tone: "red" },
-    { label: "Recent invites", value: inboxData.invitationItems.length, icon: Mail, tone: "amber" },
+    { label: "Homework ready", value: inboxData.homeworkItems.length, icon: ClipboardCheck, tone: "green", trend: inboxData.homeworkItems.length > 0 ? "Ready to review" : "Clear" },
+    { label: "Reflections", value: inboxData.reflectionItems.length, icon: MessageSquare, tone: "green", trend: inboxData.reflectionItems.length > 0 ? "Waiting" : "None waiting" },
+    { label: "Mood alerts", value: inboxData.moodAlertItems.length, icon: AlertTriangle, tone: "red", trend: inboxData.moodAlertItems.length > 0 ? "Needs review" : "Stable" },
+    { label: "Inactive clients", value: inboxData.inactiveItems.length, icon: Clock, tone: "orange", trend: inboxData.inactiveItems.length > 0 ? "Follow up" : "No stale activity" },
   ] as const
+  const estimatedReviewMinutes = Math.max(
+    0,
+    inboxData.homeworkItems.length * 2
+      + inboxData.reflectionItems.length * 2
+      + inboxData.moodAlertItems.length * 3
+      + inboxData.inactiveItems.length * 2
+  )
 
   return (
     <div className="space-y-8">
@@ -615,16 +767,23 @@ export default function TherapistInboxPage() {
                 Review real homework, reflections, mood signals, invitations, and session-prep activity from your clients.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[520px]">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[620px]">
               {summaryStats.map((stat) => {
                 const Icon = stat.icon
                 return (
-                  <div key={stat.label} className="rounded-3xl border border-slate-200/75 bg-white/90 p-4 shadow-sm backdrop-blur">
-                    <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
-                      <Icon className="h-4 w-4" />
+                  <div key={stat.label} className="rounded-[26px] border border-slate-200/75 bg-white/90 p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] backdrop-blur">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500">
+                        <TrendingUp className="h-3 w-3" />
+                        Live
+                      </div>
                     </div>
-                    <p className="text-2xl font-bold text-slate-950">{stat.value}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">{stat.label}</p>
+                    <p className="text-3xl font-bold text-slate-950">{stat.value}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">{stat.label}</p>
+                    <p className="mt-2 text-xs font-medium text-slate-400">{stat.trend}</p>
                   </div>
                 )
               })}
@@ -632,6 +791,63 @@ export default function TherapistInboxPage() {
           </div>
         </div>
       </motion.div>
+
+      {!isLoading && !error && (
+        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <Card className="overflow-hidden rounded-[30px] border-[#6D5EF5]/15 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.07)]">
+            <CardContent className="relative p-6">
+              <div className="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_10%_0%,rgba(109,94,245,0.16),transparent_36%),radial-gradient(circle_at_90%_8%,rgba(24,183,160,0.13),transparent_32%)]" />
+              <div className="relative">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">AI Daily Brief</p>
+                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Review queue at a glance</h2>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6D5EF5]/10 text-[#6D5EF5]">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    ["Homework waiting", inboxData.homeworkItems.length],
+                    ["Reflections waiting", inboxData.reflectionItems.length],
+                    ["Mood alerts", inboxData.moodAlertItems.length],
+                    ["Inactive clients", inboxData.inactiveItems.length],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl border border-slate-200/75 bg-white/80 p-4">
+                      <p className="text-2xl font-bold text-slate-950">{value}</p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-col gap-3 rounded-3xl border border-slate-200/75 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">Estimated review time</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {estimatedReviewMinutes > 0 ? `${estimatedReviewMinutes} minutes based on current items.` : "No review time estimated right now."}
+                    </p>
+                  </div>
+                  <Button asChild className="h-11 rounded-2xl bg-[#6D5EF5] px-5 text-white shadow-[0_14px_30px_rgba(109,94,245,0.24)] hover:bg-[#5B4DEA]">
+                    <Link href="/dashboard/ai-suggestions">
+                      Open AI Brief
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <InboxSection
+            eyebrow="Priority"
+            title="Needs Attention"
+            icon={AlertTriangle}
+            items={filtered(inboxData.needsAttention)}
+            emptyTitle="No clients need attention today"
+            emptyDescription="Mood alerts, overdue homework, inactive clients, and reflections ready to review will appear here."
+          />
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200/75 bg-white p-2 shadow-[0_14px_44px_rgba(15,23,42,0.045)]">
         {filters.map((filter) => (
@@ -663,55 +879,43 @@ export default function TherapistInboxPage() {
       )}
 
       {!isLoading && !error && (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <InboxSection
-            eyebrow="Today"
-            title="Today's Activity"
-            icon={InboxIcon}
-            items={filtered(inboxData.activityItems)}
-            emptyTitle="No activity today"
-            emptyDescription="Client activity from today will appear here as homework, reflections, mood check-ins, and summaries arrive."
-          />
-          <InboxSection
-            eyebrow="Priority"
-            title="Needs Attention"
-            icon={AlertTriangle}
-            items={filtered(inboxData.needsAttention)}
-            emptyTitle="No clients need attention today"
-            emptyDescription="Mood alerts, stale activity, and completed homework ready for review will appear here."
-          />
-          <InboxSection
-            eyebrow="Homework"
-            title="Homework Ready for Review"
-            icon={ClipboardCheck}
-            items={filtered(inboxData.homeworkItems)}
-            emptyTitle="No homework waiting"
-            emptyDescription="Completed homework and worksheets will appear here when clients finish them."
-          />
-          <InboxSection
-            eyebrow="Between Sessions"
-            title="Reflections Submitted"
-            icon={MessageSquare}
-            items={filtered(inboxData.reflectionItems)}
-            emptyTitle="No reflections submitted"
-            emptyDescription="Client journal entries will appear here after they submit reflections in the portal."
-          />
-          <InboxSection
-            eyebrow="Mood"
-            title="Mood Alerts"
-            icon={BarChart3}
-            items={filtered(inboxData.moodAlertItems)}
-            emptyTitle="No mood alerts"
-            emptyDescription="Low mood, high anxiety or stress, and notable drops will appear here when real check-ins are submitted."
-          />
-          <InboxSection
-            eyebrow="Invitations"
-            title="Recent Invitations"
-            icon={Users}
-            items={filtered(inboxData.invitationItems)}
-            emptyTitle="No recent invitations"
-            emptyDescription="Client invitations and registration follow-ups will appear here."
-          />
+        <div className="space-y-6">
+          <ActivityTimeline items={filtered(inboxData.recentActivityItems)} />
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <InboxSection
+              eyebrow="Homework"
+              title="Homework Ready for Review"
+              icon={ClipboardCheck}
+              items={filtered(inboxData.homeworkItems)}
+              emptyTitle="No homework waiting"
+              emptyDescription="Completed homework and worksheets will appear here when clients finish them."
+            />
+            <InboxSection
+              eyebrow="Between Sessions"
+              title="Reflections Submitted"
+              icon={MessageSquare}
+              items={filtered(inboxData.reflectionItems)}
+              emptyTitle="No reflections submitted"
+              emptyDescription="Client journal entries will appear here after they submit reflections in the portal."
+            />
+            <InboxSection
+              eyebrow="Mood"
+              title="Mood Alerts"
+              icon={BarChart3}
+              items={filtered(inboxData.moodAlertItems)}
+              emptyTitle="No mood alerts"
+              emptyDescription="Low mood, high anxiety or stress, and notable drops will appear here when real check-ins are submitted."
+            />
+            <InboxSection
+              eyebrow="Invitations"
+              title="Recent Invitations"
+              icon={Users}
+              items={filtered(inboxData.invitationItems)}
+              emptyTitle="No recent invitations"
+              emptyDescription="Client invitations and registration follow-ups will appear here."
+            />
+          </div>
         </div>
       )}
 

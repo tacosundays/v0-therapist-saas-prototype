@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils"
 import { useState, useEffect, useRef } from "react"
 import { getClient } from "@/lib/supabase/client"
 import { logClientAuditEvent } from "@/lib/audit-client"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { User } from "@supabase/supabase-js"
 
 const navSections = [
@@ -68,6 +69,20 @@ type TherapistProfile = {
   plan?: string | null
   subscription_plan?: string | null
   subscription_status?: string | null
+}
+
+function formatPlanLabel(plan: string | null) {
+  if (!plan) return null
+
+  const normalized = plan.toLowerCase()
+  if (normalized.includes("solo")) return "Solo"
+  if (normalized.includes("growing")) return "Growing"
+  if (normalized.includes("group")) return "Group Practice"
+
+  return plan
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
 }
 
 export function DashboardSidebar() {
@@ -151,12 +166,7 @@ export function DashboardSidebar() {
     : user?.email?.split('@')[0] || 'User')
   const accountEmail = therapistProfile?.email || user?.email || ""
   const planValue = therapistProfile?.plan || therapistProfile?.subscription_plan || null
-  const planLabel = planValue
-    ? planValue
-      .split("-")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ")
-    : null
+  const planLabel = formatPlanLabel(planValue)
   const roleValue = (therapistProfile as any)?.practice_role || (therapistProfile as any)?.role || user?.user_metadata?.practice_role || user?.user_metadata?.role
   const statusLabel = typeof roleValue === "string" && roleValue.toLowerCase() === "owner"
     ? "Owner"
@@ -172,14 +182,14 @@ export function DashboardSidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-full flex-col border-r border-slate-200/80 bg-white/90 shadow-[12px_0_40px_rgba(15,23,42,0.04)] backdrop-blur-xl transition-all duration-300",
-        collapsed ? "w-20" : "w-64"
+        "fixed left-0 top-0 z-40 flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[10px_0_36px_rgba(15,23,42,0.035)] backdrop-blur-xl transition-all duration-300",
+        collapsed ? "w-[76px]" : "w-[272px]"
       )}
     >
       {/* Logo */}
-      <div className="border-b border-slate-200/80 p-4">
+      <div className="border-b border-slate-200/70 px-5 py-4">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary shadow-[0_12px_28px_rgba(109,94,245,0.30)]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary shadow-[0_12px_28px_rgba(109,94,245,0.24)]">
             <Brain className="h-6 w-6 text-white" />
           </div>
           {!collapsed && (
@@ -192,18 +202,18 @@ export function DashboardSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <div className="space-y-5">
+      <nav className="flex-1 overflow-y-auto px-4 py-5">
+        <div className="space-y-6">
           {navSections.map((section, sectionIndex) => (
             <div
               key={section.label}
               className={cn(
-                "space-y-2",
-                sectionIndex > 0 && "border-t border-slate-200/70 pt-5"
+                "space-y-2.5",
+                sectionIndex > 0 && "border-t border-slate-200/60 pt-6"
               )}
             >
               {!collapsed && (
-                <p className="px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                <p className="px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
                   {section.label}
                 </p>
               )}
@@ -214,21 +224,32 @@ export function DashboardSidebar() {
                     : "exact" in item && item.exact
                     ? pathname === item.href
                     : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
-                  return (
+                  const navLink = (
                     <Link
                       key={`${section.label}-${item.label}`}
                       href={item.href}
                       className={cn(
-                        "group flex h-10 items-center gap-3 rounded-2xl px-3 text-sm transition-all",
+                        "group flex h-[42px] items-center gap-3 rounded-2xl px-3.5 text-sm transition-all duration-200 ease-out hover:translate-x-0.5",
                         collapsed && "justify-center px-0",
                         isActive
-                          ? "bg-primary text-white shadow-[0_12px_28px_rgba(109,94,245,0.24)]"
-                          : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-900"
+                          ? "bg-primary text-white shadow-[0_12px_28px_rgba(109,94,245,0.22)]"
+                          : "text-[#64748B] hover:bg-slate-100/75 hover:text-slate-950"
                       )}
                     >
                       <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-slate-400 group-hover:text-primary")} />
                       {!collapsed && <span className="truncate font-medium">{item.label}</span>}
                     </Link>
+                  )
+
+                  if (!collapsed) return navLink
+
+                  return (
+                    <Tooltip key={`${section.label}-${item.label}`}>
+                      <TooltipTrigger asChild>{navLink}</TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={10}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
                   )
                 })}
               </div>
@@ -250,21 +271,22 @@ export function DashboardSidebar() {
       </button>
 
       {/* User Section */}
-      <div className="border-t border-slate-200/80 p-4">
+      <div className="border-t border-slate-200/70 p-4">
         {!collapsed && (
-          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
             Account
           </p>
         )}
-        <div className={cn("rounded-3xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-sm", collapsed && "border-0 bg-transparent p-0 shadow-none")}>
+        <div className={cn("rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-3 shadow-sm", collapsed && "border-0 bg-transparent p-0 shadow-none")}>
           <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
               <span className="text-sm font-bold text-primary">{initials}</span>
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#18B7A0]" />
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
-                <p className="truncate text-xs text-slate-500">{accountEmail}</p>
+                <p className="truncate text-xs text-[#64748B]">{accountEmail}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
                     {statusLabel}
@@ -279,21 +301,41 @@ export function DashboardSidebar() {
             )}
           </div>
         </div>
-        <button
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="mt-4 flex h-10 w-full items-center justify-center rounded-2xl text-[#64748B] transition-all duration-200 hover:bg-slate-100/75 hover:text-slate-950"
+              >
+                {isSigningOut ? (
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+                ) : (
+                  <LogOut className="h-5 w-5 shrink-0" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
           onClick={handleSignOut}
           disabled={isSigningOut}
           className={cn(
-            "mt-3 flex h-10 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-950",
-            collapsed && "justify-center px-0"
+            "mt-4 flex h-10 w-full items-center gap-3 rounded-2xl border border-slate-200/70 bg-white px-3 text-sm font-medium text-[#64748B] transition-all duration-200 hover:bg-slate-100/75 hover:text-slate-950"
           )}
         >
           {isSigningOut ? (
-            <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
           ) : (
-            <LogOut className="w-5 h-5 shrink-0" />
+            <LogOut className="h-5 w-5 shrink-0" />
           )}
           {!collapsed && <span className="text-sm">{isSigningOut ? "Signing out..." : "Sign out"}</span>}
         </button>
+        )}
       </div>
     </aside>
   )

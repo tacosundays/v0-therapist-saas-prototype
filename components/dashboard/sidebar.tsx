@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { 
   Brain, 
   LayoutDashboard, 
+  Inbox,
   Users, 
   UserPlus,
   HeartHandshake,
@@ -33,6 +34,7 @@ const navSections = [
     label: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/dashboard/inbox", label: "Inbox", icon: Inbox },
       { href: "/dashboard/clients", label: "Clients", icon: Users },
       { href: "/dashboard/couples", label: "Couples", icon: HeartHandshake },
       { href: "/dashboard/library", label: "Content Library", icon: BookOpen },

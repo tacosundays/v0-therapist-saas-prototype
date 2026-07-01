@@ -413,7 +413,6 @@ export default function TherapistInboxPage() {
 
   const inboxData = useMemo(() => {
     const clientName = (clientId: string) => clientsById.get(clientId)?.full_name || null
-    const clientHref = (clientId: string) => `/dashboard/clients/${clientId}`
     const sessionPrepHref = (clientId: string) => `/dashboard/clients/${clientId}/session-prep`
 
     const completedAssignmentItems: InboxItem[] = assignments
@@ -597,8 +596,8 @@ export default function TherapistInboxPage() {
           : client.invite_sent_at
           ? "Client invitation email was sent."
           : "Client record is waiting for invitation follow-up.",
-        actionLabel: "Open client",
-        href: clientHref(client.id),
+        actionLabel: "Open prep",
+        href: sessionPrepHref(client.id),
         icon: Mail,
         tone: client.user_id || client.invite_accepted_at ? "teal" : "amber",
         event: client.user_id || client.invite_accepted_at ? "Invitation accepted" : "Invitation sent",
@@ -687,8 +686,8 @@ export default function TherapistInboxPage() {
           clientName: client.full_name,
           timestamp: lastActivity,
           description: `No recorded activity in ${inactiveDays} days.`,
-          actionLabel: "Open client",
-          href: clientHref(client.id),
+          actionLabel: "Open prep",
+          href: sessionPrepHref(client.id),
           icon: Clock,
           tone: "orange" as const,
           event: "Inactive client",

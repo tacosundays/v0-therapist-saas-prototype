@@ -146,42 +146,48 @@ export default function ReflectionJournalPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[#6D5EF5]/10 text-[#6D5EF5] shadow-[0_18px_44px_rgba(109,94,245,0.16)]">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 max-w-3xl">
-          <div className="flex items-center justify-between">
-            <Link href="/client-portal">
-              <Button variant="ghost" className="rounded-xl">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Portal
-              </Button>
-            </Link>
-            <div className="text-sm text-muted-foreground">{clientRecord?.full_name}</div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+    <div className="min-h-[calc(100vh-8rem)]">
+      <main>
         <div className="space-y-8">
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-            <h1 className="text-2xl font-bold text-foreground">Reflection Journal</h1>
-            <p className="text-muted-foreground mt-1">Write a between-session reflection for your therapist.</p>
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-[32px] border border-slate-200/75 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.07)]">
+            <div className="relative p-6 sm:p-8">
+              <div className="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_18%_0%,rgba(109,94,245,0.18),transparent_34%),radial-gradient(circle_at_88%_8%,rgba(24,183,160,0.15),transparent_32%)]" />
+              <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <Link href="/client-portal">
+                    <Button variant="ghost" className="mb-5 rounded-2xl text-slate-500 hover:bg-slate-100 hover:text-slate-950">
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Portal
+                    </Button>
+                  </Link>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Reflection Journal</h1>
+                  <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">Write down what has been on your mind between sessions.</p>
+                </div>
+                <div className="rounded-3xl border border-slate-200/75 bg-white/85 px-4 py-3 text-sm font-medium text-slate-500 shadow-sm">
+                  {clientRecord?.full_name}
+                </div>
+              </div>
+            </div>
           </motion.div>
 
-          {error && <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
-          {success && <div className="p-4 rounded-xl bg-primary/10 text-primary text-sm">{success}</div>}
+          {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{error}</div>}
+          {success && <div className="rounded-2xl border border-[#18B7A0]/20 bg-[#18B7A0]/10 p-4 text-sm font-medium text-[#109986]">{success}</div>}
 
-          <Card className="rounded-2xl">
+          <Card className="rounded-[28px] border-slate-200/75 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Heart className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-3 text-lg text-slate-950">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#6D5EF5]/10 text-[#6D5EF5]">
+                  <Heart className="h-5 w-5" />
+                </span>
                 New Reflection
               </CardTitle>
             </CardHeader>
@@ -190,18 +196,18 @@ export default function ReflectionJournalPage() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Title (optional)"
-                className="h-11 rounded-xl"
+                className="h-12 rounded-2xl border-slate-200"
               />
               <Textarea
                 value={reflectionText}
                 onChange={(event) => setReflectionText(event.target.value)}
                 placeholder="Write what has been on your mind..."
-                className="min-h-48 rounded-xl"
+                className="min-h-56 rounded-2xl border-slate-200 text-base leading-7"
               />
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">Mood rating</p>
-                  <p className="text-sm font-semibold text-primary">{moodRating}/10</p>
+                  <p className="text-sm font-semibold text-slate-700">Mood rating</p>
+                  <p className="rounded-full bg-[#6D5EF5]/10 px-2.5 py-1 text-sm font-bold text-[#6D5EF5]">{moodRating}/10</p>
                 </div>
                 <Slider
                   value={[moodRating]}
@@ -211,7 +217,7 @@ export default function ReflectionJournalPage() {
                   onValueChange={(value) => setMoodRating(value[0] || 5)}
                 />
               </div>
-              <Button className="w-full rounded-xl" onClick={saveReflection} disabled={isSaving || !reflectionText.trim()}>
+              <Button className="h-12 w-full rounded-2xl bg-[#6D5EF5] text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]" onClick={saveReflection} disabled={isSaving || !reflectionText.trim()}>
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -227,29 +233,33 @@ export default function ReflectionJournalPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl">
+          <Card className="rounded-[28px] border-slate-200/75 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
             <CardHeader>
-              <CardTitle className="text-lg">Previous Reflections</CardTitle>
+              <CardTitle className="text-lg text-slate-950">Previous Reflections</CardTitle>
             </CardHeader>
             <CardContent>
               {reflections.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No reflections yet.</p>
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/75 p-8 text-center">
+                  <Heart className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                  <p className="font-semibold text-slate-950">No reflections yet</p>
+                  <p className="mt-1 text-sm text-slate-500">When you save one, it will appear here.</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {reflections.map((reflection) => (
-                    <div key={reflection.id} className="p-4 rounded-xl bg-muted/30">
+                    <div key={reflection.id} className="rounded-3xl border border-slate-200/70 bg-slate-50/60 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-medium text-foreground">{reflection.title || "Untitled reflection"}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(reflection.created_at)}</p>
+                          <p className="font-semibold text-slate-950">{reflection.title || "Untitled reflection"}</p>
+                          <p className="text-xs font-medium text-slate-400">{formatDate(reflection.created_at)}</p>
                         </div>
                         {reflection.mood_rating && (
-                          <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary">
+                          <span className="rounded-full bg-[#6D5EF5]/10 px-2.5 py-1 text-xs font-bold text-[#6D5EF5]">
                             Mood {reflection.mood_rating}/10
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-foreground mt-3 whitespace-pre-wrap">{reflection.reflection_text}</p>
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{reflection.reflection_text}</p>
                     </div>
                   ))}
                 </div>
@@ -258,7 +268,7 @@ export default function ReflectionJournalPage() {
           </Card>
 
           {success && (
-            <div className="flex items-center gap-2 text-sm text-primary">
+            <div className="flex items-center gap-2 rounded-2xl bg-[#18B7A0]/10 p-4 text-sm font-medium text-[#109986]">
               <CheckCircle2 className="w-4 h-4" />
               Saved to your journal.
             </div>

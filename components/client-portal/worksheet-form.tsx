@@ -382,16 +382,16 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.05 }}
       >
-        <Card className="rounded-xl">
-          <CardContent className="p-5 space-y-3">
+        <Card className="rounded-[24px] border-slate-200/75 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.045)]">
+          <CardContent className="space-y-4 p-5">
             <div className="flex items-start gap-2">
-              <span className="text-sm font-medium text-muted-foreground mt-0.5">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#6D5EF5]/10 text-sm font-bold text-[#6D5EF5]">
                 {index + 1}.
               </span>
               <div className="flex-1">
-                <Label className="text-base font-medium">
+                <Label className="text-base font-semibold leading-6 text-slate-950">
                   {question.question_text}
-                  {question.required && <span className="text-destructive ml-1">*</span>}
+                  {question.required && <span className="ml-1 text-rose-600">*</span>}
                 </Label>
               </div>
             </div>
@@ -402,7 +402,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                   value={(value as string) || ""}
                   onChange={(e) => updateAnswer(question.id, e.target.value)}
                   placeholder="Your answer..."
-                  className="rounded-lg"
+                  className="h-11 rounded-2xl border-slate-200"
                 />
               )}
 
@@ -411,7 +411,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                   value={(value as string) || ""}
                   onChange={(e) => updateAnswer(question.id, e.target.value)}
                   placeholder="Your answer..."
-                  className="rounded-lg min-h-24"
+                  className="min-h-28 rounded-2xl border-slate-200 leading-6"
                 />
               )}
 
@@ -425,9 +425,9 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                     step={1}
                     className="py-4"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-xs font-medium text-slate-400">
                     <span>1 - Not at all</span>
-                    <span className="font-medium text-foreground">
+                    <span className="rounded-full bg-[#6D5EF5]/10 px-2.5 py-1 font-bold text-[#6D5EF5]">
                       {value !== undefined ? value : 5}
                     </span>
                     <span>10 - Extremely</span>
@@ -442,9 +442,9 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                   className="space-y-2"
                 >
                   {question.options.map((option, i) => (
-                    <div key={i} className="flex items-center space-x-2">
+                    <div key={i} className="flex items-center space-x-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 px-3 py-2">
                       <RadioGroupItem value={option} id={`${question.id}-${i}`} />
-                      <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                      <Label htmlFor={`${question.id}-${i}`} className="cursor-pointer font-medium text-slate-700">
                         {option}
                       </Label>
                     </div>
@@ -457,7 +457,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                   {question.options.map((option, i) => {
                     const checked = Array.isArray(value) && value.includes(option)
                     return (
-                      <div key={i} className="flex items-center space-x-2">
+                      <div key={i} className="flex items-center space-x-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 px-3 py-2">
                         <Checkbox
                           id={`${question.id}-${i}`}
                           checked={checked}
@@ -470,7 +470,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                             }
                           }}
                         />
-                        <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                        <Label htmlFor={`${question.id}-${i}`} className="cursor-pointer font-medium text-slate-700">
                           {option}
                         </Label>
                       </div>
@@ -484,7 +484,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                   type="date"
                   value={(value as string) || ""}
                   onChange={(e) => updateAnswer(question.id, e.target.value)}
-                  className="rounded-lg w-auto"
+                  className="h-11 w-auto rounded-2xl border-slate-200"
                 />
               )}
             </div>
@@ -497,19 +497,21 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[#6D5EF5]/10 text-[#6D5EF5]">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
       </div>
     )
   }
 
   if (error && !assignment) {
     return (
-      <Card className="rounded-2xl">
+      <Card className="rounded-[28px] border-rose-200/70 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
         <CardContent className="py-12 text-center">
-          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <p className="text-foreground font-medium mb-2">Error loading worksheet</p>
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <Button onClick={onBack} variant="outline" className="mt-4 rounded-xl">
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-rose-600" />
+          <p className="mb-2 font-semibold text-slate-950">Error loading worksheet</p>
+          <p className="text-sm text-slate-500">{error}</p>
+          <Button onClick={onBack} variant="outline" className="mt-4 rounded-2xl border-slate-200">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
           </Button>
@@ -520,17 +522,17 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
   if (submitSuccess) {
     return (
-      <Card className="rounded-2xl">
+      <Card className="rounded-[28px] border-[#18B7A0]/20 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
         <CardContent className="py-12 text-center">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200 }}
           >
-            <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-4" />
+            <CheckCircle2 className="mx-auto mb-4 h-16 w-16 text-[#18B7A0]" />
           </motion.div>
-          <h3 className="text-xl font-semibold text-foreground mb-2">Worksheet Submitted!</h3>
-          <p className="text-muted-foreground">Your therapist will review your responses.</p>
+          <h3 className="mb-2 text-xl font-bold text-slate-950">Worksheet Submitted!</h3>
+          <p className="text-slate-500">Your therapist will review your responses.</p>
         </CardContent>
       </Card>
     )
@@ -538,14 +540,14 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
   return (
     <div className="space-y-6">
-      <Button onClick={onBack} variant="ghost" className="rounded-xl">
+      <Button onClick={onBack} variant="ghost" className="rounded-2xl text-slate-500 hover:bg-slate-100 hover:text-slate-950">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to assignments
       </Button>
 
-      <Card className="rounded-2xl">
+      <Card className="overflow-hidden rounded-[28px] border-slate-200/75 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
         <CardHeader>
-          <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+          <div className="mb-2 flex items-center justify-between text-sm text-slate-500">
             <div className="flex items-center gap-2">
               {assignment?.due_date && (
                 <span className="flex items-center gap-1">
@@ -555,7 +557,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
               )}
             </div>
             {/* Auto-save status */}
-            <div className="flex items-center gap-1.5 text-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
               {isSaving ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -563,28 +565,28 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
                 </>
               ) : saveError ? (
                 <>
-                  <CloudOff className="w-3 h-3 text-destructive" />
-                  <span className="text-destructive">Save failed</span>
+                  <CloudOff className="h-3 w-3 text-rose-600" />
+                  <span className="text-rose-600">Save failed</span>
                 </>
               ) : lastSaved ? (
                 <>
-                  <Cloud className="w-3 h-3 text-primary" />
+                  <Cloud className="h-3 w-3 text-[#18B7A0]" />
                   <span>Saved</span>
                 </>
               ) : null}
             </div>
           </div>
-          <CardTitle className="text-xl">{assignment?.worksheet_templates?.title}</CardTitle>
+          <CardTitle className="text-2xl text-slate-950">{assignment?.worksheet_templates?.title}</CardTitle>
           {assignment?.worksheet_templates?.description && (
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="mt-2 text-sm leading-6 text-slate-500">
               {assignment.worksheet_templates.description}
             </p>
           )}
           {/* Progress bar */}
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">{answeredCount} of {questions.length} questions</span>
+              <span className="text-slate-500">Progress</span>
+              <span className="font-semibold text-slate-950">{answeredCount} of {questions.length} questions</span>
             </div>
             <Progress value={progressPercent} className="h-2" />
           </div>
@@ -596,9 +598,9 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
       </div>
 
       {error && (
-        <Card className="rounded-xl border-destructive bg-destructive/10">
+        <Card className="rounded-2xl border-rose-200 bg-rose-50">
           <CardContent className="py-3 px-4">
-            <p className="text-sm text-destructive flex items-center gap-2">
+            <p className="flex items-center gap-2 text-sm font-medium text-rose-700">
               <AlertCircle className="w-4 h-4" />
               {error}
             </p>
@@ -609,7 +611,7 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
       <Button
         onClick={handleSubmit}
         disabled={isSubmitting}
-        className="w-full h-12 rounded-xl text-base"
+        className="h-12 w-full rounded-2xl bg-[#6D5EF5] text-base text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]"
       >
         {isSubmitting ? (
           <>

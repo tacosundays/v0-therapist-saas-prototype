@@ -78,9 +78,11 @@ export default function ClientPortalLayout({
   // Loading state
   if (isChecking) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your portal...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC]">
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-3xl bg-[#6D5EF5]/10 text-[#6D5EF5] shadow-[0_18px_44px_rgba(109,94,245,0.16)]">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+        <p className="text-sm font-medium text-slate-500">Loading your portal...</p>
       </div>
     )
   }
@@ -88,15 +90,15 @@ export default function ClientPortalLayout({
   // Error state - show message instead of redirect loop
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
-        <div className="max-w-md w-full text-center">
-          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-destructive" />
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] p-8">
+        <div className="w-full max-w-md rounded-[28px] border border-rose-200/70 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-50">
+            <AlertCircle className="h-8 w-8 text-rose-600" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Unable to Access Portal</h1>
-          <p className="text-muted-foreground mb-6">{error}</p>
+          <h1 className="mb-2 text-2xl font-bold text-slate-950">Unable to Access Portal</h1>
+          <p className="mb-6 text-sm leading-6 text-slate-500">{error}</p>
           <div className="space-y-3">
-            <Button onClick={handleSignOut} className="w-full">
+            <Button onClick={handleSignOut} className="h-11 w-full rounded-2xl bg-[#6D5EF5] hover:bg-[#5B4DEA]">
               Back to Login
             </Button>
           </div>
@@ -110,25 +112,28 @@ export default function ClientPortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-950">
       <SessionTimeout />
       {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/85 shadow-[0_10px_36px_rgba(15,23,42,0.035)] backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Brain className="w-5 h-5 text-primary-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#6D5EF5] shadow-[0_14px_30px_rgba(109,94,245,0.24)]">
+                <Brain className="h-5 w-5 text-white" />
               </div>
-              <span className="font-semibold text-foreground">ShrinkAid</span>
+              <div>
+                <span className="block font-bold tracking-tight text-slate-950">ShrinkAid</span>
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Client Portal</span>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               {clientName && (
-                <span className="text-sm text-muted-foreground hidden sm:block">
+                <span className="hidden text-sm font-medium text-slate-500 sm:block">
                   {clientName}
                 </span>
               )}
-              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="rounded-2xl text-slate-500 hover:bg-slate-100 hover:text-slate-950">
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
               </Button>
@@ -138,7 +143,7 @@ export default function ClientPortalLayout({
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {children}
       </main>
     </div>

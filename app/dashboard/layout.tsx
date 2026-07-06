@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { GlobalSearch } from "@/components/dashboard/global-search"
 import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
 import { Loader2, AlertCircle } from "lucide-react"
 import { checkUserRole } from "@/lib/auth/check-user-role"
@@ -106,7 +107,10 @@ export default function DashboardLayout({
       <DashboardSidebar />
       <div className="pl-64 transition-all duration-300">
         <SubscriptionBanner />
-        <main className="mx-auto w-full max-w-[1500px] p-8 xl:p-10">
+        <div className="mx-auto w-full max-w-[1500px] px-8 pt-6 xl:px-10">
+          <GlobalSearch />
+        </div>
+        <main className="mx-auto w-full max-w-[1500px] p-8 pt-6 xl:p-10 xl:pt-6">
           {children}
         </main>
       </div>

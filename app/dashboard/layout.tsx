@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { AiCopilot } from "@/components/dashboard/ai-copilot"
 import { GlobalSearch } from "@/components/dashboard/global-search"
 import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
 import { Loader2, AlertCircle } from "lucide-react"
@@ -105,6 +106,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(109,94,245,0.10),transparent_34rem),linear-gradient(180deg,#F8FAFC_0%,#EEF2FF_100%)]">
       <SessionTimeout />
       <DashboardSidebar />
+      <AiCopilot />
       <div className="pl-64 transition-all duration-300">
         <SubscriptionBanner />
         <div className="mx-auto w-full max-w-[1500px] px-8 pt-6 xl:px-10">

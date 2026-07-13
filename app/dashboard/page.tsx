@@ -477,6 +477,7 @@ export default function DashboardPage() {
     + (moodAlertCount * 3)
     + (attentionItems.length * 2),
   )
+  const reflectionCount = clientReflections.length + latestReflections.length
 
   const nextBestAction = homeworkWaitingForReview.length > 0
     ? "Review completed homework"
@@ -552,6 +553,11 @@ export default function DashboardPage() {
                 </Link>
               </Button>
             </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              <BriefCount label="Homework waiting" value={homeworkWaitingCount} />
+              <BriefCount label="Reflections" value={reflectionCount} />
+              <BriefCount label="Mood alerts" value={moodAlertCount} />
+            </div>
             <div className="mt-5 space-y-2">
               {(topPriorities.length > 0 ? topPriorities : ["No priority items found in current client activity."]).map((priority, index) => (
                 <div key={priority} className="flex gap-3 rounded-2xl bg-white/10 px-3 py-2 text-sm leading-5 text-white/80">
@@ -564,10 +570,10 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
               <CalendarClock className="h-5 w-5 text-primary" />
-              Today&apos;s Schedule
+              Today&apos;s Session Prep
             </CardTitle>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/calendar">
@@ -598,14 +604,28 @@ export default function DashboardPage() {
   )
 }
 
+function BriefCount({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl bg-white/10 px-3 py-2">
+      <p className="text-lg font-bold text-white">{value}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45">{label}</p>
+    </div>
+  )
+}
+
 function CompactPrepRow({ item }: { item: ClientWorkspaceSummary }) {
   return (
-    <div className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="grid gap-3 py-3 first:pt-0 last:pb-0 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div className="flex min-w-0 items-start gap-3">
         <ClientAvatar name={item.client.full_name} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-950">{item.client.full_name}</p>
-          <p className="mt-1 text-xs text-slate-500">Last activity: {item.lastActivity}</p>
+          <p className="mt-1 text-xs text-slate-500">Time not scheduled · Last activity: {item.lastActivity}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <StatusPill label={item.homeworkStatus} />
+            <StatusPill label={item.reflectionStatus} />
+            <StatusPill label={item.moodStatus} />
+          </div>
         </div>
       </div>
       <Button variant="outline" size="sm" className="shrink-0 bg-white/80" asChild>
@@ -614,6 +634,14 @@ function CompactPrepRow({ item }: { item: ClientWorkspaceSummary }) {
         </Link>
       </Button>
     </div>
+  )
+}
+
+function StatusPill({ label }: { label: string }) {
+  return (
+    <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+      {label}
+    </span>
   )
 }
 

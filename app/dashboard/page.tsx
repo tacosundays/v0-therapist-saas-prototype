@@ -27,6 +27,8 @@ import {
 import Link from "next/link"
 import { getClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
+import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
+import { FirstTimeExperience } from "@/components/dashboard/first-time-experience"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import type { User } from "@supabase/supabase-js"
 
@@ -121,6 +123,9 @@ export default function DashboardPage() {
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAssignHomeworkOpen, setIsAssignHomeworkOpen] = useState(false)
+  const [selectedHomeworkClientId, setSelectedHomeworkClientId] = useState<string | undefined>(undefined)
+  const [activationCelebration, setActivationCelebration] = useState<"client" | "homework" | null>(null)
 
   const fetchData = useCallback(async (therapistId: string) => {
     try {
@@ -264,6 +269,19 @@ export default function DashboardPage() {
     getTherapistId().then(({ therapistId }) => {
       if (therapistId) fetchData(therapistId)
     })
+    setActivationCelebration("client")
+  }
+
+  const openAssignHomework = () => {
+    setSelectedHomeworkClientId(clients[0]?.id)
+    setIsAssignHomeworkOpen(true)
+  }
+
+  const handleAssignmentCreated = () => {
+    getTherapistId().then(({ therapistId }) => {
+      if (therapistId) fetchData(therapistId)
+    })
+    setActivationCelebration("homework")
   }
 
   const getGreeting = () => {
@@ -530,11 +548,9 @@ export default function DashboardPage() {
               <UserPlus className="mr-2 h-4 w-4" />
               Client
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/clients">
-                <ClipboardCheck className="mr-2 h-4 w-4" />
-                Homework
-              </Link>
+            <DropdownMenuItem onClick={openAssignHomework}>
+              <ClipboardCheck className="mr-2 h-4 w-4" />
+              Homework
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/dashboard/library">
@@ -551,6 +567,17 @@ export default function DashboardPage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <FirstTimeExperience
+        clientCount={clients.length}
+        homeworkCount={assignments.length + worksheetAssignments.length}
+        reviewCount={homeworkWaitingCount + clientReflections.length}
+        isLoading={isLoading}
+        celebration={activationCelebration}
+        onAddClient={() => setIsAddModalOpen(true)}
+        onAssignHomework={openAssignHomework}
+        onDismissCelebration={() => setActivationCelebration(null)}
+      />
 
       <Card className="bg-[#0F172A] text-white">
         <CardContent className="p-6">
@@ -641,6 +668,13 @@ export default function DashboardPage() {
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
         onClientAdded={handleClientAdded}
+      />
+
+      <AssignHomeworkModal
+        open={isAssignHomeworkOpen}
+        onOpenChange={setIsAssignHomeworkOpen}
+        onAssignmentCreated={handleAssignmentCreated}
+        preselectedClientId={selectedHomeworkClientId}
       />
 
     </div>

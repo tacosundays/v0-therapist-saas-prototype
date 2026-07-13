@@ -488,7 +488,7 @@ export default function ClientsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_65px_rgba(15,23,42,0.10)]">
+                <Card id={`client-${client.id}`} className="h-full scroll-mt-24 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_65px_rgba(15,23,42,0.10)]">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">

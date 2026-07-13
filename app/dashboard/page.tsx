@@ -596,8 +596,8 @@ export default function DashboardPage() {
               <BriefMetric label="Review time" value={estimatedReviewTime} suffix="min" />
             </div>
             <Button className="bg-white text-slate-950 hover:bg-white/90" asChild>
-              <Link href={sessionPrepQueue[0] ? `/dashboard/clients/${sessionPrepQueue[0].client.id}/session-prep` : "/dashboard/inbox"}>
-                Start Daily Review
+              <Link href="/dashboard/daily-workflow">
+                Start My Day
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

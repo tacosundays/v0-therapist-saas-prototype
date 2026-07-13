@@ -485,9 +485,15 @@ export default function DashboardPage() {
       : clients.length === 0
         ? "Invite your first client"
         : "Assign homework"
+  const topPriorities = [
+    ...attentionItems.map((item) => item.detail ? `${item.title}: ${item.detail}` : item.title),
+    homeworkWaitingCount > 0 ? `${homeworkWaitingCount} homework item${homeworkWaitingCount === 1 ? "" : "s"} waiting for review` : null,
+    moodAlertCount > 0 ? `${moodAlertCount} mood alert${moodAlertCount === 1 ? "" : "s"} to review` : null,
+    sessionPrepQueue.length > 0 ? `${sessionPrepQueue.length} client${sessionPrepQueue.length === 1 ? "" : "s"} ready for session prep` : null,
+  ].filter(Boolean).slice(0, 3) as string[]
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8">
       <div>
         <div>
           <motion.h1
@@ -501,56 +507,59 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <Card className="bg-[#0F172A] text-white">
-        <CardContent className="p-5 sm:p-6">
-          <div className="grid gap-5 lg:grid-cols-[0.65fr_1.35fr_auto] lg:items-center">
-            <div>
-              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-[#18B7A0]">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">AI Daily Brief</p>
-              <h2 className="mt-1 text-lg font-bold tracking-tight text-white sm:text-xl">{nextBestAction}</h2>
+      <Card className="overflow-hidden border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Needs Attention
+          </CardTitle>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard/inbox">
+              View All
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {attentionItems.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="No clients need attention today." description="Inactivity, mood alerts, and review-ready work will appear here." />
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {attentionItems.map((item) => (
+                <AttentionRow key={item.id} clientName={item.title} detail={item.detail} href={item.href} />
+              ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <BriefMetric label="Sessions today" value={sessionPrepQueue.length} />
-              <BriefMetric label="Homework waiting" value={homeworkWaitingCount} />
-              <BriefMetric label="Mood alerts" value={moodAlertCount} />
-              <BriefMetric label="Review time" value={estimatedReviewTime} suffix="min" />
-            </div>
-            <Button className="bg-white text-slate-950 hover:bg-white/90" asChild>
-              <Link href="/dashboard/daily-workflow">
-                Start My Day
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      <section className="grid gap-10 xl:grid-cols-[1fr_1fr]">
-        <Card className="overflow-hidden border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Needs Attention
-            </CardTitle>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/inbox">
-                View All
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {attentionItems.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No clients need attention today." description="Inactivity, mood alerts, and review-ready work will appear here." />
-            ) : (
-              <div className="space-y-3">
-                {attentionItems.map((item) => (
-                  <AttentionRow key={item.id} clientName={item.title} detail={item.detail} href={item.href} />
-                ))}
+      <section className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card className="bg-[#0F172A] text-white">
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-[#18B7A0]">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">AI Daily Brief</p>
+                <h2 className="mt-1 text-lg font-bold tracking-tight text-white sm:text-xl">{nextBestAction}</h2>
+                <p className="mt-2 text-sm text-white/60">Estimated review time: {estimatedReviewTime} min</p>
               </div>
-            )}
+              <Button className="bg-white text-slate-950 hover:bg-white/90" asChild>
+                <Link href="/dashboard/daily-workflow">
+                  Start My Day
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+            <div className="mt-5 space-y-2">
+              {(topPriorities.length > 0 ? topPriorities : ["No priority items found in current client activity."]).map((priority, index) => (
+                <div key={priority} className="flex gap-3 rounded-2xl bg-white/10 px-3 py-2 text-sm leading-5 text-white/80">
+                  <span className="font-bold text-[#18B7A0]">{index + 1}</span>
+                  <span>{priority}</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -575,7 +584,7 @@ export default function DashboardPage() {
             ) : sessionPrepQueue.length === 0 ? (
               <EmptyState icon={CalendarClock} title="No next sessions queued." description="Calendar-backed sessions and full schedule details live on the Calendar page." />
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-slate-200/80">
                 {sessionPrepQueue.slice(0, 3).map((item) => (
                   <CompactPrepRow key={item.client.id} item={item} />
                 ))}
@@ -589,26 +598,17 @@ export default function DashboardPage() {
   )
 }
 
-function BriefMetric({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
-  return (
-    <div className="rounded-2xl bg-white/10 px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-white">{value}{suffix ? <span className="ml-1 text-sm font-semibold text-white/55">{suffix}</span> : null}</p>
-    </div>
-  )
-}
-
 function CompactPrepRow({ item }: { item: ClientWorkspaceSummary }) {
   return (
-    <div className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
-      <div className="flex items-start gap-3">
+    <div className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
         <ClientAvatar name={item.client.full_name} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-950">{item.client.full_name}</p>
           <p className="mt-1 text-xs text-slate-500">Last activity: {item.lastActivity}</p>
         </div>
       </div>
-      <Button variant="outline" size="sm" className="mt-4 w-full bg-white/80" asChild>
+      <Button variant="outline" size="sm" className="shrink-0 bg-white/80" asChild>
         <Link href={`/dashboard/clients/${item.client.id}/session-prep`}>
           Open Session Prep
         </Link>

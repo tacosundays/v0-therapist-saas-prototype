@@ -7,28 +7,14 @@ import { Button } from "@/components/ui/button"
 import { 
   CalendarClock,
   CheckCircle2, 
-  ClipboardCheck,
-  FileText,
-  Plus,
   ArrowRight,
   Loader2,
   AlertTriangle,
   Sparkles,
-  UserPlus,
-  Users,
   type LucideIcon,
 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { getClient } from "@/lib/supabase/client"
-import { AddClientModal } from "@/components/dashboard/add-client-modal"
-import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
-import { FirstTimeExperience } from "@/components/dashboard/first-time-experience"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import type { User } from "@supabase/supabase-js"
 
@@ -122,10 +108,6 @@ export default function DashboardPage() {
   const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [isAssignHomeworkOpen, setIsAssignHomeworkOpen] = useState(false)
-  const [selectedHomeworkClientId, setSelectedHomeworkClientId] = useState<string | undefined>(undefined)
-  const [activationCelebration, setActivationCelebration] = useState<"client" | "homework" | null>(null)
 
   const fetchData = useCallback(async (therapistId: string) => {
     try {
@@ -264,25 +246,6 @@ export default function DashboardPage() {
 
     loadDashboard()
   }, [fetchData])
-
-  const handleClientAdded = () => {
-    getTherapistId().then(({ therapistId }) => {
-      if (therapistId) fetchData(therapistId)
-    })
-    setActivationCelebration("client")
-  }
-
-  const openAssignHomework = () => {
-    setSelectedHomeworkClientId(clients[0]?.id)
-    setIsAssignHomeworkOpen(true)
-  }
-
-  const handleAssignmentCreated = () => {
-    getTherapistId().then(({ therapistId }) => {
-      if (therapistId) fetchData(therapistId)
-    })
-    setActivationCelebration("homework")
-  }
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -524,8 +487,8 @@ export default function DashboardPage() {
         : "Assign homework"
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-12">
+      <div>
         <div>
           <motion.h1
             initial={{ opacity: 0, y: -8 }}
@@ -536,58 +499,17 @@ export default function DashboardPage() {
           </motion.h1>
           <p className="mt-1 text-sm text-slate-500">What should I work on first today?</p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="h-11 rounded-xl">
-              <Plus className="mr-2 h-4 w-4" />
-              New
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 rounded-xl">
-            <DropdownMenuItem onClick={() => setIsAddModalOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Client
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={openAssignHomework}>
-              <ClipboardCheck className="mr-2 h-4 w-4" />
-              Homework
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/library">
-                <FileText className="mr-2 h-4 w-4" />
-                Worksheet
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/team">
-                <Users className="mr-2 h-4 w-4" />
-                Team Member
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
-      <FirstTimeExperience
-        clientCount={clients.length}
-        homeworkCount={assignments.length + worksheetAssignments.length}
-        reviewCount={homeworkWaitingCount + clientReflections.length}
-        isLoading={isLoading}
-        celebration={activationCelebration}
-        onAddClient={() => setIsAddModalOpen(true)}
-        onAssignHomework={openAssignHomework}
-        onDismissCelebration={() => setActivationCelebration(null)}
-      />
-
       <Card className="bg-[#0F172A] text-white">
-        <CardContent className="p-6">
-          <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr_auto] lg:items-center">
+        <CardContent className="p-5 sm:p-6">
+          <div className="grid gap-5 lg:grid-cols-[0.65fr_1.35fr_auto] lg:items-center">
             <div>
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#18B7A0]">
+              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-[#18B7A0]">
                 <Sparkles className="h-5 w-5" />
               </div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">AI Daily Brief</p>
-              <h2 className="mt-2 text-xl font-bold tracking-tight text-white">{nextBestAction}</h2>
+              <h2 className="mt-1 text-lg font-bold tracking-tight text-white sm:text-xl">{nextBestAction}</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <BriefMetric label="Sessions today" value={sessionPrepQueue.length} />
@@ -605,7 +527,7 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-8 xl:grid-cols-[1fr_1fr]">
+      <section className="grid gap-10 xl:grid-cols-[1fr_1fr]">
         <Card className="overflow-hidden border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
@@ -662,20 +584,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
-
-      {/* Invite Client Modal */}
-      <AddClientModal
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
-        onClientAdded={handleClientAdded}
-      />
-
-      <AssignHomeworkModal
-        open={isAssignHomeworkOpen}
-        onOpenChange={setIsAssignHomeworkOpen}
-        onAssignmentCreated={handleAssignmentCreated}
-        preselectedClientId={selectedHomeworkClientId}
-      />
 
     </div>
   )

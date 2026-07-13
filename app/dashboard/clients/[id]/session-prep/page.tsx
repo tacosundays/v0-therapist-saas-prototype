@@ -11,19 +11,23 @@ import {
   CalendarClock,
   CheckCircle2,
   Circle,
+  ClipboardCheck,
   Clock,
   FileText,
+  ListFilter,
   Loader2,
   MessageSquare,
   Plus,
   Save,
   Sparkles,
+  StickyNote,
   TrendingDown,
   TrendingUp,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -85,6 +89,8 @@ interface WorksheetResponseRecord {
 interface SessionPrepNote {
   id: string
   note: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 interface ProgressNote {
@@ -136,10 +142,16 @@ interface SessionSummaryRecord {
   created_at: string
 }
 
+type JourneyFilter = "all" | "homework" | "reflections" | "mood" | "notes" | "ai"
+
 interface TimelineItem {
+  id: string
   date: string
   label: string
   detail: string
+  type: JourneyFilter
+  actionLabel?: string
+  actionHref?: string
 }
 
 type ProgressNoteType = "DAP" | "SOAP"
@@ -242,8 +254,10 @@ export default function SessionPrepPage() {
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
   const [progressNotes, setProgressNotes] = useState<ProgressNote[]>([])
   const [sessionSummaries, setSessionSummaries] = useState<SessionSummaryRecord[]>([])
+  const [sessionPrepNote, setSessionPrepNote] = useState<SessionPrepNote | null>(null)
   const [noteId, setNoteId] = useState<string | null>(null)
   const [note, setNote] = useState("")
+  const [journeyFilter, setJourneyFilter] = useState<JourneyFilter>("all")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
@@ -327,7 +341,7 @@ export default function SessionPrepPage() {
             .order("created_at", { ascending: false }),
           supabase
             .from("session_prep_notes")
-            .select("id, note")
+            .select("id, note, created_at, updated_at")
             .eq("client_id", clientId)
             .eq("therapist_id", resolvedTherapistId)
             .order("updated_at", { ascending: false })
@@ -338,28 +352,28 @@ export default function SessionPrepPage() {
             .eq("client_id", clientId)
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
-            .limit(5),
+            .limit(50),
           supabase
             .from("client_reflections")
             .select("id, title, reflection_text, mood_rating, created_at")
             .eq("client_id", clientId)
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
-            .limit(10),
+            .limit(50),
           supabase
             .from("client_mood_checkins")
             .select("id, mood_rating, anxiety_rating, stress_rating, note, created_at")
             .eq("client_id", clientId)
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
-            .limit(30),
+            .limit(100),
           supabase
             .from("session_summaries")
             .select("id, therapist_id, client_id, summary_json, summary_text, source_counts, model, created_at")
             .eq("client_id", clientId)
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
-            .limit(5),
+            .limit(25),
         ])
 
         if (assignmentsResult.error) throwQueryError("assignments query failed", assignmentsResult.error)
@@ -379,7 +393,7 @@ export default function SessionPrepPage() {
               .eq("client_id", clientId)
               .in("assignment_id", worksheetAssignmentIds)
               .order("updated_at", { ascending: false })
-              .limit(10)
+              .limit(50)
           : { data: [], error: null }
 
         if (responsesResult.error) throwQueryError("worksheet_responses query failed", responsesResult.error)
@@ -393,6 +407,7 @@ export default function SessionPrepPage() {
         setMoodCheckIns((moodCheckInsResult.data || []) as MoodCheckIn[])
         setProgressNotes((progressNotesResult.data || []) as ProgressNote[])
         setSessionSummaries((sessionSummariesResult.data || []) as SessionSummaryRecord[])
+        setSessionPrepNote(latestNote)
         setNoteId(latestNote?.id || null)
         setNote(latestNote?.note || "")
       } catch (err) {
@@ -458,40 +473,120 @@ export default function SessionPrepPage() {
     const items: TimelineItem[] = []
 
     if (clientRecord?.created_at) {
-      items.push({ date: clientRecord.created_at, label: "Invited", detail: "Client record created" })
+      items.push({
+        id: `client-created-${clientRecord.id}`,
+        date: clientRecord.created_at,
+        label: "Client created",
+        detail: "Client record was added to this therapist-owned caseload.",
+        type: "all",
+        actionLabel: "Open Client",
+        actionHref: `/dashboard/clients#client-${clientRecord.id}`,
+      })
     }
     if (clientRecord?.invite_sent_at) {
-      items.push({ date: clientRecord.invite_sent_at, label: "Invite email sent", detail: clientRecord.email || "Client email" })
+      items.push({
+        id: `invite-sent-${clientRecord.id}`,
+        date: clientRecord.invite_sent_at,
+        label: "Invite email sent",
+        detail: clientRecord.email || "Client invite was sent.",
+        type: "all",
+        actionLabel: "Open Client",
+        actionHref: `/dashboard/clients#client-${clientRecord.id}`,
+      })
     }
     if (clientRecord?.invite_accepted_at) {
-      items.push({ date: clientRecord.invite_accepted_at, label: "Registered", detail: "Client created their account" })
+      items.push({
+        id: `invite-accepted-${clientRecord.id}`,
+        date: clientRecord.invite_accepted_at,
+        label: "Client registered",
+        detail: "Client created their account.",
+        type: "all",
+        actionLabel: "Open Client",
+        actionHref: `/dashboard/clients#client-${clientRecord.id}`,
+      })
     }
 
     assignments.forEach((assignment) => {
       if (assignment.assigned_at || assignment.created_at) {
-        items.push({ date: assignment.assigned_at || assignment.created_at!, label: "Assigned homework", detail: assignment.title })
+        items.push({
+          id: `assignment-assigned-${assignment.id}`,
+          date: assignment.assigned_at || assignment.created_at!,
+          label: "Homework assigned",
+          detail: assignment.title,
+          type: "homework",
+          actionLabel: "Open Session Prep",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
       if (assignment.started_at) {
-        items.push({ date: assignment.started_at, label: "Started homework", detail: assignment.title })
+        items.push({
+          id: `assignment-started-${assignment.id}`,
+          date: assignment.started_at,
+          label: "Homework started",
+          detail: assignment.title,
+          type: "homework",
+          actionLabel: "Open Session Prep",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
       if (assignment.completed_at) {
-        items.push({ date: assignment.completed_at, label: "Completed homework", detail: assignment.title })
+        items.push({
+          id: `assignment-completed-${assignment.id}`,
+          date: assignment.completed_at,
+          label: "Assignment completed",
+          detail: assignment.title,
+          type: "homework",
+          actionLabel: "Open Session Prep",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
       if (assignment.reflection && assignment.completed_at) {
-        items.push({ date: assignment.completed_at, label: "Submitted reflection", detail: assignment.title })
+        items.push({
+          id: `assignment-reflection-${assignment.id}`,
+          date: assignment.completed_at,
+          label: "Reflection submitted",
+          detail: `Homework reflection for ${assignment.title}`,
+          type: "reflections",
+          actionLabel: "View",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
     })
 
     worksheetAssignments.forEach((assignment) => {
       const title = assignment.worksheet_templates?.title || "Worksheet"
       if (assignment.assigned_at) {
-        items.push({ date: assignment.assigned_at, label: "Assigned worksheet", detail: title })
+        items.push({
+          id: `worksheet-assigned-${assignment.id}`,
+          date: assignment.assigned_at,
+          label: "Homework assigned",
+          detail: title,
+          type: "homework",
+          actionLabel: "Open Session Prep",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
       if (assignment.started_at) {
-        items.push({ date: assignment.started_at, label: "Started worksheet", detail: title })
+        items.push({
+          id: `worksheet-started-${assignment.id}`,
+          date: assignment.started_at,
+          label: "Homework started",
+          detail: title,
+          type: "homework",
+          actionLabel: "Open Session Prep",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
       if (assignment.completed_at) {
-        items.push({ date: assignment.completed_at, label: "Completed worksheet", detail: title })
+        items.push({
+          id: `worksheet-completed-${assignment.id}`,
+          date: assignment.completed_at,
+          label: "Homework completed",
+          detail: title,
+          type: "homework",
+          actionLabel: "Open Session Prep",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
+        })
       }
     })
 
@@ -500,31 +595,91 @@ export default function SessionPrepPage() {
       const responseDate = response.updated_at || response.created_at
       if (responseText && responseDate) {
         items.push({
+          id: `worksheet-response-${response.id}`,
           date: responseDate,
-          label: "Submitted reflection",
+          label: "Reflection submitted",
           detail: worksheetTitleById.get(response.assignment_id) || "Worksheet response",
+          type: "reflections",
+          actionLabel: "View",
+          actionHref: `/dashboard/clients/${clientId}/session-prep`,
         })
       }
     })
 
     clientReflections.forEach((reflection) => {
       items.push({
+        id: `reflection-${reflection.id}`,
         date: reflection.created_at,
-        label: "Submitted reflection",
+        label: "Reflection submitted",
         detail: reflection.title || "Reflection journal entry",
+        type: "reflections",
+        actionLabel: "View",
+        actionHref: "/dashboard/reflections",
       })
     })
 
     moodCheckIns.forEach((checkIn) => {
       items.push({
+        id: `mood-${checkIn.id}`,
         date: checkIn.created_at,
         label: "Mood check-in",
         detail: `Mood ${checkIn.mood_rating}/10${checkIn.note ? `: ${checkIn.note}` : ""}`,
+        type: "mood",
+        actionLabel: "Open Session Prep",
+        actionHref: `/dashboard/clients/${clientId}/session-prep`,
       })
     })
 
-    return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20)
-  }, [assignments, clientRecord, clientReflections, moodCheckIns, worksheetAssignments, worksheetResponses, worksheetTitleById])
+    progressNotes.forEach((progressNote) => {
+      items.push({
+        id: `progress-note-${progressNote.id}`,
+        date: progressNote.created_at,
+        label: "Session note",
+        detail: `${progressNote.note_type || "Progress"} note saved${progressNote.subjective ? `: ${progressNote.subjective}` : ""}`,
+        type: "notes",
+        actionLabel: "Open Session Prep",
+        actionHref: `/dashboard/clients/${clientId}/session-prep#progress-notes`,
+      })
+    })
+
+    if (sessionPrepNote?.note && (sessionPrepNote.updated_at || sessionPrepNote.created_at)) {
+      items.push({
+        id: `therapist-note-${sessionPrepNote.id}`,
+        date: sessionPrepNote.updated_at || sessionPrepNote.created_at!,
+        label: "Therapist note",
+        detail: sessionPrepNote.note,
+        type: "notes",
+        actionLabel: "Open Session Prep",
+        actionHref: `/dashboard/clients/${clientId}/session-prep#progress-notes`,
+      })
+    }
+
+    sessionSummaries.forEach((summary) => {
+      items.push({
+        id: `session-summary-${summary.id}`,
+        date: summary.created_at,
+        label: "AI session summary generated",
+        detail: summary.summary_json?.clientOverview || summary.summary_text || "AI session prep summary generated from existing client data.",
+        type: "ai",
+        actionLabel: "View",
+        actionHref: `/dashboard/clients/${clientId}/session-prep#ai-summary`,
+      })
+    })
+
+    return items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [
+    assignments,
+    clientId,
+    clientRecord,
+    clientReflections,
+    moodCheckIns,
+    progressNotes,
+    sessionPrepNote,
+    sessionSummaries,
+    worksheetAssignments,
+    worksheetResponses,
+    worksheetTitleById,
+  ])
 
   const buildProgressNoteContext = () => {
     const recentCompletedAssignments = [
@@ -557,7 +712,7 @@ export default function SessionPrepPage() {
         : ["- None"]),
       "Recent activity:",
       ...(timeline.length > 0
-        ? timeline.slice(0, 5).map((item) => `- ${item.label}: ${item.detail} (${formatDateTime(item.date)})`)
+        ? [...timeline].reverse().slice(0, 5).map((item) => `- ${item.label}: ${item.detail} (${formatDateTime(item.date)})`)
         : ["- None"]),
     ]
 
@@ -611,7 +766,7 @@ export default function SessionPrepPage() {
 
       if (insertError) throwQueryError("progress_notes insert failed", insertError)
 
-      setProgressNotes((current) => [data as ProgressNote, ...current].slice(0, 5))
+      setProgressNotes((current) => [data as ProgressNote, ...current].slice(0, 50))
       setSuccess("Progress note saved.")
       setIsProgressNoteOpen(false)
     } catch (err) {
@@ -661,7 +816,7 @@ export default function SessionPrepPage() {
         throw new Error("Session summary was not returned.")
       }
 
-      setSessionSummaries((current) => [result.summary as SessionSummaryRecord, ...current].slice(0, 5))
+      setSessionSummaries((current) => [result.summary as SessionSummaryRecord, ...current].slice(0, 25))
       setSuccess("Session summary generated.")
     } catch (err) {
       console.error("[v0] Session Prep: failed to generate session summary", err)
@@ -710,7 +865,7 @@ export default function SessionPrepPage() {
           .update({ note })
           .eq("id", existingNoteId)
           .eq("therapist_id", therapistId)
-          .select("id, note")
+          .select("id, note, created_at, updated_at")
           .maybeSingle()
 
         if (updateError) {
@@ -725,11 +880,12 @@ export default function SessionPrepPage() {
 
         setNoteId(updatedNote.id)
         setNote(updatedNote.note || "")
+        setSessionPrepNote(updatedNote as SessionPrepNote)
       } else {
         const { data, error: insertError } = await supabase
           .from("session_prep_notes")
           .insert(notePayload)
-          .select("id, note")
+          .select("id, note, created_at, updated_at")
           .single()
 
         if (insertError) {
@@ -739,6 +895,7 @@ export default function SessionPrepPage() {
 
         setNoteId(data.id)
         setNote(data.note || "")
+        setSessionPrepNote(data as SessionPrepNote)
       }
 
       setSuccess("Session notes saved.")
@@ -785,10 +942,18 @@ export default function SessionPrepPage() {
     ...clientReflections.map((reflection) => reflection.created_at),
     ...moodCheckIns.map((checkIn) => checkIn.created_at),
     ...progressNotes.map((progressNote) => progressNote.created_at),
+    sessionPrepNote?.updated_at,
+    sessionPrepNote?.created_at,
     ...sessionSummaries.map((summary) => summary.created_at),
   ].filter(Boolean) as string[]
   const lastActivityAt = activityDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null
   const daysSinceLastActivity = getRelativeDays(lastActivityAt)
+  const timeInTreatmentDays = getRelativeDays(clientRecord?.created_at)
+  const timeInTreatmentLabel = timeInTreatmentDays === null
+    ? "Not available"
+    : timeInTreatmentDays < 30
+      ? `${timeInTreatmentDays} days`
+      : `${Math.floor(timeInTreatmentDays / 30)} mo ${timeInTreatmentDays % 30} days`
   const reflectionRate = totalAssignments > 0 ? Math.round((journalReflectionCount / totalAssignments) * 100) : null
   const engagementScore = Math.min(
     100,
@@ -838,6 +1003,17 @@ export default function SessionPrepPage() {
     })),
   ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
   const latestReflection = clientReflections[0] || null
+  const filteredJourneyItems = journeyFilter === "all"
+    ? timeline
+    : timeline.filter((item) => item.type === journeyFilter)
+  const journeyFilters: { value: JourneyFilter; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "homework", label: "Homework" },
+    { value: "reflections", label: "Reflections" },
+    { value: "mood", label: "Mood" },
+    { value: "notes", label: "Notes" },
+    { value: "ai", label: "AI" },
+  ]
 
   return (
     <div className="max-w-[1500px] space-y-6">
@@ -902,6 +1078,13 @@ export default function SessionPrepPage() {
         <MetricCard title="Days Since Activity" value={daysSinceLastActivity !== null ? String(daysSinceLastActivity) : "--"} detail={formatRelativeActivity(lastActivityAt)} icon={Clock} tone={daysSinceLastActivity !== null && daysSinceLastActivity >= 14 ? "red" : "slate"} />
       </div>
 
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-slate-100 p-1 sm:w-auto sm:inline-grid">
+          <TabsTrigger value="overview" className="rounded-xl">Overview</TabsTrigger>
+          <TabsTrigger value="journey" className="rounded-xl">Journey</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-0">
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.25fr_0.85fr]">
         <div className="space-y-6">
           <Card className="rounded-[1.75rem]">
@@ -916,7 +1099,7 @@ export default function SessionPrepPage() {
                 <EmptyPanel icon={Clock} title="No client activity yet." description="Sessions, homework, reflections, mood check-ins, and summaries will appear here." />
               ) : (
                 <div className="space-y-0">
-                  {timeline.slice(0, 12).map((item, index) => (
+                  {[...timeline].reverse().slice(0, 12).map((item, index) => (
                     <TimelineRow key={`${item.date}-${item.label}-${index}`} item={item} />
                   ))}
                 </div>
@@ -1011,7 +1194,7 @@ export default function SessionPrepPage() {
           </div>
 
           {latestSessionSummary && (
-            <Card className="rounded-[1.75rem]">
+            <Card id="ai-summary" className="rounded-[1.75rem]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Sparkles className="w-5 h-5 text-primary" />
@@ -1123,6 +1306,71 @@ export default function SessionPrepPage() {
           </Card>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="journey" className="mt-0 space-y-6">
+          <JourneySummaryPanel
+            timeInTreatment={timeInTreatmentLabel}
+            completionRate={totalAssignments > 0 ? `${completionRate}%` : "--"}
+            reflectionRate={reflectionRate !== null ? `${reflectionRate}%` : "--"}
+            moodTrend={moodTrend}
+            engagementScore={engagementScore}
+            totalEvents={timeline.length}
+          />
+
+          <Card className="rounded-[1.75rem]">
+            <CardHeader className="gap-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CalendarClock className="w-5 h-5 text-primary" />
+                    Treatment Journey
+                  </CardTitle>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Chronological timeline built from existing therapist-owned client activity.
+                  </p>
+                </div>
+                <Button variant="outline" className="rounded-xl" asChild>
+                  <Link href={`/dashboard/clients/${clientId}/session-prep#progress-notes`}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Therapist Note
+                  </Link>
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {journeyFilters.map((filter) => (
+                  <Button
+                    key={filter.value}
+                    type="button"
+                    variant={journeyFilter === filter.value ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => setJourneyFilter(filter.value)}
+                  >
+                    {filter.value === journeyFilter && <ListFilter className="mr-2 h-3.5 w-3.5" />}
+                    {filter.label}
+                  </Button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredJourneyItems.length === 0 ? (
+                <EmptyPanel
+                  icon={CalendarClock}
+                  title="No journey events in this filter."
+                  description="Events appear here when existing homework, reflections, mood, notes, or AI summaries are available for this client."
+                />
+              ) : (
+                <div className="space-y-0">
+                  {filteredJourneyItems.map((item) => (
+                    <TimelineRow key={item.id} item={item} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={isProgressNoteOpen} onOpenChange={setIsProgressNoteOpen}>
         <DialogContent className="sm:max-w-3xl rounded-2xl max-h-[90vh] overflow-y-auto">
@@ -1301,19 +1549,115 @@ function EmptyPanel({
   )
 }
 
+function JourneySummaryPanel({
+  timeInTreatment,
+  completionRate,
+  reflectionRate,
+  moodTrend,
+  engagementScore,
+  totalEvents,
+}: {
+  timeInTreatment: string
+  completionRate: string
+  reflectionRate: string
+  moodTrend: string
+  engagementScore: number
+  totalEvents: number
+}) {
+  const items = [
+    { label: "Time in treatment", value: timeInTreatment, detail: `${totalEvents} journey events`, icon: CalendarClock, tone: "slate" as const },
+    { label: "Homework completion", value: completionRate, detail: "Assigned homework completed", icon: CheckCircle2, tone: "green" as const },
+    { label: "Reflection rate", value: reflectionRate, detail: "Reflections per assignment", icon: MessageSquare, tone: "purple" as const },
+    { label: "Mood trend", value: moodTrend, detail: "Recent check-in direction", icon: moodTrend === "declining" ? TrendingDown : TrendingUp, tone: moodTrend === "declining" ? "red" as const : "amber" as const },
+    { label: "Engagement score", value: `${engagementScore}/100`, detail: "Homework, mood, reflection, recency", icon: BarChart3, tone: "green" as const },
+  ]
+
+  return (
+    <Card className="rounded-[1.75rem] border-slate-200/80 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Sparkles className="w-5 h-5 text-primary" />
+          Journey Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {items.map((item) => {
+            const Icon = item.icon
+            const toneClass = item.tone === "green"
+              ? "bg-[#18B7A0]/10 text-[#0F8D7E]"
+              : item.tone === "purple"
+                ? "bg-primary/10 text-primary"
+                : item.tone === "red"
+                  ? "bg-red-500/10 text-red-700"
+                  : item.tone === "amber"
+                    ? "bg-amber-500/10 text-amber-700"
+                    : "bg-slate-100 text-slate-600"
+
+            return (
+              <div key={item.label} className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
+                <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</p>
+                <p className="mt-1 text-2xl font-bold capitalize text-slate-950">{item.value}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function TimelineRow({ item }: { item: TimelineItem }) {
+  const Icon = item.type === "mood"
+    ? BarChart3
+    : item.type === "ai"
+      ? Sparkles
+      : item.type === "reflections"
+        ? MessageSquare
+        : item.type === "notes"
+          ? StickyNote
+          : item.type === "homework"
+            ? ClipboardCheck
+            : CalendarClock
+
+  const toneClass = item.type === "mood"
+    ? "bg-amber-500/10 text-amber-700"
+    : item.type === "ai"
+      ? "bg-primary/10 text-primary"
+      : item.type === "reflections"
+        ? "bg-[#6D5EF5]/10 text-[#6D5EF5]"
+        : item.type === "notes"
+          ? "bg-slate-100 text-slate-600"
+          : item.type === "homework"
+            ? "bg-[#18B7A0]/10 text-[#0F8D7E]"
+            : "bg-white text-primary"
+
   return (
     <div className="group relative flex gap-3 pb-5 last:pb-0">
       <div className="absolute left-5 top-10 h-[calc(100%-2.5rem)] w-px bg-slate-200 group-last:hidden" />
-      <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-primary shadow-sm">
-        {item.label.toLowerCase().includes("mood") ? <BarChart3 className="h-4 w-4" /> : item.label.toLowerCase().includes("summary") ? <Sparkles className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+      <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 shadow-sm ${toneClass}`}>
+        <Icon className="h-4 w-4" />
       </div>
-      <div className="min-w-0 flex-1 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-3">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-950">{item.label}</p>
-          <p className="shrink-0 text-xs text-slate-400">{formatDate(item.date)}</p>
+      <div className="min-w-0 flex-1 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4 transition-colors hover:bg-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+              <Badge variant="outline" className="rounded-full capitalize">{item.type === "all" ? "Client" : item.type}</Badge>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">{formatDateTime(item.date)}</p>
+            <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{item.detail}</p>
+          </div>
+          {item.actionHref && item.actionLabel && (
+            <Button variant="outline" size="sm" className="shrink-0 rounded-xl" asChild>
+              <Link href={item.actionHref}>{item.actionLabel}</Link>
+            </Button>
+          )}
         </div>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.detail}</p>
       </div>
     </div>
   )

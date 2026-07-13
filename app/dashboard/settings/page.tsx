@@ -21,14 +21,17 @@ import { getTherapistId } from "@/lib/auth/check-user-role"
 import { 
   User,
   Bell,
+  CalendarDays,
   Shield,
   CreditCard,
+  ExternalLink,
   HelpCircle,
   Loader2,
   CheckCircle2,
   AlertCircle,
   Upload,
-  Copy
+  Copy,
+  Unplug
 } from "lucide-react"
 
 type TherapistRecord = Record<string, unknown> & {
@@ -57,6 +60,17 @@ type MfaEnrollment = {
     secret: string
     uri: string
   }
+}
+
+type CalendarConnection = {
+  id: string
+  provider: string
+  provider_account_email: string | null
+  calendar_id: string
+  scopes: string[] | null
+  generate_ai_prep_overnight: boolean
+  connected_at: string
+  updated_at: string
 }
 
 function splitFullName(fullName: string | null | undefined) {
@@ -94,6 +108,10 @@ export default function SettingsPage() {
   const [isManagingMfa, setIsManagingMfa] = useState(false)
   const [mfaError, setMfaError] = useState<string | null>(null)
   const [mfaSuccess, setMfaSuccess] = useState<string | null>(null)
+  const [calendarConnection, setCalendarConnection] = useState<CalendarConnection | null>(null)
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false)
+  const [isCalendarManaging, setIsCalendarManaging] = useState(false)
+  const [calendarError, setCalendarError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -135,6 +153,7 @@ export default function SettingsPage() {
         setCredentials(record?.credentials || "")
         setProfilePhotoUrl(getPhotoUrl(record))
         await loadMfaStatus()
+        await loadCalendarConnection()
       } catch (err) {
         console.error("[v0] Settings: failed to load therapist", err)
         setError(err instanceof Error ? err.message : "Failed to load settings")
@@ -146,10 +165,149 @@ export default function SettingsPage() {
     loadTherapist()
   }, [])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const calendarStatus = params.get("calendar")
+    const message = params.get("message")
+
+    if (calendarStatus === "connected") {
+      setSuccess("Google Calendar connected.")
+      window.history.replaceState({}, "", "/dashboard/settings")
+    } else if (calendarStatus === "error") {
+      setCalendarError(message || "Google Calendar connection failed.")
+      window.history.replaceState({}, "", "/dashboard/settings")
+    }
+  }, [])
+
   const getAuthHeader = async () => {
     const supabase = getClient()
     const { data: { session } } = await supabase.auth.getSession()
     return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : null
+  }
+
+  const loadCalendarConnection = async () => {
+    setIsCalendarLoading(true)
+    setCalendarError(null)
+
+    try {
+      const authHeader = await getAuthHeader()
+      if (!authHeader) return
+
+      const response = await fetch("/api/calendar/connection", {
+        headers: authHeader,
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        setCalendarError(result?.error || "Failed to load calendar connection.")
+        return
+      }
+
+      setCalendarConnection(result?.connection || null)
+    } catch (err) {
+      setCalendarError(err instanceof Error ? err.message : "Failed to load calendar connection.")
+    } finally {
+      setIsCalendarLoading(false)
+    }
+  }
+
+  const connectGoogleCalendar = async () => {
+    setIsCalendarManaging(true)
+    setCalendarError(null)
+    setSuccess(null)
+
+    try {
+      const authHeader = await getAuthHeader()
+      if (!authHeader) {
+        setCalendarError("You must be logged in to connect Google Calendar.")
+        return
+      }
+
+      const response = await fetch("/api/calendar/google/start", {
+        method: "POST",
+        headers: authHeader,
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok || !result?.authUrl) {
+        setCalendarError(result?.error || "Failed to start Google Calendar connection.")
+        return
+      }
+
+      window.location.href = result.authUrl
+    } catch (err) {
+      setCalendarError(err instanceof Error ? err.message : "Failed to connect Google Calendar.")
+    } finally {
+      setIsCalendarManaging(false)
+    }
+  }
+
+  const disconnectGoogleCalendar = async () => {
+    setIsCalendarManaging(true)
+    setCalendarError(null)
+    setSuccess(null)
+
+    try {
+      const authHeader = await getAuthHeader()
+      if (!authHeader) {
+        setCalendarError("You must be logged in to disconnect Google Calendar.")
+        return
+      }
+
+      const response = await fetch("/api/calendar/connection", {
+        method: "DELETE",
+        headers: authHeader,
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        setCalendarError(result?.error || "Failed to disconnect Google Calendar.")
+        return
+      }
+
+      setCalendarConnection(null)
+      setSuccess("Google Calendar disconnected.")
+    } catch (err) {
+      setCalendarError(err instanceof Error ? err.message : "Failed to disconnect Google Calendar.")
+    } finally {
+      setIsCalendarManaging(false)
+    }
+  }
+
+  const updateOvernightPrep = async (enabled: boolean) => {
+    if (!calendarConnection) return
+
+    setIsCalendarManaging(true)
+    setCalendarError(null)
+
+    try {
+      const authHeader = await getAuthHeader()
+      if (!authHeader) {
+        setCalendarError("You must be logged in to update calendar settings.")
+        return
+      }
+
+      const response = await fetch("/api/calendar/connection", {
+        method: "PATCH",
+        headers: {
+          ...authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ generateAiPrepOvernight: enabled }),
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        setCalendarError(result?.error || "Failed to update calendar setting.")
+        return
+      }
+
+      setCalendarConnection(result?.connection || null)
+    } catch (err) {
+      setCalendarError(err instanceof Error ? err.message : "Failed to update calendar setting.")
+    } finally {
+      setIsCalendarManaging(false)
+    }
   }
 
   const loadMfaStatus = async () => {
@@ -627,6 +785,92 @@ export default function SettingsPage() {
               </div>
               <Switch />
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-primary" />
+              Connected Calendars
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isCalendarLoading ? (
+              <div className="flex items-center gap-2 rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading calendar connection...
+              </div>
+            ) : calendarConnection ? (
+              <>
+                <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Google Calendar connected</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {calendarConnection.provider_account_email || "Google account"} · read-only upcoming events
+                      </p>
+                    </div>
+                    <Button variant="outline" className="rounded-xl" asChild>
+                      <Link href="/dashboard/calendar">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View Calendar
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Generate AI Prep Overnight</p>
+                    <p className="text-xs text-muted-foreground">
+                      Queue prep generation for matched upcoming sessions. Automation wiring can run from this saved preference.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={calendarConnection.generate_ai_prep_overnight}
+                    onCheckedChange={updateOvernightPrep}
+                    disabled={isCalendarManaging}
+                  />
+                </div>
+
+                <Separator />
+
+                <Button
+                  variant="outline"
+                  className="rounded-xl text-destructive hover:text-destructive"
+                  onClick={disconnectGoogleCalendar}
+                  disabled={isCalendarManaging}
+                >
+                  {isCalendarManaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Unplug className="mr-2 h-4 w-4" />}
+                  Disconnect Google Calendar
+                </Button>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-5">
+                <p className="text-sm font-semibold text-foreground">No calendar connected</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  Connect Google Calendar to show today&apos;s sessions, tomorrow&apos;s sessions, and the upcoming week inside ShrinkAid.
+                </p>
+                <Button className="mt-4 rounded-xl" onClick={connectGoogleCalendar} disabled={isCalendarManaging}>
+                  {isCalendarManaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarDays className="mr-2 h-4 w-4" />}
+                  Connect Google Calendar
+                </Button>
+              </div>
+            )}
+
+            {calendarError && (
+              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {calendarError}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

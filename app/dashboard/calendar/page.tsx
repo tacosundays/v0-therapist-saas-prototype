@@ -87,6 +87,37 @@ type PrepClient = {
   readyReasons: string[]
 }
 
+type CalendarSessionEvent = {
+  id: string
+  title: string
+  description: string | null
+  location: string | null
+  htmlLink: string | null
+  start: { dateTime?: string; date?: string; timeZone?: string }
+  end: { dateTime?: string; date?: string; timeZone?: string }
+  matchedClient: { id: string; name: string } | null
+  prep: {
+    homeworkStatus: string
+    reflectionStatus: string
+    moodStatus: string
+    lastActivityAt: string | null
+  } | null
+}
+
+type CalendarEventsPayload = {
+  connected: boolean
+  connection?: {
+    providerAccountEmail: string | null
+    generateAiPrepOvernight: boolean
+    connectedAt: string
+  }
+  sections: {
+    today: CalendarSessionEvent[]
+    tomorrow: CalendarSessionEvent[]
+    upcomingWeek: CalendarSessionEvent[]
+  }
+}
+
 const toneClasses = {
   green: "bg-emerald-50 text-emerald-600 border-emerald-200/70",
   amber: "bg-amber-50 text-amber-700 border-amber-200/70",
@@ -115,6 +146,27 @@ function formatTimestamp(value: string | null) {
   if (diffHours < 24) return `${diffHours}h ago`
 
   return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })
+}
+
+function formatEventTime(event: CalendarSessionEvent) {
+  const value = event.start.dateTime || event.start.date
+  if (!value) return "Time unavailable"
+  const date = new Date(value)
+  if (event.start.date && !event.start.dateTime) return "All day"
+  return date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function formatEventDate(event: CalendarSessionEvent) {
+  const value = event.start.dateTime || event.start.date
+  if (!value) return "Date unavailable"
+  return new Date(value).toLocaleDateString(undefined, {
+    weekday: "short",
     month: "short",
     day: "numeric",
   })
@@ -257,12 +309,112 @@ function PrepClientCard({ prepClient }: { prepClient: PrepClient }) {
   )
 }
 
+function CalendarEventCard({ event }: { event: CalendarSessionEvent }) {
+  const prep = event.prep
+
+  return (
+    <div className="rounded-[28px] border border-slate-200/75 bg-white p-5 shadow-[0_16px_44px_rgba(15,23,42,0.045)]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+            <Clock className="h-3.5 w-3.5" />
+            {formatEventDate(event)} · {formatEventTime(event)}
+          </div>
+          <p className="mt-2 truncate text-base font-bold text-slate-950">{event.title}</p>
+          {event.location && <p className="mt-1 text-sm text-slate-500">{event.location}</p>}
+        </div>
+        {event.matchedClient ? (
+          <Button
+            asChild
+            className="h-10 shrink-0 rounded-2xl bg-[#6D5EF5] px-4 text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]"
+          >
+            <Link href={`/dashboard/clients/${event.matchedClient.id}/session-prep`}>
+              Open Session Prep
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        ) : event.htmlLink ? (
+          <Button asChild variant="outline" className="h-10 shrink-0 rounded-2xl">
+            <a href={event.htmlLink} target="_blank" rel="noreferrer">View</a>
+          </Button>
+        ) : null}
+      </div>
+
+      {event.matchedClient ? (
+        <>
+          <div className="mt-4 rounded-2xl border border-[#18B7A0]/20 bg-[#18B7A0]/10 p-3">
+            <p className="text-sm font-semibold text-[#0F8D7E]">Matched to {event.matchedClient.name}</p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                Homework
+              </div>
+              <StatusPill label={prep?.homeworkStatus || "No homework"} tone={prep?.homeworkStatus?.includes("ready") ? "green" : prep?.homeworkStatus?.includes("pending") ? "amber" : "slate"} />
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                <MessageSquare className="h-3.5 w-3.5" />
+                Reflections
+              </div>
+              <StatusPill label={prep?.reflectionStatus || "None yet"} tone={prep?.reflectionStatus === "Submitted" ? "green" : "slate"} />
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Mood
+              </div>
+              <StatusPill label={prep?.moodStatus || "No check-in"} tone={prep?.moodStatus === "Needs review" ? "red" : prep?.moodStatus?.startsWith("Mood") ? "teal" : "slate"} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm leading-6 text-slate-500">
+          No existing client matched this calendar event by name.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function CalendarSessionSection({
+  eyebrow,
+  title,
+  icon,
+  events,
+  emptyTitle,
+  emptyDescription,
+}: {
+  eyebrow: string
+  title: string
+  icon: LucideIcon
+  events: CalendarSessionEvent[]
+  emptyTitle: string
+  emptyDescription: string
+}) {
+  return (
+    <SectionCard eyebrow={eyebrow} title={title} icon={icon}>
+      {events.length > 0 ? (
+        <div className="space-y-4">
+          {events.map((event) => (
+            <CalendarEventCard key={event.id} event={event} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState title={emptyTitle} description={emptyDescription} icon={icon} />
+      )}
+    </SectionCard>
+  )
+}
+
 export default function CalendarPage() {
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignmentRecord[]>([])
   const [reflections, setReflections] = useState<ReflectionRecord[]>([])
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckInRecord[]>([])
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventsPayload | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -282,6 +434,13 @@ export default function CalendarPage() {
           setError("No therapist account found for your email.")
           return
         }
+
+        const { data: { session } } = await supabase.auth.getSession()
+        const calendarEventsPromise = session?.access_token
+          ? fetch("/api/calendar/events", {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            }).then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+          : Promise.resolve({ ok: true, payload: null })
 
         const [clientsResult, assignmentsResult, worksheetResult, reflectionsResult, moodResult] = await Promise.all([
           supabase
@@ -317,11 +476,15 @@ export default function CalendarPage() {
         if (reflectionsResult.error) throw reflectionsResult.error
         if (moodResult.error) throw moodResult.error
 
+        const calendarResult = await calendarEventsPromise
+        if (!calendarResult.ok) throw new Error(calendarResult.payload?.error || "Failed to load Google Calendar events.")
+
         setClients(clientsResult.data || [])
         setAssignments(assignmentsResult.data || [])
         setWorksheetAssignments(worksheetResult.data || [])
         setReflections(reflectionsResult.data || [])
         setMoodCheckIns(moodResult.data || [])
+        setCalendarEvents(calendarResult.payload || null)
       } catch (err) {
         console.error("[v0] Calendar: failed to load", err)
         setError(err instanceof Error ? err.message : "Failed to load calendar.")
@@ -405,6 +568,10 @@ export default function CalendarPage() {
   const homeworkReadyCount = prepClients.filter((client) => client.homeworkTone === "green").length
   const reflectionReadyCount = prepClients.filter((client) => client.reflectionTone === "green").length
   const moodAlertCount = prepClients.filter((client) => client.moodTone === "red").length
+  const connectedCalendarEvents = calendarEvents?.connected ? calendarEvents : null
+  const todaySessions = connectedCalendarEvents?.sections.today || []
+  const tomorrowSessions = connectedCalendarEvents?.sections.tomorrow || []
+  const upcomingWeekSessions = connectedCalendarEvents?.sections.upcomingWeek || []
 
   return (
     <div className="space-y-8">
@@ -429,7 +596,7 @@ export default function CalendarPage() {
             </div>
             <div className="grid grid-cols-3 gap-3 lg:w-[520px]">
               {[
-                { label: "Prep ready", value: prepReadyClients.length, icon: Sparkles, tone: "purple" as const },
+                { label: "Today", value: todaySessions.length, icon: CalendarClock, tone: "purple" as const },
                 { label: "Homework", value: homeworkReadyCount, icon: ClipboardCheck, tone: "green" as const },
                 { label: "Mood alerts", value: moodAlertCount, icon: AlertTriangle, tone: "red" as const },
               ].map((stat) => {
@@ -464,22 +631,49 @@ export default function CalendarPage() {
       {!isLoading && !error && (
         <>
           <div className="grid gap-6 xl:grid-cols-2">
-            <SectionCard eyebrow="Today" title="Today&apos;s Schedule" icon={CalendarClock}>
+            {connectedCalendarEvents ? (
+              <>
+                <CalendarSessionSection
+                  eyebrow="Today"
+                  title="Today's Sessions"
+                  icon={CalendarClock}
+                  events={todaySessions}
+                  emptyTitle="No sessions today"
+                  emptyDescription="Google Calendar is connected, but no events were found for today."
+                />
+                <CalendarSessionSection
+                  eyebrow="Tomorrow"
+                  title="Tomorrow's Sessions"
+                  icon={CalendarDays}
+                  events={tomorrowSessions}
+                  emptyTitle="No sessions tomorrow"
+                  emptyDescription="Google Calendar is connected, but no events were found for tomorrow."
+                />
+              </>
+            ) : (
+              <SectionCard eyebrow="Connect" title="Google Calendar disconnected" icon={CalendarDays}>
               <EmptyState
-                title="No scheduled sessions found"
-                description="No existing session-time field was found in the app data, so this schedule stays empty until calendar data exists."
+                title="Connect Google Calendar to show sessions"
+                description="Upcoming sessions will appear here after Google Calendar is connected in Settings."
                 icon={CalendarDays}
               />
+              <Button className="mt-4 rounded-2xl" asChild>
+                <Link href="/dashboard/settings">Open Settings</Link>
+              </Button>
             </SectionCard>
-
-            <SectionCard eyebrow="Next" title="Upcoming Sessions" icon={Clock}>
-              <EmptyState
-                title="No upcoming session times available"
-                description="Client prep can still happen below using homework, reflections, and mood check-ins already in ShrinkAid."
-                icon={Clock}
-              />
-            </SectionCard>
+            )}
           </div>
+
+          {connectedCalendarEvents && (
+            <CalendarSessionSection
+              eyebrow="Upcoming"
+              title="Upcoming Week"
+              icon={Clock}
+              events={upcomingWeekSessions}
+              emptyTitle="No more sessions this week"
+              emptyDescription="Google Calendar is connected, but no additional events were found in the next week."
+            />
+          )}
 
           <SectionCard eyebrow="Prep" title="Session Prep Ready" icon={Sparkles}>
             {prepReadyClients.length > 0 ? (

@@ -7,17 +7,28 @@ import { Button } from "@/components/ui/button"
 import { 
   CalendarClock,
   CheckCircle2, 
+  ClipboardCheck,
+  FileText,
   Plus,
   ArrowRight,
   Loader2,
   AlertTriangle,
   Sparkles,
+  UserPlus,
+  Users,
   type LucideIcon,
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { getClient } from "@/lib/supabase/client"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { getTherapistId } from "@/lib/auth/check-user-role"
+import type { User } from "@supabase/supabase-js"
 
 interface Client {
   id: string
@@ -100,6 +111,7 @@ type ClientWorkspaceSummary = {
 }
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignment[]>([])
@@ -222,6 +234,7 @@ export default function DashboardPage() {
     const loadDashboard = async () => {
       const supabase = getClient()
       const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
 
       if (!user) {
         setIsLoading(false)
@@ -253,6 +266,18 @@ export default function DashboardPage() {
     })
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good morning"
+    if (hour < 18) return "Good afternoon"
+    return "Good evening"
+  }
+
+  const displayName = user?.user_metadata?.first_name
+    || user?.user_metadata?.full_name?.split(" ")?.[0]
+    || user?.email?.split("@")[0]
+    || "there"
+
   // Get latest reflections
   const latestReflections = assignments
     .filter(a => a.reflection && a.completed_at)
@@ -265,7 +290,6 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     .slice(0, 3)
 
-  const submittedReflections = clientReflections.length + latestReflections.length
   const homeworkWaitingCount = recentlyCompletedWorksheets.length + latestReflections.length
 
   const getLatestActivityAt = (client: Client, clientAssignments: Assignment[], clientWorksheetAssignments: WorksheetAssignment[]) => {
@@ -455,7 +479,23 @@ export default function DashboardPage() {
       detail: item.reasons.slice(0, 2).join(" · "),
       href: "/dashboard/couples",
     })),
-  ].slice(0, 4)
+  ].slice(0, 3)
+
+  const moodAlertClientIds = new Set<string>()
+  moodCheckIns.forEach((checkIn) => {
+    if (moodAlertClientIds.has(checkIn.client_id)) return
+    if (checkIn.mood_rating < 4 || (checkIn.anxiety_rating || 0) > 8) {
+      moodAlertClientIds.add(checkIn.client_id)
+    }
+  })
+  const moodAlertCount = moodAlertClientIds.size
+  const estimatedReviewTime = Math.max(
+    5,
+    (sessionPrepQueue.length * 3)
+    + (homeworkWaitingCount * 2)
+    + (moodAlertCount * 3)
+    + (attentionItems.length * 2),
+  )
 
   const nextBestAction = homeworkWaitingForReview.length > 0
     ? "Review completed homework"
@@ -465,76 +505,98 @@ export default function DashboardPage() {
         ? "Invite your first client"
         : "Assign homework"
 
-  const simplifiedStats = [
-    { label: "Sessions Today", value: sessionPrepQueue.length.toString(), icon: CalendarClock, detail: "Ready for session prep" },
-    { label: "Needs Review", value: homeworkWaitingForReview.length.toString(), icon: CheckCircle2, detail: "Homework or reflections waiting" },
-    { label: "Clients Requiring Attention", value: attentionItems.length.toString(), icon: AlertTriangle, detail: "Follow-up recommended" },
-  ]
-
   return (
-    <div className="space-y-12">
-      <div className="flex flex-col gap-5 rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-10">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="saas-eyebrow mb-2">Dashboard</p>
           <motion.h1
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-2xl font-bold tracking-tight text-slate-950"
           >
-            What should I do next?
+            {getGreeting()}, {displayName}
           </motion.h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Next best action: <span className="font-semibold text-primary">{nextBestAction}</span>
-          </p>
+          <p className="mt-1 text-sm text-slate-500">What should I work on first today?</p>
         </div>
-        <Button className="h-11 rounded-xl" onClick={() => setIsAddModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="h-11 rounded-xl">
+              <Plus className="mr-2 h-4 w-4" />
+              New
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 rounded-xl">
+            <DropdownMenuItem onClick={() => setIsAddModalOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Client
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/clients">
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Homework
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/library">
+                <FileText className="mr-2 h-4 w-4" />
+                Worksheet
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/team">
+                <Users className="mr-2 h-4 w-4" />
+                Team Member
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <section className="grid gap-5 md:grid-cols-3">
-        {simplifiedStats.map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.06 }}
-          >
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                    <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{stat.value}</p>
-                    <p className="mt-2 text-xs text-slate-500">{stat.detail}</p>
-                  </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </section>
+      <Card className="bg-[#0F172A] text-white">
+        <CardContent className="p-6">
+          <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr_auto] lg:items-center">
+            <div>
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#18B7A0]">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">AI Daily Brief</p>
+              <h2 className="mt-2 text-xl font-bold tracking-tight text-white">{nextBestAction}</h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <BriefMetric label="Sessions today" value={sessionPrepQueue.length} />
+              <BriefMetric label="Homework waiting" value={homeworkWaitingCount} />
+              <BriefMetric label="Mood alerts" value={moodAlertCount} />
+              <BriefMetric label="Review time" value={estimatedReviewTime} suffix="min" />
+            </div>
+            <Button className="bg-white text-slate-950 hover:bg-white/90" asChild>
+              <Link href={sessionPrepQueue[0] ? `/dashboard/clients/${sessionPrepQueue[0].client.id}/session-prep` : "/dashboard/inbox"}>
+                Start Daily Review
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-      <section className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-8 xl:grid-cols-[1fr_1fr]">
         <Card className="overflow-hidden border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               Needs Attention
             </CardTitle>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
-              {attentionItems.length === 0 ? "All clear" : `${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"}`}
-            </span>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/inbox">
+                View All
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {attentionItems.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No clients need attention today." description="Clients with inactivity, overdue work, mood drops, or review-ready homework will appear here." />
+              <EmptyState icon={CheckCircle2} title="No clients need attention today." description="Inactivity, mood alerts, and review-ready work will appear here." />
             ) : (
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-3">
                 {attentionItems.map((item) => (
                   <AttentionRow key={item.id} clientName={item.title} detail={item.detail} href={item.href} />
                 ))}
@@ -562,7 +624,7 @@ export default function DashboardPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : sessionPrepQueue.length === 0 ? (
-              <EmptyState icon={CalendarClock} title="No session prep items yet" description="Today's schedule and calendar-backed sessions belong on the Calendar page." />
+              <EmptyState icon={CalendarClock} title="No next sessions queued." description="Calendar-backed sessions and full schedule details live on the Calendar page." />
             ) : (
               <div className="space-y-3">
                 {sessionPrepQueue.slice(0, 3).map((item) => (
@@ -573,31 +635,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
-
-      <Card className="bg-[#0F172A] text-white">
-        <CardContent className="p-6">
-          <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr_auto] lg:items-center">
-            <div>
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#18B7A0]">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">AI Daily Brief</p>
-              <h2 className="mt-2 text-xl font-bold tracking-tight text-white">Session prep, review queue, and attention signals</h2>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <BriefMetric label="Homework waiting" value={homeworkWaitingCount} />
-              <BriefMetric label="Reflections" value={submittedReflections} />
-              <BriefMetric label="Attention" value={attentionItems.length} />
-            </div>
-            <Button className="bg-white text-slate-950 hover:bg-white/90" asChild>
-              <Link href={sessionPrepQueue[0] ? `/dashboard/clients/${sessionPrepQueue[0].client.id}/session-prep` : "/dashboard/inbox"}>
-                Start
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Invite Client Modal */}
       <AddClientModal
@@ -610,11 +647,11 @@ export default function DashboardPage() {
   )
 }
 
-function BriefMetric({ label, value }: { label: string; value: number }) {
+function BriefMetric({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
   return (
     <div className="rounded-2xl bg-white/10 px-4 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-white">{value}</p>
+      <p className="mt-1 text-2xl font-bold text-white">{value}{suffix ? <span className="ml-1 text-sm font-semibold text-white/55">{suffix}</span> : null}</p>
     </div>
   )
 }

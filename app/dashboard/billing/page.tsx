@@ -14,7 +14,10 @@ import {
   AlertCircle,
   ExternalLink,
   CheckCircle2,
-  Users
+  Users,
+  ChevronDown,
+  ChevronUp,
+  LifeBuoy
 } from "lucide-react"
 import { PRODUCTS, type Product } from "@/lib/products"
 import { getCheckoutAvailability, getSubscriptionStatus, createCustomerPortalSession, startSubscriptionCheckout, verifyAndActivateSubscription } from "@/app/actions/stripe"
@@ -50,6 +53,8 @@ export default function BillingPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [clientCount, setClientCount] = useState<number>(0)
   const [checkoutAvailability, setCheckoutAvailability] = useState<Record<string, boolean>>({})
+  const [showAllPlans, setShowAllPlans] = useState(false)
+  const [showChangePlans, setShowChangePlans] = useState(false)
   const hasVerified = useRef(false)
 
   // Get current user on mount
@@ -199,22 +204,46 @@ export default function BillingPage() {
   const hasSubscription = isActive || (isTrialing && currentPlan)
   const planLimits = getPlanLimits(currentPlan)
   const clientLimitDisplay = getClientLimitDisplay(currentPlan)
+  const recommendedPlan = PRODUCTS.find((product) => product.isPopular) || PRODUCTS[0]
+  const therapistSeatLimit = planLimits.therapistLimit === null ? "Unlimited" : planLimits.therapistLimit.toString()
+  const therapistSeatsUsed = currentPlan === "group-practice" ? 1 : 1
+  const periodEndLabel = subscriptionData?.subscription?.endDate
+    ? new Date(subscriptionData.subscription.endDate).toLocaleDateString()
+    : null
+  const trialEndLabel = subscriptionData?.subscription?.trialEndDate
+    ? new Date(subscriptionData.subscription.trialEndDate).toLocaleDateString()
+    : null
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-4">
+        <div className="saas-page-header">
+          <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-8 w-40 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-4 w-64 animate-pulse rounded bg-slate-100" />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index} className="rounded-2xl">
+              <CardContent className="p-5">
+                <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200" />
+                <div className="mt-4 h-8 w-1/2 animate-pulse rounded bg-slate-200" />
+                <div className="mt-4 h-3 w-2/3 animate-pulse rounded bg-slate-100" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="saas-page-header">
         <p className="saas-eyebrow mb-2">Subscription</p>
         <h1 className="text-3xl font-bold tracking-tight text-slate-950">Billing</h1>
-        <p className="mt-2 text-sm text-slate-500">Manage your subscription and billing</p>
+        <p className="mt-2 text-sm text-slate-500">Manage your plan, usage, and Stripe billing portal.</p>
       </div>
 
       {/* Success Message */}
@@ -263,151 +292,201 @@ export default function BillingPage() {
         </motion.div>
       )}
 
-      {/* Current Subscription Status */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid gap-6 md:grid-cols-2"
-      >
-        {/* Usage Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="w-5 h-5 text-primary" />
-              Usage
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-sm text-muted-foreground">Clients</span>
-                  <span className="text-sm font-medium">
-                    {clientCount} / {clientLimitDisplay}
+      {hasSubscription ? (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]"
+          >
+            <Card className="rounded-2xl border-slate-200/80">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Current Plan
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-2xl font-bold tracking-tight text-slate-950">
+                    {currentPlanName || "Current Plan"}
                   </span>
+                  {isActive && <Badge className="rounded-full bg-primary/10 text-primary">Active</Badge>}
+                  {isTrialing && <Badge variant="secondary" className="rounded-full">Trial</Badge>}
                 </div>
-                {planLimits.clientLimit !== null && (
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all ${
-                        clientCount >= planLimits.clientLimit 
-                          ? "bg-destructive" 
-                          : clientCount >= planLimits.clientLimit * 0.8 
-                            ? "bg-amber-500" 
-                            : "bg-primary"
-                      }`}
-                      style={{ width: `${Math.min((clientCount / planLimits.clientLimit) * 100, 100)}%` }}
-                    />
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Subscription status</p>
+                    <p className="mt-1 font-semibold capitalize text-slate-950">{subscriptionData?.status || "Active"}</p>
                   </div>
-                )}
-                {planLimits.clientLimit === null && (
-                  <div className="h-2 bg-primary/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full w-1/4" />
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {isTrialing ? "Trial ends" : "Renews"}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 font-semibold text-slate-950">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      {isTrialing ? trialEndLabel || "Not available" : periodEndLabel || "Not available"}
+                    </p>
                   </div>
+                </div>
+                {isTrialing && (
+                  <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
+                    Trial is active{trialEndLabel ? ` until ${trialEndLabel}` : ""}.
+                  </p>
                 )}
-              </div>
-              {planLimits.clientLimit !== null && clientCount >= planLimits.clientLimit * 0.8 && (
-                <p className="text-xs text-amber-600">
-                  {clientCount >= planLimits.clientLimit 
-                    ? "You've reached your client limit. Upgrade for more."
-                    : "You're approaching your client limit."
-                  }
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Subscription Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CreditCard className="w-5 h-5 text-primary" />
-              Current Plan
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-lg font-semibold">
-                  {currentPlanName 
-                    ? isTrialing 
-                      ? `${currentPlanName} — Free Trial`
-                      : currentPlanName
-                    : isTrialing
-                      ? "Free Trial"
-                      : "No Active Plan"
-                  }
-                </span>
-                {isActive && (
-                  <Badge className="bg-primary/10 text-primary">Active</Badge>
-                )}
-                {isTrialing && !isActive && (
-                  <Badge variant="secondary">Trial</Badge>
-                )}
-                {!isActive && !isTrialing && (
-                  <Badge variant="destructive">Inactive</Badge>
-                )}
-              </div>
-              
-              {subscriptionData?.subscription?.endDate && isActive && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4" />
-                  Renews {new Date(subscriptionData.subscription.endDate).toLocaleDateString()}
-                </p>
-              )}
-              
-              {isTrialing && subscriptionData?.subscription?.trialEndDate && (
-                <p className="text-sm text-amber-600 flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4" />
-                  Trial ends {new Date(subscriptionData.subscription.trialEndDate).toLocaleDateString()}
-                </p>
-              )}
-
-              {hasSubscription && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="rounded-xl mt-2"
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
                   onClick={handleManageSubscription}
                   disabled={isPortalLoading}
                 >
-                  {isPortalLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                  )}
-                  Manage
+                  {isPortalLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                  Manage Subscription
                 </Button>
-              )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-slate-200/80">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Users className="h-5 w-5 text-primary" />
+                  Usage
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <UsageMeter label="Clients" used={clientCount} limitLabel={clientLimitDisplay} limit={planLimits.clientLimit} />
+                <UsageMeter label="Therapist seats" used={therapistSeatsUsed} limitLabel={therapistSeatLimit} limit={planLimits.therapistLimit} />
+                {planLimits.clientLimit !== null && clientCount >= planLimits.clientLimit * 0.8 && (
+                  <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+                    {clientCount >= planLimits.clientLimit
+                      ? "You've reached your client limit. Change plans for more capacity."
+                      : "You're approaching your client limit."
+                    }
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="rounded-2xl border-slate-200/80">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Plan Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between rounded-xl"
+                  onClick={() => setShowChangePlans((value) => !value)}
+                >
+                  Change Plan
+                  {showChangePlans ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+                {showChangePlans && (
+                  <div className="space-y-2 rounded-xl border border-slate-200/80 p-3">
+                    {PRODUCTS.map((product) => (
+                      <CompactPlanAction
+                        key={product.id}
+                        product={product}
+                        isCurrentPlan={currentPlan === product.id}
+                        isLoading={checkoutLoading === product.id}
+                        canCheckout={checkoutAvailability[product.id] ?? false}
+                        onSelect={() => handleSelectPlan(product.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+                <Button
+                  className="w-full rounded-xl"
+                  onClick={handleManageSubscription}
+                  disabled={isPortalLoading}
+                >
+                  {isPortalLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                  Cancel or Manage in Stripe
+                </Button>
+              </CardContent>
+            </Card>
+
+            <BillingHelpCard />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <Card className="rounded-2xl border-primary/30 shadow-[0_22px_60px_rgba(109,94,245,0.10)]">
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-xl">Recommended Plan</CardTitle>
+                  <Badge className="rounded-full bg-primary text-primary-foreground">Recommended</Badge>
+                </div>
+                <CardDescription>{recommendedPlan.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div>
+                  <span className="text-4xl font-bold tracking-tight text-slate-950">${(recommendedPlan.priceInCents / 100).toFixed(0)}</span>
+                  <span className="text-muted-foreground">/{recommendedPlan.interval}</span>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                  {recommendedPlan.clientLimit === null ? "Unlimited clients" : `Up to ${recommendedPlan.clientLimit} active clients`}
+                </div>
+                <Button
+                  className="w-full rounded-xl"
+                  onClick={() => handleSelectPlan(recommendedPlan.id)}
+                  disabled={checkoutLoading === recommendedPlan.id}
+                >
+                  {checkoutLoading === recommendedPlan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Start {recommendedPlan.name}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-slate-200/80">
+              <CardHeader>
+                <CardTitle className="text-base">Account Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
+                  <span className="text-sm text-slate-500">Subscription</span>
+                  <Badge variant="destructive" className="rounded-full">Inactive</Badge>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
+                  <span className="text-sm text-slate-500">Clients</span>
+                  <span className="text-sm font-semibold">{clientCount} / {clientLimitDisplay}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between rounded-xl"
+                  onClick={() => setShowAllPlans((value) => !value)}
+                >
+                  View all plans
+                  {showAllPlans ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {showAllPlans && (
+            <div>
+              <h2 className="mb-4 text-xl font-semibold tracking-tight text-slate-950">All Plans</h2>
+              <div className="grid gap-4 md:grid-cols-3">
+                {PRODUCTS.map((product, index) => (
+                  <PlanCard
+                    key={product.id}
+                    product={product}
+                    isCurrentPlan={currentPlan === product.id}
+                    isLoading={checkoutLoading === product.id}
+                    canCheckout={checkoutAvailability[product.id] ?? false}
+                    onSelect={() => handleSelectPlan(product.id)}
+                    delay={index * 0.06}
+                  />
+                ))}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          )}
 
-      {/* Pricing Plans */}
-      <div>
-        <h2 className="mb-4 text-xl font-semibold tracking-tight text-slate-950">
-          {isActive ? "Change Plan" : "Choose a Plan"}
-        </h2>
-        <div className="grid gap-6 md:grid-cols-3">
-          {PRODUCTS.map((product, index) => (
-            <PlanCard
-              key={product.id}
-              product={product}
-              isCurrentPlan={currentPlan === product.id}
-              isLoading={checkoutLoading === product.id}
-              canCheckout={checkoutAvailability[product.id] ?? false}
-              onSelect={() => handleSelectPlan(product.id)}
-              delay={index * 0.1}
-            />
-          ))}
-        </div>
-      </div>
-
-      <footer className="pt-2 text-center text-xs text-muted-foreground">
-        Checkout build: 06f215b
-      </footer>
+          <BillingHelpCard />
+        </>
+      )}
     </div>
   )
 }
@@ -419,6 +498,80 @@ interface PlanCardProps {
   canCheckout: boolean
   onSelect: () => void
   delay: number
+}
+
+function UsageMeter({ label, used, limitLabel, limit }: { label: string; used: number; limitLabel: string; limit: number | null }) {
+  const percent = limit === null ? 25 : Math.min((used / limit) * 100, 100)
+  const isNearLimit = limit !== null && used >= limit * 0.8
+  const isAtLimit = limit !== null && used >= limit
+
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-sm font-semibold text-slate-950">{used} / {limitLabel}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all ${isAtLimit ? "bg-destructive" : isNearLimit ? "bg-amber-500" : "bg-primary"}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function CompactPlanAction({
+  product,
+  isCurrentPlan,
+  isLoading,
+  canCheckout,
+  onSelect,
+}: {
+  product: Product
+  isCurrentPlan: boolean
+  isLoading: boolean
+  canCheckout: boolean
+  onSelect: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="font-semibold text-slate-950">{product.name}</p>
+        <p className="text-sm text-slate-500">${(product.priceInCents / 100).toFixed(0)}/{product.interval}</p>
+      </div>
+      {isCurrentPlan ? (
+        <Badge className="w-fit rounded-full bg-primary/10 text-primary">Current</Badge>
+      ) : product.contactSalesIfMissingPrice && !canCheckout ? (
+        <Button variant="outline" className="rounded-xl" disabled>
+          Contact Sales
+        </Button>
+      ) : (
+        <Button variant="outline" className="rounded-xl" onClick={onSelect} disabled={isLoading}>
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Select
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function BillingHelpCard() {
+  return (
+    <Card className="rounded-2xl border-slate-200/80">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <LifeBuoy className="h-5 w-5 text-primary" />
+          Billing Help
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm leading-6 text-slate-500">
+          For invoices, plan changes, cancellation questions, or Stripe portal issues, contact ShrinkAid support.
+        </p>
+      </CardContent>
+    </Card>
+  )
 }
 
 function PlanCard({ product, isCurrentPlan, isLoading, canCheckout, onSelect, delay }: PlanCardProps) {

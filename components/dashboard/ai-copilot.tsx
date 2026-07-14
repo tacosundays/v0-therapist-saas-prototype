@@ -1,13 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   AlertCircle,
   ArrowRight,
   Bot,
   CheckCircle2,
-  Clipboard,
   ClipboardCheck,
   Clock,
   Copy,
@@ -20,7 +19,6 @@ import {
   TrendingUp,
   UserRound,
 } from "lucide-react"
-import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -92,10 +90,6 @@ const starterPrompts = [
   "Who needs attention today?",
   "Prepare my next session",
   "Homework waiting for review",
-  "Mood alerts",
-  "Clients inactive 14+ days",
-  "Weekly practice summary",
-  "Recommend homework",
 ]
 
 const sourceSections = [
@@ -114,13 +108,10 @@ function formatAnswerForClipboard(result: CopilotResult) {
     structured.summary,
     "",
     "Key Findings",
-    ...structured.keyFindings.map((item) => `- ${item}`),
+    ...structured.keyFindings.slice(0, 3).map((item) => `- ${item}`),
     "",
-    "Recommended Next Steps",
-    ...structured.recommendedNextSteps.map((item) => `- ${item}`),
-    "",
-    "Supporting Data",
-    ...structured.supportingData.map((item) => `- ${item}`),
+    "Recommended Next Step",
+    ...structured.recommendedNextSteps.slice(0, 1).map((item) => `- ${item}`),
     "",
     "Clinical Reminder",
     structured.clinicalReminder,
@@ -140,9 +131,8 @@ function StructuredResponse({ result }: { result: CopilotResult }) {
 
   const sections = [
     { title: "Summary", content: structured.summary },
-    { title: "Key Findings", items: structured.keyFindings },
-    { title: "Recommended Next Steps", items: structured.recommendedNextSteps },
-    { title: "Supporting Data", items: structured.supportingData },
+    { title: "Key Findings", items: structured.keyFindings.slice(0, 3) },
+    { title: "Recommended Next Step", items: structured.recommendedNextSteps.slice(0, 1) },
     { title: "Clinical Reminder", content: structured.clinicalReminder || disclaimer },
   ]
 
@@ -154,7 +144,7 @@ function StructuredResponse({ result }: { result: CopilotResult }) {
           {section.items ? (
             <ul className="space-y-2">
               {section.items.map((item) => (
-                <li key={item} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
+                <li key={item} className="rounded-[8px] bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
                   {item}
                 </li>
               ))}
@@ -170,10 +160,8 @@ function StructuredResponse({ result }: { result: CopilotResult }) {
 
 function DailyBriefCard({
   brief,
-  onStart,
 }: {
   brief: DailyBrief
-  onStart: () => void
 }) {
   const stats = [
     { label: "Homework waiting", value: brief.homeworkWaiting, icon: ClipboardCheck },
@@ -202,14 +190,14 @@ function DailyBriefCard({
                 <Icon className="h-4 w-4" />
                 <span className="text-xs font-semibold">{stat.label}</span>
               </div>
-              <p className="text-2xl font-bold text-slate-950">{stat.value}</p>
+              <p className="text-xl font-bold text-slate-950">{stat.value}</p>
             </div>
           )
         })}
       </div>
       {brief.highlights.length ? (
         <div className="mt-4 space-y-2">
-          {brief.highlights.slice(0, 4).map((highlight) => (
+          {brief.highlights.slice(0, 3).map((highlight) => (
             <p key={highlight} className="rounded-[8px] bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
               {highlight}
             </p>
@@ -220,10 +208,58 @@ function DailyBriefCard({
           No review items were found in the retrieved therapist-owned data.
         </p>
       )}
-      <Button type="button" className="mt-4 h-10 w-full rounded-[8px] bg-[#6D5EF5] text-white hover:bg-[#5B4DEA]" onClick={onStart}>
-        <ArrowRight className="mr-2 h-4 w-4" />
-        Start Daily Review
+      <Button asChild type="button" className="mt-4 h-10 w-full rounded-[8px] bg-[#6D5EF5] text-white hover:bg-[#5B4DEA]">
+        <Link href="/dashboard/daily-workflow">
+          <ArrowRight className="mr-2 h-4 w-4" />
+          Start Daily Review
+        </Link>
       </Button>
+    </div>
+  )
+}
+
+function SourceSummary({
+  result,
+  expanded,
+  onToggle,
+}: {
+  result: CopilotResult
+  expanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="rounded-[8px] border border-slate-200 bg-white p-3 shadow-sm">
+      <Button type="button" variant="ghost" className="h-9 w-full justify-between rounded-[8px] px-2 text-slate-600" onClick={onToggle}>
+        <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Show Sources</span>
+        <span className="text-xs font-semibold">{expanded ? "Hide" : "Show"}</span>
+      </Button>
+      {expanded && (
+        <div className="mt-3 grid gap-2">
+          {sourceSections.map((section) => {
+            const Icon = section.icon
+            const source = result.sources?.[section.key]
+            const count = result.sourceCounts?.[section.key === "homework" ? "assignments" : section.key]
+            return (
+              <div key={section.key} className="rounded-[8px] border border-slate-200 bg-slate-50/70 p-3">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-[#6D5EF5]" />
+                    <p className="text-sm font-semibold text-slate-950">{section.label}</p>
+                  </div>
+                  {typeof count === "number" && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500">
+                      {count}
+                    </span>
+                  )}
+                </div>
+                <p className="line-clamp-2 text-xs leading-5 text-slate-600">
+                  {source?.summary || "No matching source details returned."}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -237,13 +273,8 @@ export function AiCopilot() {
   const [loadingPrompt, setLoadingPrompt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({})
   const [hasLoadedBrief, setHasLoadedBrief] = useState(false)
-  const [homeworkModalOpen, setHomeworkModalOpen] = useState(false)
-  const [homeworkDraft, setHomeworkDraft] = useState<CopilotResult["recommendedHomework"]>(null)
-
-  const latestResult = useMemo(() => {
-    return [...messages].reverse().find((message) => message.result)?.result || null
-  }, [messages])
 
   useEffect(() => {
     if (open && !hasLoadedBrief && messages.length === 0) {
@@ -268,7 +299,7 @@ export function AiCopilot() {
     setIsLoading(true)
     setLoadingPrompt(prompt)
     setError(null)
-    setQuestion(prompt)
+    if (!options?.silentUserMessage) setQuestion(prompt)
 
     try {
       const supabase = getClient()
@@ -308,7 +339,9 @@ export function AiCopilot() {
         result: payload,
       }
       setDailyBrief(payload.dailyBrief || null)
-      setMessages((current) => [...current, assistantMessage])
+      if (!options?.silentUserMessage) {
+        setMessages((current) => [...current, assistantMessage])
+      }
     } catch (err) {
       console.error("[v0] AI Copilot: request failed", err)
       setError(err instanceof Error ? err.message : "AI Copilot failed to respond.")
@@ -324,14 +357,6 @@ export function AiCopilot() {
     setCopiedMessageId(message.id)
     window.setTimeout(() => setCopiedMessageId(null), 1600)
   }
-
-  const openHomeworkModal = (result: CopilotResult) => {
-    if (!result.recommendedHomework) return
-    setHomeworkDraft(result.recommendedHomework)
-    setHomeworkModalOpen(true)
-  }
-
-  const actionClient = latestResult?.primaryClient
 
   return (
     <>
@@ -349,43 +374,54 @@ export function AiCopilot() {
           side="right"
           className="flex h-dvh w-full flex-col gap-0 border-slate-200 bg-[#F8FAFC] p-0 sm:max-w-[620px]"
         >
-          <SheetHeader className="border-b border-slate-200/70 bg-white px-4 py-4 sm:px-6 sm:py-5">
+          <SheetHeader className="border-b border-slate-200/70 bg-white px-4 py-3 sm:px-5">
             <div className="flex items-start gap-3 pr-8">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-[#6D5EF5]/10 text-[#6D5EF5]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#6D5EF5]/10 text-[#6D5EF5]">
                 <Bot className="h-5 w-5" />
               </div>
               <div>
-                <SheetTitle className="text-xl font-bold tracking-tight text-slate-950">AI Copilot</SheetTitle>
-                <SheetDescription className="mt-1 leading-6 text-slate-500">
+                <SheetTitle className="text-lg font-bold tracking-tight text-slate-950">AI Copilot</SheetTitle>
+                <SheetDescription className="mt-0.5 text-sm leading-5 text-slate-500">
                   Therapist workflow support grounded in your existing client activity.
                 </SheetDescription>
               </div>
             </div>
           </SheetHeader>
 
-          <div className="border-b border-amber-200/70 bg-amber-50/80 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:px-6">
+          <div className="border-b border-amber-200/70 bg-amber-50/70 px-4 py-2 text-xs font-medium leading-5 text-amber-800 sm:px-5">
             {disclaimer}
           </div>
 
           <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-5 p-4 pb-6 sm:p-6">
-              {dailyBrief && <DailyBriefCard brief={dailyBrief} onStart={() => askCopilot("Who needs attention today?")} />}
-
-              <div className="rounded-[8px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Quick prompts</p>
-                <div className="flex flex-wrap gap-2">
-                  {starterPrompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => askCopilot(prompt)}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-600 transition-all hover:border-[#6D5EF5]/25 hover:bg-[#6D5EF5]/5 hover:text-[#6D5EF5]"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
+            <div className="space-y-4 p-4 pb-5 sm:p-5">
+              {messages.length === 0 && (
+                <div className="rounded-[8px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
+                  <p className="text-sm font-bold text-slate-950">Good morning. What needs your attention first?</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Start with today&apos;s brief or ask a focused question about homework, mood, reflections, or session prep.
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {dailyBrief && <DailyBriefCard brief={dailyBrief} />}
+
+              {messages.length === 0 && (
+                <div className="rounded-[8px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Quick prompts</p>
+                  <div className="flex flex-wrap gap-2">
+                    {starterPrompts.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => askCopilot(prompt)}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-600 transition-all hover:border-[#6D5EF5]/25 hover:bg-[#6D5EF5]/5 hover:text-[#6D5EF5]"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {messages.map((message) => (
@@ -407,110 +443,46 @@ export function AiCopilot() {
                         <div className="rounded-[8px] border border-slate-200 bg-white p-4 shadow-sm">
                           <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Actions</p>
                           <div className="grid gap-2 sm:grid-cols-2">
-                            {message.result.primaryClient ? (
+                            {message.result.primaryClient && (
                               <Button asChild variant="outline" className="h-10 justify-start rounded-[8px]">
                                 <Link href={`/dashboard/clients#client-${message.result.primaryClient.id}`}>
                                   <UserRound className="mr-2 h-4 w-4" />
                                   Open Client
                                 </Link>
                               </Button>
-                            ) : (
-                              <Button type="button" variant="outline" className="h-10 justify-start rounded-[8px]" disabled>
-                                <UserRound className="mr-2 h-4 w-4" />
-                                Open Client
-                              </Button>
                             )}
-                            {message.result.primaryClient ? (
+                            {message.result.primaryClient && (
                               <Button asChild variant="outline" className="h-10 justify-start rounded-[8px]">
                                 <Link href={`/dashboard/clients/${message.result.primaryClient.id}/session-prep`}>
                                   <FileText className="mr-2 h-4 w-4" />
                                   Open Session Prep
                                 </Link>
                               </Button>
-                            ) : (
-                              <Button type="button" variant="outline" className="h-10 justify-start rounded-[8px]" disabled>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Open Session Prep
-                              </Button>
                             )}
                             <Button type="button" variant="outline" className="h-10 justify-start rounded-[8px]" onClick={() => copySummary(message)}>
                               {copiedMessageId === message.id ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
                               {copiedMessageId === message.id ? "Copied" : "Copy Summary"}
                             </Button>
-                            {message.result.primaryClient ? (
-                              <Button asChild variant="outline" className="h-10 justify-start rounded-[8px]">
-                                <Link href={`/dashboard/clients/${message.result.primaryClient.id}/session-prep#progress-notes`}>
-                                  <StickyNote className="mr-2 h-4 w-4" />
-                                  Add Therapist Note
-                                </Link>
-                              </Button>
-                            ) : (
-                              <Button type="button" variant="outline" className="h-10 justify-start rounded-[8px]" disabled>
-                                <StickyNote className="mr-2 h-4 w-4" />
-                                Add Therapist Note
-                              </Button>
-                            )}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="h-10 justify-start rounded-[8px] sm:col-span-2"
-                              disabled={!message.result.recommendedHomework}
-                              onClick={() => openHomeworkModal(message.result!)}
-                            >
-                              <Clipboard className="mr-2 h-4 w-4" />
-                              Assign Recommended Homework
+                            <Button asChild variant="outline" className="h-10 justify-start rounded-[8px]">
+                              <Link href="/dashboard/daily-workflow">
+                                <ArrowRight className="mr-2 h-4 w-4" />
+                                Start Daily Review
+                              </Link>
                             </Button>
                           </div>
-                          {!message.result.recommendedHomework && (
-                            <p className="mt-3 text-xs leading-5 text-slate-500">
-                              Homework assignment appears only when Copilot returns a grounded recommendation that can use the existing assignment flow.
-                            </p>
-                          )}
                         </div>
 
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Sources reviewed</p>
-                          {sourceSections.map((section) => {
-                            const Icon = section.icon
-                            const source = message.result?.sources?.[section.key]
-                            const count = message.result?.sourceCounts?.[section.key === "homework" ? "assignments" : section.key]
-                            return (
-                              <div key={section.key} className="rounded-[8px] border border-slate-200 bg-white p-4 shadow-sm">
-                                <div className="mb-2 flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#6D5EF5]/10 text-[#6D5EF5]">
-                                      <Icon className="h-4 w-4" />
-                                    </div>
-                                    <p className="font-semibold text-slate-950">{section.label}</p>
-                                  </div>
-                                  {typeof count === "number" && (
-                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
-                                      {count}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm leading-6 text-slate-600">
-                                  {source?.summary || "No matching source details returned."}
-                                </p>
-                                {source?.citations?.length ? (
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    {source.citations.map((citation) => (
-                                      <span key={citation} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                                        {citation}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                            )
-                          })}
-                        </div>
+                        <SourceSummary
+                          result={message.result}
+                          expanded={!!expandedSources[message.id]}
+                          onToggle={() => setExpandedSources((current) => ({ ...current, [message.id]: !current[message.id] }))}
+                        />
 
                         {message.result.suggestedFollowUps?.length ? (
                           <div className="rounded-[8px] border border-slate-200 bg-white p-4 shadow-sm">
                             <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Suggested follow-ups</p>
                             <div className="flex flex-wrap gap-2">
-                              {message.result.suggestedFollowUps.map((followUp) => (
+                              {message.result.suggestedFollowUps.slice(0, 3).map((followUp) => (
                                 <button
                                   key={followUp}
                                   type="button"
@@ -535,11 +507,16 @@ export function AiCopilot() {
                     <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#6D5EF5]/10">
                       <Loader2 className="h-5 w-5 animate-spin text-[#6D5EF5]" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-950">Reviewing current practice data</p>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-950">Reviewing therapist-owned data...</p>
                       <p className="mt-1 text-sm leading-6 text-slate-600">
-                        Checking therapist-owned homework, reflections, mood check-ins, and notes for “{loadingPrompt}”.
+                        Checking homework, reflections, mood check-ins, and notes for “{loadingPrompt}”.
                       </p>
+                      <div className="mt-4 space-y-2">
+                        <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+                        <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+                        <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -551,7 +528,10 @@ export function AiCopilot() {
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
                     <div>
                       <p className="font-bold">Copilot could not finish that request.</p>
-                      <p className="mt-1 leading-6">{error}</p>
+                      <p className="mt-1 leading-6">
+                        Your last prompt is still in the box. You can retry when the connection or service is ready.
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-rose-700">{error}</p>
                       <Button type="button" variant="outline" className="mt-3 h-9 rounded-[8px] border-rose-200 bg-white text-rose-700 hover:bg-rose-50" onClick={() => askCopilot(question)}>
                         Try again
                       </Button>
@@ -599,15 +579,6 @@ export function AiCopilot() {
           </div>
         </SheetContent>
       </Sheet>
-
-      <AssignHomeworkModal
-        open={homeworkModalOpen}
-        onOpenChange={setHomeworkModalOpen}
-        onAssignmentCreated={() => setHomeworkDraft(null)}
-        preselectedClientId={homeworkDraft?.clientId || actionClient?.id}
-        prefilledTitle={homeworkDraft?.title}
-        prefilledDescription={homeworkDraft?.description}
-      />
     </>
   )
 }

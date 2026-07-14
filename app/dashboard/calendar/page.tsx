@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
 import {
   AlertTriangle,
   ArrowRight,
@@ -18,7 +17,6 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getTherapistId } from "@/lib/auth/check-user-role"
@@ -635,45 +633,40 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="overflow-hidden rounded-[28px] border border-slate-200/75 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
-      >
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <Badge className="mb-3 rounded-full bg-[#6D5EF5]/10 px-3 py-1 text-[#6D5EF5] hover:bg-[#6D5EF5]/10">
-                Calendar
-              </Badge>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                Session readiness.
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                See who is on the calendar and whether each matched session has homework, reflection, mood, and prep signals ready.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-3 lg:w-[480px]">
-              {[
-                { label: "Sessions Today", value: todaySessions.length, icon: CalendarClock, tone: "purple" as const },
-                { label: "Sessions Tomorrow", value: tomorrowSessions.length, icon: CalendarDays, tone: "teal" as const },
-                { label: "Prep Needed", value: prepNeededCount, icon: AlertTriangle, tone: prepNeededCount > 0 ? "amber" as const : "green" as const },
-              ].map((stat) => {
-                const Icon = stat.icon
-                return (
-                  <div key={stat.label} className="rounded-2xl border border-slate-200/75 bg-slate-50/70 p-4">
-                    <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <p className="text-2xl font-bold text-slate-950">{stat.value}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{stat.label}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+      <div className="saas-page-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="saas-eyebrow mb-2">Calendar</p>
+          <h1>Session readiness</h1>
+          <p className="saas-muted mt-2 max-w-2xl">
+            See who is on the calendar and whether each matched session has homework, reflection, mood, and prep signals ready.
+          </p>
         </div>
-      </motion.div>
+        <Button asChild>
+          <Link href="/dashboard/settings">
+            Calendar Settings
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { label: "Sessions Today", value: todaySessions.length, icon: CalendarClock, tone: "purple" as const },
+          { label: "Sessions Tomorrow", value: tomorrowSessions.length, icon: CalendarDays, tone: "teal" as const },
+          { label: "Prep Needed", value: prepNeededCount, icon: AlertTriangle, tone: prepNeededCount > 0 ? "amber" as const : "green" as const },
+        ].map((stat) => {
+          const Icon = stat.icon
+          return (
+            <div key={stat.label} className="saas-card p-4">
+              <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <p className="text-2xl font-bold text-slate-950">{stat.value}</p>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">{stat.label}</p>
+            </div>
+          )
+        })}
+      </div>
 
       {isLoading && (
         <LoadingRows />

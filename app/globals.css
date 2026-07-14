@@ -29,6 +29,13 @@
   --chart-4: #f59e0b;
   --chart-5: #ec4899;
   --radius: 1.125rem;
+  --saas-radius-card: 1.5rem;
+  --saas-radius-control: 0.875rem;
+  --saas-shadow-card: 0 18px 55px rgba(15, 23, 42, 0.06);
+  --saas-shadow-card-hover: 0 24px 70px rgba(15, 23, 42, 0.09);
+  --saas-shadow-control: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --saas-space-section: 1.5rem;
+  --saas-space-card: 1.25rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #0f172a;
   --sidebar-primary: #6d5ef5;
@@ -123,18 +130,62 @@
     @apply bg-background text-foreground antialiased;
     text-rendering: geometricPrecision;
   }
+
+  h1 {
+    @apply text-3xl font-bold tracking-tight text-foreground sm:text-4xl;
+  }
+
+  h2 {
+    @apply text-xl font-bold tracking-tight text-foreground;
+  }
+
+  h3 {
+    @apply text-lg font-semibold tracking-tight text-foreground;
+  }
 }
 
 @layer components {
   .saas-page-header {
-    @apply rounded-3xl border border-white/80 bg-white/80 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)] backdrop-blur-xl;
+    @apply rounded-[var(--saas-radius-card)] border border-border/80 bg-card/90 p-5 shadow-[var(--saas-shadow-card)] backdrop-blur-xl sm:p-6;
+  }
+
+  .saas-page-header > :first-child {
+    @apply min-w-0;
   }
 
   .saas-eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-primary;
+    @apply text-xs font-bold uppercase tracking-[0.14em] text-primary;
   }
 
   .saas-soft-panel {
-    @apply rounded-3xl border border-slate-200/80 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.06)] backdrop-blur-xl;
+    @apply rounded-[var(--saas-radius-card)] border border-border/80 bg-card/90 shadow-[var(--saas-shadow-card)] backdrop-blur-xl;
+  }
+
+  .saas-section {
+    @apply space-y-4;
+  }
+
+  .saas-card {
+    @apply rounded-[var(--saas-radius-card)] border border-border/80 bg-card/95 shadow-[var(--saas-shadow-card)] backdrop-blur-sm;
+  }
+
+  .saas-muted {
+    @apply text-sm leading-6 text-muted-foreground;
+  }
+
+  .saas-form-row {
+    @apply space-y-2;
+  }
+
+  .saas-empty-state {
+    @apply rounded-[var(--saas-radius-card)] border border-dashed border-border bg-muted/40 p-6 text-center;
+  }
+
+  .saas-success {
+    @apply rounded-[var(--saas-radius-control)] border border-primary/20 bg-primary/10 p-4 text-sm font-medium text-primary;
+  }
+
+  .saas-error {
+    @apply rounded-[var(--saas-radius-control)] border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive;
   }
 }

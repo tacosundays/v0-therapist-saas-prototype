@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { motion } from "framer-motion"
 import {
   ArrowRight,
   BarChart3,
@@ -18,7 +17,6 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -422,20 +420,12 @@ export default function DailyWorkflowPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-6">
+      <div className="saas-page-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <Badge className="mb-3 rounded-full bg-primary/10 text-primary hover:bg-primary/10">
-            Guided Daily Workflow
-          </Badge>
-          <motion.h1
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl font-bold tracking-tight text-slate-950"
-          >
-            Start My Day
-          </motion.h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+          <p className="saas-eyebrow mb-2">Guided Daily Workflow</p>
+          <h1>Start My Day</h1>
+          <p className="saas-muted mt-2 max-w-2xl">
             One morning workflow that connects the existing Daily Brief, Inbox, Reflections, Session Prep, and Homework assignment flows.
           </p>
         </div>

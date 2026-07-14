@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
 import {
   AlertTriangle,
   ArrowRight,
@@ -18,7 +17,6 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getTherapistId } from "@/lib/auth/check-user-role"
@@ -810,50 +808,44 @@ export default function TherapistInboxPage() {
   )
 
   return (
-    <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="overflow-hidden rounded-[32px] border border-slate-200/75 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.07)]"
-      >
-        <div className="relative p-6 sm:p-8">
-          <div className="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_20%_0%,rgba(99,91,255,0.18),transparent_32%),radial-gradient(circle_at_82%_8%,rgba(24,183,160,0.16),transparent_30%)]" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <Badge className="mb-4 rounded-full bg-[#6D5EF5]/10 px-3 py-1 text-[#6D5EF5] hover:bg-[#6D5EF5]/10">
-                Therapist Inbox
-              </Badge>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                Your morning clinical workspace.
-              </h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-                Review real homework, reflections, mood signals, invitations, and session-prep activity from your clients.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[620px]">
-              {summaryStats.map((stat) => {
-                const Icon = stat.icon
-                return (
-                  <div key={stat.label} className="rounded-[26px] border border-slate-200/75 bg-white/90 p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] backdrop-blur">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500">
-                        <TrendingUp className="h-3 w-3" />
-                        Live
-                      </div>
-                    </div>
-                    <p className="text-3xl font-bold text-slate-950">{stat.value}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-600">{stat.label}</p>
-                    <p className="mt-2 text-xs font-medium text-slate-400">{stat.trend}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="saas-page-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="saas-eyebrow mb-2">Therapist Inbox</p>
+          <h1>Your morning workspace</h1>
+          <p className="saas-muted mt-2 max-w-2xl">
+            Review homework, reflections, mood signals, invitations, and session-prep activity from your clients.
+          </p>
         </div>
-      </motion.div>
+        <Button asChild>
+          <Link href="/dashboard/daily-workflow">
+            Start Daily Review
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {summaryStats.map((stat) => {
+          const Icon = stat.icon
+          return (
+            <div key={stat.label} className="saas-card p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" />
+                  Live
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-slate-950">{stat.value}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{stat.label}</p>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">{stat.trend}</p>
+            </div>
+          )
+        })}
+      </div>
 
       {!isLoading && !error && (
         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">

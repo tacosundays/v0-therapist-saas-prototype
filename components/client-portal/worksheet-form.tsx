@@ -608,23 +608,25 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         </Card>
       )}
 
-      <Button
-        onClick={handleSubmit}
-        disabled={isSubmitting}
-        className="h-12 w-full rounded-2xl bg-[#6D5EF5] text-base text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Submitting...
-          </>
-        ) : (
-          <>
-            <CheckCircle2 className="w-4 h-4 mr-2" />
-            Submit Worksheet
-          </>
-        )}
-      </Button>
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-slate-200/75 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <Button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="h-12 w-full rounded-2xl bg-[#6D5EF5] text-base text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Submit Worksheet
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   )
 }

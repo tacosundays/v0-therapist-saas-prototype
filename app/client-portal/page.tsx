@@ -956,7 +956,7 @@ function ClientPortalContent() {
                         </p>
                       ) : (
                         <p className="mt-4 rounded-2xl border border-dashed border-slate-200 p-3 text-xs font-medium text-slate-500">
-                          No check-ins yet. Your first check-in will appear here after you save it.
+                          Your first check-in will appear here after you save it.
                         </p>
                       )}
                     </div>

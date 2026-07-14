@@ -11,7 +11,6 @@ import {
   ClipboardCheck,
   Clock,
   Inbox as InboxIcon,
-  Loader2,
   Mail,
   MessageSquare,
   Sparkles,
@@ -178,6 +177,71 @@ function EmptyState({ title, description, icon: Icon }: { title: string; descrip
       </div>
       <p className="font-semibold text-slate-950">{title}</p>
       <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>
+    </div>
+  )
+}
+
+function InboxLoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card className="overflow-hidden rounded-[30px] border-slate-200/75 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.05)]">
+          <CardContent className="p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div className="space-y-3">
+                <div className="h-3 w-28 animate-pulse rounded bg-slate-100" />
+                <div className="h-7 w-56 animate-pulse rounded bg-slate-200" />
+              </div>
+              <div className="h-12 w-12 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="rounded-2xl border border-slate-200/75 bg-slate-50/70 p-4">
+                  <div className="h-7 w-10 animate-pulse rounded bg-slate-200" />
+                  <div className="mt-2 h-3 w-28 animate-pulse rounded bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-[30px] border-slate-200/75 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.05)]">
+          <CardContent className="p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div className="space-y-3">
+                <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+                <div className="h-7 w-44 animate-pulse rounded bg-slate-200" />
+              </div>
+              <div className="h-12 w-12 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="rounded-3xl border border-slate-200/70 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-11 w-11 animate-pulse rounded-2xl bg-slate-100" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-64 max-w-full animate-pulse rounded bg-slate-100" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={index} className="rounded-[28px] border-slate-200/75 bg-white">
+            <CardContent className="p-5">
+              <div className="mb-4 h-5 w-40 animate-pulse rounded bg-slate-200" />
+              <div className="space-y-3">
+                <div className="h-16 animate-pulse rounded-2xl bg-slate-100" />
+                <div className="h-16 animate-pulse rounded-2xl bg-slate-100" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }
@@ -866,9 +930,7 @@ export default function TherapistInboxPage() {
       </div>
 
       {isLoading && (
-        <div className="flex items-center justify-center rounded-[28px] border border-slate-200 bg-white py-20 shadow-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-[#6D5EF5]" />
-        </div>
+        <InboxLoadingSkeleton />
       )}
 
       {error && !isLoading && (

@@ -231,7 +231,7 @@ export function AssignHomeworkModal({
               </div>
             ) : clients.length === 0 ? (
               <div className="p-3 bg-muted/50 text-muted-foreground text-sm rounded-xl">
-                No clients found. Add a client first before assigning homework.
+                Add a client before assigning homework.
               </div>
             ) : (
               <Select 

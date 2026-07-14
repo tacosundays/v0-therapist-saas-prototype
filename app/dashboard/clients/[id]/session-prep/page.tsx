@@ -241,6 +241,63 @@ function throwQueryError(label: string, err: unknown): never {
   throw new Error(message)
 }
 
+function ClientProfileSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="h-10 w-32 animate-pulse rounded-xl bg-slate-100" />
+        <div className="h-10 w-40 animate-pulse rounded-xl bg-slate-100" />
+      </div>
+      <Card className="rounded-2xl border-slate-200/80">
+        <CardContent className="p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 animate-pulse rounded-2xl bg-slate-200" />
+              <div className="space-y-3">
+                <div className="h-7 w-52 animate-pulse rounded bg-slate-200" />
+                <div className="h-4 w-64 max-w-full animate-pulse rounded bg-slate-100" />
+              </div>
+            </div>
+            <div className="h-11 w-44 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Card key={index} className="rounded-2xl border-slate-200/80">
+            <CardContent className="p-5">
+              <div className="h-4 w-24 animate-pulse rounded bg-slate-100" />
+              <div className="mt-3 h-7 w-20 animate-pulse rounded bg-slate-200" />
+              <div className="mt-3 h-3 w-32 animate-pulse rounded bg-slate-100" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Card className="rounded-2xl border-slate-200/80">
+        <CardContent className="p-5">
+          <div className="mb-5 flex flex-wrap gap-2">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-10 w-24 animate-pulse rounded-xl bg-slate-100" />
+            ))}
+          </div>
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="grid gap-4 rounded-2xl border border-slate-200/70 p-4 sm:grid-cols-[40px_1fr_auto] sm:items-start">
+                <div className="h-10 w-10 animate-pulse rounded-2xl bg-slate-100" />
+                <div className="space-y-2">
+                  <div className="h-4 w-48 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-full max-w-md animate-pulse rounded bg-slate-100" />
+                </div>
+                <div className="h-9 w-28 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function SessionPrepPage() {
   const params = useParams<{ id: string }>()
   const clientId = params.id
@@ -912,9 +969,7 @@ export default function SessionPrepPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
+      <ClientProfileSkeleton />
     )
   }
 
@@ -1096,7 +1151,7 @@ export default function SessionPrepPage() {
             </CardHeader>
             <CardContent>
               {timeline.length === 0 ? (
-                <EmptyPanel icon={Clock} title="No client activity yet." description="Sessions, homework, reflections, mood check-ins, and summaries will appear here." />
+                <EmptyPanel icon={Clock} title="Activity will appear here" description="Sessions, homework, reflections, mood check-ins, and summaries collect here as this client uses ShrinkAid." />
               ) : (
                 <div className="space-y-0">
                   {[...timeline].reverse().slice(0, 12).map((item, index) => (
@@ -1119,7 +1174,7 @@ export default function SessionPrepPage() {
             </CardHeader>
             <CardContent>
               {homeworkProgressItems.length === 0 ? (
-                <EmptyPanel icon={FileText} title="No homework assigned yet." description="Assigned homework and worksheet progress will appear here." />
+                <EmptyPanel icon={FileText} title="No homework assigned" description="Assigned homework and worksheet progress will appear here after you send work to this client." />
               ) : (
                 <div className="space-y-3">
                   {homeworkProgressItems.slice(0, 7).map((item) => (
@@ -1140,7 +1195,7 @@ export default function SessionPrepPage() {
               </CardHeader>
               <CardContent>
                 {!latestReflection ? (
-                  <EmptyPanel icon={MessageSquare} title="No reflections yet." description="Client journal entries will appear here." compact />
+                  <EmptyPanel icon={MessageSquare} title="Reflections will appear here" description="Client journal entries collect here after they submit them in the portal." compact />
                 ) : (
                   <div className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4">
                     <div className="mb-3 flex items-start justify-between gap-3">
@@ -1165,7 +1220,7 @@ export default function SessionPrepPage() {
               </CardHeader>
               <CardContent>
                 {!mostRecentMood ? (
-                  <EmptyPanel icon={BarChart3} title="No mood check-ins yet." description="Client mood tracking will appear here." compact />
+                  <EmptyPanel icon={BarChart3} title="Mood check-ins will appear here" description="Client mood tracking collects here after portal check-ins." compact />
                 ) : (
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
@@ -1268,7 +1323,7 @@ export default function SessionPrepPage() {
             </CardHeader>
             <CardContent>
               {progressNotes.length === 0 ? (
-                <p className="text-sm text-slate-500">No progress notes saved yet.</p>
+                <p className="text-sm text-slate-500">Saved progress notes will appear here.</p>
               ) : (
                 <div className="space-y-3">
                   {progressNotes.slice(0, 3).map((progressNote) => (
@@ -1357,8 +1412,8 @@ export default function SessionPrepPage() {
               {filteredJourneyItems.length === 0 ? (
                 <EmptyPanel
                   icon={CalendarClock}
-                  title="No journey events in this filter."
-                  description="Events appear here when existing homework, reflections, mood, notes, or AI summaries are available for this client."
+                  title="This filter is clear"
+                  description="Existing homework, reflections, mood, notes, or AI summaries will appear here when available for this client."
                 />
               ) : (
                 <div className="space-y-0">

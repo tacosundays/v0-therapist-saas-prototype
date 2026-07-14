@@ -496,11 +496,24 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[#6D5EF5]/10 text-[#6D5EF5]">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      </div>
+      <Card className="rounded-[28px] border-slate-200/75 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
+        <CardContent className="space-y-5 p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="h-10 w-24 animate-pulse rounded-2xl bg-slate-100" />
+            <div className="h-8 w-28 animate-pulse rounded-full bg-slate-100" />
+          </div>
+          <div className="space-y-3">
+            <div className="h-7 w-64 max-w-full animate-pulse rounded bg-slate-200" />
+            <div className="h-4 w-full max-w-xl animate-pulse rounded bg-slate-100" />
+          </div>
+          <div className="h-3 w-full animate-pulse rounded-full bg-slate-100" />
+          <div className="space-y-3 rounded-2xl border border-slate-200/75 p-4">
+            <div className="h-5 w-3/4 animate-pulse rounded bg-slate-200" />
+            <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+          </div>
+          <div className="h-12 animate-pulse rounded-2xl bg-slate-100" />
+        </CardContent>
+      </Card>
     )
   }
 

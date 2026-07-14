@@ -8,7 +8,6 @@ import {
   CalendarClock,
   CheckCircle2, 
   ArrowRight,
-  Loader2,
   AlertTriangle,
   Sparkles,
   type LucideIcon,
@@ -559,7 +558,7 @@ export default function DashboardPage() {
               <BriefCount label="Mood alerts" value={moodAlertCount} />
             </div>
             <div className="mt-5 space-y-2">
-              {(topPriorities.length > 0 ? topPriorities : ["No priority items found in current client activity."]).map((priority, index) => (
+              {(topPriorities.length > 0 ? topPriorities : ["You are caught up based on current client activity."]).map((priority, index) => (
                 <div key={priority} className="flex gap-3 rounded-2xl bg-white/10 px-3 py-2 text-sm leading-5 text-white/80">
                   <span className="font-bold text-[#18B7A0]">{index + 1}</span>
                   <span>{priority}</span>
@@ -584,11 +583,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
+              <SessionPrepSkeleton />
             ) : sessionPrepQueue.length === 0 ? (
-              <EmptyState icon={CalendarClock} title="No next sessions queued." description="Calendar-backed sessions and full schedule details live on the Calendar page." />
+              <EmptyState icon={CalendarClock} title="No sessions today" description="Calendar-backed sessions and readiness details appear here when they are scheduled." ctaLabel="View upcoming week" ctaHref="/dashboard/calendar" />
             ) : (
               <div className="divide-y divide-slate-200/80">
                 {sessionPrepQueue.slice(0, 3).map((item) => (
@@ -600,6 +597,30 @@ export default function DashboardPage() {
         </Card>
       </section>
 
+    </div>
+  )
+}
+
+function SessionPrepSkeleton() {
+  return (
+    <div className="divide-y divide-slate-200/80">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="grid gap-3 py-3 first:pt-0 last:pb-0 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-slate-200" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-36 animate-pulse rounded bg-slate-200" />
+              <div className="h-3 w-56 max-w-full animate-pulse rounded bg-slate-100" />
+              <div className="flex gap-1.5">
+                <div className="h-6 w-20 animate-pulse rounded-full bg-slate-100" />
+                <div className="h-6 w-24 animate-pulse rounded-full bg-slate-100" />
+                <div className="h-6 w-16 animate-pulse rounded-full bg-slate-100" />
+              </div>
+            </div>
+          </div>
+          <div className="h-9 w-36 animate-pulse rounded-xl bg-slate-100" />
+        </div>
+      ))}
     </div>
   )
 }
@@ -659,10 +680,14 @@ function EmptyState({
   icon: Icon,
   title,
   description,
+  ctaLabel,
+  ctaHref,
 }: {
   icon: LucideIcon
   title: string
   description: string
+  ctaLabel?: string
+  ctaHref?: string
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -671,6 +696,11 @@ function EmptyState({
       </div>
       <p className="text-sm font-semibold text-slate-700">{title}</p>
       <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">{description}</p>
+      {ctaLabel && ctaHref && (
+        <Button variant="outline" size="sm" className="mt-4 bg-white" asChild>
+          <Link href={ctaHref}>{ctaLabel}</Link>
+        </Button>
+      )}
     </div>
   )
 }

@@ -717,7 +717,7 @@ export default function CalendarPage() {
                 icon={CalendarClock}
                 events={todaySessions}
                 emptyTitle="No sessions today"
-                emptyDescription="No matched or unmatched Google Calendar events were found for today."
+                emptyDescription="Sessions from your connected calendar will appear here with readiness details."
               />
               <CalendarSessionSection
                 eyebrow="Tomorrow"
@@ -725,7 +725,7 @@ export default function CalendarPage() {
                 icon={CalendarDays}
                 events={tomorrowSessions}
                 emptyTitle="No sessions tomorrow"
-                emptyDescription="No matched or unmatched Google Calendar events were found for tomorrow."
+                emptyDescription="Tomorrow's connected calendar sessions will appear here when scheduled."
               />
               <CalendarSessionSection
                 eyebrow="Week"
@@ -733,7 +733,7 @@ export default function CalendarPage() {
                 icon={Clock}
                 events={upcomingWeekSessions}
                 emptyTitle="No upcoming sessions"
-                emptyDescription="No additional Google Calendar events were found in the upcoming week."
+                emptyDescription="The rest of your week is clear based on the connected calendar."
               />
             </>
           ) : (

@@ -146,10 +146,24 @@ export default function ReflectionJournalPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[#6D5EF5]/10 text-[#6D5EF5] shadow-[0_18px_44px_rgba(109,94,245,0.16)]">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
+      <div className="min-h-[calc(100vh-8rem)]">
+        <main>
+          <div className="space-y-8">
+            <div className="rounded-[32px] border border-slate-200/75 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.07)] sm:p-8">
+              <div className="h-10 w-28 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="mt-5 h-9 w-64 animate-pulse rounded bg-slate-200" />
+              <div className="mt-4 h-4 w-96 max-w-full animate-pulse rounded bg-slate-100" />
+            </div>
+            <Card className="rounded-[28px] border-slate-200/75 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.06)]">
+              <CardContent className="space-y-5 p-6">
+                <div className="h-6 w-44 animate-pulse rounded bg-slate-200" />
+                <div className="h-12 animate-pulse rounded-2xl bg-slate-100" />
+                <div className="h-56 animate-pulse rounded-2xl bg-slate-100" />
+                <div className="h-12 animate-pulse rounded-2xl bg-slate-100" />
+              </CardContent>
+            </Card>
+          </div>
+        </main>
       </div>
     )
   }

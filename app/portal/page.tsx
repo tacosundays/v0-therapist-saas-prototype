@@ -87,7 +87,7 @@ export default function PortalPage() {
       console.log("[v0] Legacy portal: client id found:", client?.id ?? "none")
 
       if (!client) {
-        setError("No client record found. Please contact your therapist to set up your account.")
+        setError("Your portal is not ready yet. Please contact your therapist to finish setup.")
         setIsLoading(false)
         return
       }
@@ -217,8 +217,29 @@ export default function PortalPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <Card className="rounded-2xl border-slate-200/80">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 animate-pulse rounded-2xl bg-slate-200" />
+              <div className="flex-1 space-y-3">
+                <div className="h-7 w-52 animate-pulse rounded bg-slate-200" />
+                <div className="h-4 w-72 max-w-full animate-pulse rounded bg-slate-100" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index} className="rounded-2xl border-slate-200/80">
+              <CardContent className="p-5">
+                <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
+                <div className="mt-3 h-3 w-full animate-pulse rounded bg-slate-100" />
+                <div className="mt-5 h-10 w-32 animate-pulse rounded-xl bg-slate-100" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     )
   }

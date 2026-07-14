@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -12,10 +12,8 @@ import {
   Plus,
   MoreHorizontal,
   Mail,
-  Calendar,
   CheckCircle2,
   Clock,
-  Loader2,
   FileText,
   Link as LinkIcon,
   AlertTriangle,
@@ -76,9 +74,11 @@ interface ClientReflection {
   client_id: string
 }
 
+type ClientDirectoryFilter = "all" | "needs_attention" | "homework_ready" | "inactive" | "recently_active"
+
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState<"all" | "invited" | "email_sent" | "registered" | "active">("all")
+  const [filterStatus, setFilterStatus] = useState<ClientDirectoryFilter>("all")
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -298,55 +298,44 @@ export default function ClientsPage() {
       return new Date(a.due_date) < now
     }).length
     
-    // Get latest reflection
-    const assignmentsWithReflections = clientAssignments
-      .filter(a => a.reflection && a.completed_at)
-      .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
-    const latestReflection = assignmentsWithReflections[0] || null
-
     // Get completed worksheet assignments for this client
     const completedWorksheets = clientWorksheetAssignments.filter(a => a.status === "completed")
-    const latestCompletedAt = [
-      ...clientAssignments.map(a => a.completed_at).filter(Boolean),
-      ...clientWorksheetAssignments.map(a => a.completed_at).filter(Boolean),
-    ].sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0] || null
+    const readyForReview = clientAssignments.filter(a => a.completed || a.status === "completed" || a.reflection).length + completedWorksheets.length
     const reflectionCount = clientReflections.filter(reflection => reflection.client_id === clientId).length
     
-    return { total, completed, active, started, assigned, completionRate, overdue, latestReflection, completedWorksheets, latestCompletedAt, reflectionCount }
+    return { total, completed, active, started, assigned, completionRate, overdue, completedWorksheets, readyForReview, reflectionCount }
   }
 
-  const filteredClients = clients.filter((client) => {
-    const matchesSearch = client.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    const matchesFilter = filterStatus === "all" || getClientInviteStatus(client).key === filterStatus
-    return matchesSearch && matchesFilter
-  })
+  const getDaysSince = (date: string | null) => {
+    if (!date) return null
+    return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
+  }
 
-  // Calculate days since created
-  const getDaysSinceCreated = (createdAt: string) => {
-    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
+  const formatRelativeDate = (date: string | null) => {
+    if (!date) return "No activity yet"
+    const days = getDaysSince(date)
+    if (days === null) return "No activity yet"
     if (days === 0) return "Today"
     if (days === 1) return "Yesterday"
     return `${days} days ago`
   }
 
-  const formatDate = (date: string | null) => {
-    if (!date) return null
-    return new Date(date).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
+  const getLatestActivityAt = (client: Client) => {
+    const clientAssignments = assignments.filter(a => a.client_id === client.id)
+    const clientWorksheetAssignments = worksheetAssignments.filter(a => a.client_id === client.id)
+    const dates = [
+      client.created_at,
+      client.invite_sent_at,
+      client.invite_accepted_at,
+      ...clientAssignments.flatMap(a => [a.assigned_at, a.started_at, a.completed_at]),
+      ...clientWorksheetAssignments.flatMap(a => [a.assigned_at, a.started_at, a.completed_at]),
+    ].filter(Boolean) as string[]
+
+    return dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null
   }
 
   function isClientRegistered(client: Client) {
     return Boolean(client.user_id || client.invite_accepted_at || client.status === "active")
-  }
-
-  function getRegisteredDateLabel(client: Client) {
-    if (client.invite_accepted_at) return formatDate(client.invite_accepted_at)
-    if (client.user_id || client.status === "active") return formatDate(client.created_at)
-    return "Not registered yet"
   }
 
   function getClientInviteStatus(client: Client) {
@@ -383,312 +372,372 @@ export default function ClientsPage() {
     }
   }
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="saas-page-header flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="saas-eyebrow mb-2">Client operations</p>
-          <motion.h1
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl font-bold tracking-tight text-slate-950"
-          >
-            Clients
-          </motion.h1>
-          <p className="mt-2 text-sm text-slate-500">Manage your client list and assignments</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => openAssignModal()}>
-            <FileText className="w-4 h-4 mr-2" />
-            Assign Homework
-          </Button>
-          <Button onClick={() => setIsAddModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Invite Client
-          </Button>
-        </div>
-      </div>
+  const activeClientCount = clients.filter(isClientRegistered).length
 
-      {/* Search and Filter */}
-      <div className="saas-soft-panel flex flex-col gap-4 p-4 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-11 rounded-2xl border-slate-200 bg-white pl-10"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(["all", "invited", "email_sent", "registered", "active"] as const).map((status) => (
-            <Button
-              key={status}
-              variant={filterStatus === status ? "default" : "outline"}
-              onClick={() => setFilterStatus(status)}
-              className="capitalize"
+  const directoryRows = clients
+    .map((client) => {
+      const stats = getClientStats(client.id)
+      const inviteStatus = getClientInviteStatus(client)
+      const lastActivityAt = getLatestActivityAt(client)
+      const inactiveDays = getDaysSince(lastActivityAt)
+      const isInactive = inactiveDays !== null && inactiveDays >= 14
+      const hasHomeworkReady = stats.readyForReview > 0
+      const needsAttention = stats.overdue > 0 || hasHomeworkReady || isInactive
+      const attentionLabel = stats.overdue > 0
+        ? `${stats.overdue} overdue`
+        : hasHomeworkReady
+          ? "Homework Ready"
+          : isInactive
+            ? `Inactive ${inactiveDays}d`
+            : "Clear"
+
+      return {
+        client,
+        stats,
+        inviteStatus,
+        isRegistered: isClientRegistered(client),
+        lastActivityAt,
+        lastActivityLabel: formatRelativeDate(lastActivityAt),
+        inactiveDays,
+        isInactive,
+        hasHomeworkReady,
+        isRecentlyActive: inactiveDays !== null && inactiveDays <= 7,
+        needsAttention,
+        attentionLabel,
+      }
+    })
+    .sort((a, b) => {
+      if (a.needsAttention !== b.needsAttention) return a.needsAttention ? -1 : 1
+      return new Date(b.lastActivityAt || 0).getTime() - new Date(a.lastActivityAt || 0).getTime()
+    })
+
+  const filteredRows = directoryRows.filter((row) => {
+    const matchesSearch = row.client.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (row.client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    const matchesFilter =
+      filterStatus === "all" ||
+      (filterStatus === "needs_attention" && row.needsAttention) ||
+      (filterStatus === "homework_ready" && row.hasHomeworkReady) ||
+      (filterStatus === "inactive" && row.isInactive) ||
+      (filterStatus === "recently_active" && row.isRecentlyActive)
+
+    return matchesSearch && matchesFilter
+  })
+
+  const filterOptions: { key: ClientDirectoryFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "needs_attention", label: "Needs Attention" },
+    { key: "homework_ready", label: "Homework Ready" },
+    { key: "inactive", label: "Inactive" },
+    { key: "recently_active", label: "Recently Active" },
+  ]
+
+  const getInitials = (name: string) => (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .map(part => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
+  )
+
+  return (
+    <div className="space-y-6">
+      <div className="saas-page-header space-y-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="saas-eyebrow mb-2">Client directory</p>
+            <motion.h1
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-3xl font-bold tracking-tight text-slate-950"
             >
-              {status.replace("_", " ")}
+              Clients
+            </motion.h1>
+            <p className="mt-2 text-sm text-slate-500">{activeClientCount} active clients</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 sm:w-72">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search clients"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-10 rounded-xl border-slate-200 bg-white pl-10"
+              />
+            </div>
+            <Button onClick={() => setIsAddModalOpen(true)} className="h-10">
+              <Plus className="mr-2 h-4 w-4" />
+              Invite Client
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {filterOptions.map((filter) => (
+            <Button
+              key={filter.key}
+              variant={filterStatus === filter.key ? "default" : "outline"}
+              onClick={() => setFilterStatus(filter.key)}
+              size="sm"
+              className="h-9 rounded-full"
+            >
+              {filter.label}
             </Button>
           ))}
         </div>
       </div>
 
-      {/* Loading State */}
       {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
+        <Card className="overflow-hidden border-slate-200/80">
+          <CardContent className="p-0">
+            <div className="hidden grid-cols-[minmax(220px,1.3fr)_120px_120px_140px_120px_140px_120px] gap-4 border-b border-slate-200/80 bg-slate-50/80 px-5 py-3 text-xs font-medium uppercase tracking-wide text-slate-500 lg:grid">
+              <span>Client</span>
+              <span>Status</span>
+              <span>Activity</span>
+              <span>Homework</span>
+              <span>Mood</span>
+              <span>Attention</span>
+              <span className="text-right">Action</span>
+            </div>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="grid gap-4 border-b border-slate-100 px-5 py-4 last:border-0 lg:grid-cols-[minmax(220px,1.3fr)_120px_120px_140px_120px_140px_120px] lg:items-center">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
+                  <div className="space-y-2">
+                    <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+                    <div className="h-3 w-44 animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+                {Array.from({ length: 6 }).map((__, cellIndex) => (
+                  <div key={cellIndex} className="h-7 w-full animate-pulse rounded-full bg-slate-100" />
+                ))}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
-      {/* Error State */}
       {error && !isLoading && (
-        <div className="p-4 bg-destructive/10 text-destructive rounded-xl">
-          {error}
-        </div>
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="flex items-start gap-3 p-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-destructive">Clients could not load</h3>
+              <p className="mt-1 text-sm text-destructive/80">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {clientActionMessage && !isLoading && (
-        <div className="p-4 bg-primary/10 text-primary rounded-xl">
+        <div className="rounded-xl bg-primary/10 p-4 text-primary">
           {clientActionMessage}
         </div>
       )}
 
-      {/* Empty State */}
       {!isLoading && !error && clients.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10">
-              <Plus className="w-8 h-8 text-muted-foreground" />
+        <Card className="border-dashed border-slate-300 bg-white">
+          <CardContent className="flex flex-col items-center justify-center px-6 py-14 text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <Plus className="h-7 w-7 text-primary" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">No clients yet</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Get started by inviting your first client
+            <h3 className="mb-2 text-lg font-semibold text-slate-950">Start your client directory</h3>
+            <p className="mb-5 max-w-sm text-sm text-muted-foreground">
+              Invite your first client to begin tracking homework, reflections, and session prep from one place.
             </p>
             <Button onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Invite Your First Client
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Clients Grid */}
-      {!isLoading && !error && filteredClients.length > 0 && (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredClients.map((client, index) => {
-            const stats = getClientStats(client.id)
-            const inviteStatus = getClientInviteStatus(client)
-            const isRegistered = isClientRegistered(client)
-            return (
-              <motion.div
-                key={client.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card id={`client-${client.id}`} className="h-full scroll-mt-24 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_65px_rgba(15,23,42,0.10)]">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
-                          <span className="text-lg font-bold text-primary">
-                            {client.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                          </span>
-                        </div>
-                        <div>
-                          <CardTitle className="text-base tracking-tight text-slate-950">{client.full_name}</CardTitle>
-                          {client.email && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <Mail className="w-3 h-3" />
-                              {client.email}
-                            </p>
-                          )}
-                          <Badge variant="outline" className={`mt-2 rounded-full px-2.5 py-0.5 ${inviteStatus.className}`}>
-                            {inviteStatus.label}
-                          </Badge>
-                        </div>
+      {!isLoading && !error && clients.length > 0 && filteredRows.length === 0 && (
+        <Card className="border-slate-200/80">
+          <CardContent className="flex flex-col items-center justify-center px-6 py-12 text-center">
+            <Search className="mb-3 h-8 w-8 text-muted-foreground" />
+            <h3 className="text-base font-semibold text-slate-950">No clients match this view</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Try a different filter or search term.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !error && filteredRows.length > 0 && (
+        <Card className="overflow-hidden border-slate-200/80 shadow-sm">
+          <CardContent className="p-0">
+            <div className="hidden grid-cols-[minmax(220px,1.3fr)_120px_120px_140px_120px_140px_120px] gap-4 border-b border-slate-200/80 bg-slate-50/80 px-5 py-3 text-xs font-medium uppercase tracking-wide text-slate-500 lg:grid">
+              <span>Client</span>
+              <span>Status</span>
+              <span>Activity</span>
+              <span>Homework</span>
+              <span>Mood</span>
+              <span>Attention</span>
+              <span className="text-right">Action</span>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {filteredRows.map((row, index) => {
+                const { client, stats, inviteStatus, isRegistered } = row
+                const homeworkLabel = stats.total === 0
+                  ? "No Assignment"
+                  : row.hasHomeworkReady
+                    ? "Homework Ready"
+                    : `${stats.completed}/${stats.total} done`
+
+                const homeworkClassName = row.hasHomeworkReady
+                  ? "border-primary/20 bg-primary/10 text-primary"
+                  : stats.total === 0
+                    ? "border-slate-200 bg-slate-50 text-slate-600"
+                    : "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+
+                const attentionClassName = row.needsAttention
+                  ? row.isInactive
+                    ? "border-amber-500/20 bg-amber-500/10 text-amber-700"
+                    : "border-destructive/20 bg-destructive/10 text-destructive"
+                  : "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+
+                return (
+                  <motion.div
+                    key={client.id}
+                    id={`client-${client.id}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.025 }}
+                    className="grid gap-4 px-4 py-4 transition-colors hover:bg-slate-50/70 sm:px-5 lg:grid-cols-[minmax(220px,1.3fr)_120px_120px_140px_120px_140px_120px] lg:items-center"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/15">
+                        <span className="text-sm font-bold text-primary">{getInitials(client.full_name)}</span>
                       </div>
+                      <div className="min-w-0">
+                        <Link
+                          href={`/dashboard/clients/${client.id}/session-prep`}
+                          className="block truncate text-sm font-semibold text-slate-950 hover:text-primary"
+                        >
+                          {client.full_name}
+                        </Link>
+                        {client.email && (
+                          <p className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{client.email}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 lg:block">
+                      <span className="text-xs font-medium text-muted-foreground lg:hidden">Status</span>
+                      <Badge variant="outline" className={`rounded-full px-2.5 py-1 ${inviteStatus.className}`}>
+                        {inviteStatus.label}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 text-sm lg:block">
+                      <span className="text-xs font-medium text-muted-foreground lg:hidden">Last activity</span>
+                      <span className="text-slate-700">{row.lastActivityLabel}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 lg:block">
+                      <span className="text-xs font-medium text-muted-foreground lg:hidden">Homework</span>
+                      <div>
+                        <Badge variant="outline" className={`rounded-full px-2.5 py-1 ${homeworkClassName}`}>
+                          {homeworkLabel}
+                        </Badge>
+                        {stats.total > 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">{stats.completionRate ?? 0}% completion</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 lg:block">
+                      <span className="text-xs font-medium text-muted-foreground lg:hidden">Mood</span>
+                      <Badge variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600">
+                        In Session Prep
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 lg:block">
+                      <span className="text-xs font-medium text-muted-foreground lg:hidden">Attention</span>
+                      <Badge variant="outline" className={`rounded-full px-2.5 py-1 ${attentionClassName}`}>
+                        {row.needsAttention && !row.isInactive && <AlertTriangle className="mr-1 h-3 w-3" />}
+                        {row.attentionLabel}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 lg:border-0 lg:pt-0">
+                      <Button asChild size="sm" className="h-9 flex-1 lg:flex-none">
+                        <Link href={`/dashboard/clients/${client.id}/session-prep`}>Open Client</Link>
+                      </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                            <MoreHorizontal className="w-4 h-4" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl">
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem>View Profile</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/clients/${client.id}/session-prep`}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              View Profile
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Assign Homework
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openAssignWorksheetModal(client.id)}>
+                            <FileText className="mr-2 h-4 w-4" />
                             Assign Online Worksheet
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/clients/${client.id}/session-prep`}>
-                              <FileText className="w-4 h-4 mr-2" />
+                              <Clock className="mr-2 h-4 w-4" />
                               Session Prep
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/clients/${client.id}/session-prep#progress-notes`}>
-                              <FileText className="w-4 h-4 mr-2" />
+                              <FileText className="mr-2 h-4 w-4" />
                               View Notes
                             </Link>
                           </DropdownMenuItem>
+                          {stats.completedWorksheets.slice(0, 2).map(ws => (
+                            <DropdownMenuItem key={ws.id} onClick={() => viewWorksheetResponses(ws.id)}>
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              View {ws.worksheet_templates?.title}
+                            </DropdownMenuItem>
+                          ))}
                           {client.email && (
                             <DropdownMenuItem onClick={() => copyPortalLink(client.email!, client.id)}>
-                              <LinkIcon className="w-4 h-4 mr-2" />
+                              <LinkIcon className="mr-2 h-4 w-4" />
                               {copiedClientId === client.id ? "Copied!" : "Copy Portal Link"}
                             </DropdownMenuItem>
                           )}
                           {!isRegistered && client.email && (
                             <DropdownMenuItem onClick={() => handleResendInvite(client)}>
-                              <Mail className="w-4 h-4 mr-2" />
-                              Resend Invite
+                              <Mail className="mr-2 h-4 w-4" />
+                              {resendingClientId === client.id ? "Sending..." : "Resend Invite"}
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem>Send Message</DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            Send Message
+                          </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-4 flex flex-col flex-1">
-                    <div className="space-y-4 flex-1">
-                      {/* Progress Bar */}
-                      {stats.total > 0 && (
-                        <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3">
-                          <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">Progress</span>
-                            <span className="font-medium text-foreground">{stats.completed}/{stats.total}</span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full bg-primary transition-all duration-300"
-                              style={{ width: `${stats.completionRate || 0}%` }}
-                            />
-                          </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Status Badges */}
-                      <div className="flex flex-wrap gap-2">
-                        {stats.completed > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                            <CheckCircle2 className="w-3 h-3" />
-                            {stats.completed} completed
-                          </span>
-                        )}
-                        {stats.started > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-700">
-                            <Clock className="w-3 h-3" />
-                            {stats.started} started
-                          </span>
-                        )}
-                        {stats.assigned > 0 && stats.overdue === 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600">
-                            <Clock className="w-3 h-3" />
-                            {stats.assigned} assigned
-                          </span>
-                        )}
-                        {stats.overdue > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
-                            <AlertTriangle className="w-3 h-3" />
-                            {stats.overdue} overdue
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <Calendar className="w-4 h-4" />
-                          Added
-                        </span>
-                        <span className="text-foreground">{getDaysSinceCreated(client.created_at)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Completed date
-                        </span>
-                        <span className="text-foreground">{formatDate(stats.latestCompletedAt) || "No completions yet"}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <Mail className="w-4 h-4" />
-                          Last invited
-                        </span>
-                        <span className="text-foreground">{formatDate(client.invite_sent_at) || "Not sent yet"}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Registered on
-                        </span>
-                        <span className="text-foreground">{getRegisteredDateLabel(client)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <MessageSquare className="w-4 h-4" />
-                          Reflections
-                        </span>
-                        <span className="text-foreground">{stats.reflectionCount}</span>
-                      </div>
-
-                      {/* Latest Reflection */}
-                      {stats.latestReflection && (
-                        <div className="space-y-1 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <MessageSquare className="w-3 h-3" />
-                            Latest reflection
-                          </div>
-                          <p className="text-xs text-foreground line-clamp-2">
-                            {stats.latestReflection.reflection}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                                on {stats.latestReflection.title}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Completed Worksheets */}
-                          {stats.completedWorksheets.length > 0 && (
-                            <div className="space-y-2">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                <FileText className="w-3 h-3" />
-                                Completed worksheets
-                              </p>
-                              {stats.completedWorksheets.slice(0, 2).map(ws => (
-                                <Button
-                                  key={ws.id}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full justify-start text-xs h-8 rounded-lg bg-muted/30"
-                                  onClick={() => viewWorksheetResponses(ws.id)}
-                                >
-                                  <CheckCircle2 className="w-3 h-3 mr-2 text-primary" />
-                                  {ws.worksheet_templates?.title}
-                                </Button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                    <div className="mt-5 border-t border-slate-200/80 pt-5">
-                      <Button size="sm" className="w-full" onClick={() => openAssignModal(client.id)}>
-                        Assign
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )
-          })}
-        </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Invite Client Modal */}

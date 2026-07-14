@@ -133,24 +133,6 @@ function parseDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function formatTimestamp(value: string | null) {
-  const date = parseDate(value)
-  if (!date) return "No recent activity"
-
-  const diffMs = Date.now() - date.getTime()
-  const diffMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)))
-  if (diffMinutes < 1) return "Just now"
-  if (diffMinutes < 60) return `${diffMinutes}m ago`
-
-  const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })
-}
-
 function formatEventTime(event: CalendarSessionEvent) {
   const value = event.start.dateTime || event.start.date
   if (!value) return "Time unavailable"
@@ -189,6 +171,34 @@ function StatusPill({ label, tone }: { label: string; tone: keyof typeof toneCla
   )
 }
 
+function getHomeworkTone(label: string | undefined): keyof typeof toneClasses {
+  if (label?.includes("ready")) return "green"
+  if (label?.includes("pending")) return "amber"
+  return "slate"
+}
+
+function getReflectionTone(label: string | undefined): keyof typeof toneClasses {
+  return label === "Submitted" ? "green" : "slate"
+}
+
+function getMoodTone(label: string | undefined): keyof typeof toneClasses {
+  if (label === "Needs review") return "red"
+  if (label?.startsWith("Mood")) return "teal"
+  return "slate"
+}
+
+function getPrepReadiness(event: CalendarSessionEvent) {
+  if (!event.matchedClient) return "Not available"
+  if (!event.prep) return "No prep signals"
+  const hasPrepSignal = [
+    event.prep.homeworkStatus,
+    event.prep.reflectionStatus,
+    event.prep.moodStatus,
+  ].some((status) => status && !["No homework", "None yet", "No check-in"].includes(status))
+
+  return hasPrepSignal ? "Signals ready" : "No prep signals"
+}
+
 function EmptyState({
   title,
   description,
@@ -206,6 +216,38 @@ function EmptyState({
       </div>
       <p className="font-semibold text-slate-950">{title}</p>
       <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">{description}</p>
+    </div>
+  )
+}
+
+function LoadingRows() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="rounded-3xl border border-slate-200/75 bg-white p-4 shadow-sm">
+            <div className="mb-3 h-10 w-10 animate-pulse rounded-2xl bg-slate-100" />
+            <div className="h-8 w-14 animate-pulse rounded bg-slate-200" />
+            <div className="mt-2 h-3 w-24 animate-pulse rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div key={index} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-3">
+              <div className="h-3 w-32 animate-pulse rounded bg-slate-100" />
+              <div className="h-5 w-56 animate-pulse rounded bg-slate-200" />
+              <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-4 lg:w-[520px]">
+              {Array.from({ length: 4 }).map((__, pillIndex) => (
+                <div key={pillIndex} className="h-9 animate-pulse rounded-full bg-slate-100" />
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -239,94 +281,109 @@ function SectionCard({
   )
 }
 
-function PrepClientCard({ prepClient }: { prepClient: PrepClient }) {
+function AdditionalPrepRow({ prepClient }: { prepClient: PrepClient }) {
   const { client } = prepClient
 
   return (
-    <div className="group rounded-[28px] border border-slate-200/75 bg-white p-5 shadow-[0_16px_44px_rgba(15,23,42,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6D5EF5]/25 hover:shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="grid gap-4 rounded-2xl border border-slate-200/75 bg-white p-4 shadow-sm lg:grid-cols-[minmax(180px,1fr)_minmax(320px,1.4fr)_auto] lg:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#6D5EF5]/10 text-xs font-bold text-[#6D5EF5]">
+          {client.full_name
+            .split(" ")
+            .map((part) => part[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()}
+        </div>
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#6D5EF5]/10 text-sm font-bold text-[#6D5EF5]">
-              {client.full_name
-                .split(" ")
-                .map((part) => part[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate font-bold text-slate-950">{client.full_name}</p>
-              <p className="text-sm text-slate-500">Next session: Not scheduled</p>
-            </div>
-          </div>
-        </div>
-        <Button
-          asChild
-          className="h-11 shrink-0 rounded-2xl bg-[#6D5EF5] px-5 text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]"
-        >
-          <Link href={`/dashboard/clients/${client.id}/session-prep`}>
-            Open Session Prep
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            <ClipboardCheck className="h-3.5 w-3.5" />
-            Homework
-          </div>
-          <StatusPill label={prepClient.homeworkStatus} tone={prepClient.homeworkTone} />
-        </div>
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            <MessageSquare className="h-3.5 w-3.5" />
-            Reflections
-          </div>
-          <StatusPill label={prepClient.reflectionStatus} tone={prepClient.reflectionTone} />
-        </div>
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            <BarChart3 className="h-3.5 w-3.5" />
-            Mood
-          </div>
-          <StatusPill label={prepClient.moodStatus} tone={prepClient.moodTone} />
+          <p className="truncate font-bold text-slate-950">{client.full_name}</p>
+          <p className="text-sm text-slate-500">No matched calendar event</p>
         </div>
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-        <Clock className="h-3.5 w-3.5" />
-        Last activity {formatTimestamp(prepClient.lastActivityAt)}
+      <div className="flex flex-wrap gap-2">
+        <StatusPill label={prepClient.homeworkStatus} tone={prepClient.homeworkTone} />
+        <StatusPill label={prepClient.reflectionStatus} tone={prepClient.reflectionTone} />
+        <StatusPill label={prepClient.moodStatus} tone={prepClient.moodTone} />
         {prepClient.readyReasons.map((reason) => (
-          <span key={reason} className="rounded-full bg-[#18B7A0]/10 px-2.5 py-1 font-bold text-[#109986]">
+          <span key={reason} className="rounded-full bg-[#18B7A0]/10 px-2.5 py-1 text-xs font-bold text-[#109986]">
             {reason}
           </span>
         ))}
       </div>
+      <Button
+        asChild
+        className="h-11 rounded-2xl bg-[#6D5EF5] px-5 text-white shadow-[0_14px_30px_rgba(109,94,245,0.18)] hover:bg-[#5B4DEA]"
+      >
+        <Link href={`/dashboard/clients/${client.id}/session-prep`}>
+          Open Session Prep
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Link>
+      </Button>
     </div>
   )
 }
 
 function CalendarEventCard({ event }: { event: CalendarSessionEvent }) {
   const prep = event.prep
+  const prepReadiness = getPrepReadiness(event)
 
   return (
-    <div className="rounded-[28px] border border-slate-200/75 bg-white p-5 shadow-[0_16px_44px_rgba(15,23,42,0.045)]">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-            <Clock className="h-3.5 w-3.5" />
-            {formatEventDate(event)} · {formatEventTime(event)}
+    <div className="rounded-[24px] border border-slate-200/75 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.045)]">
+      <div className="grid gap-4 lg:grid-cols-[120px_minmax(220px,1fr)_minmax(360px,1.3fr)_auto] lg:items-center">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400 lg:block">
+            <Clock className="h-3.5 w-3.5 lg:mb-1" />
+            <span>{formatEventTime(event)}</span>
           </div>
-          <p className="mt-2 truncate text-base font-bold text-slate-950">{event.title}</p>
-          {event.location && <p className="mt-1 text-sm text-slate-500">{event.location}</p>}
+          <p className="mt-1 text-sm text-slate-500">{formatEventDate(event)}</p>
         </div>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-base font-bold text-slate-950">
+              {event.matchedClient?.name || "Not matched to a client"}
+            </p>
+            {!event.matchedClient && <StatusPill label="Not matched to a client" tone="slate" />}
+          </div>
+          <p className="mt-1 truncate text-sm text-slate-500">{event.title}</p>
+          {event.location && <p className="mt-1 truncate text-xs text-slate-400">{event.location}</p>}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Homework
+            </div>
+            <StatusPill label={prep?.homeworkStatus || "No homework"} tone={getHomeworkTone(prep?.homeworkStatus)} />
+          </div>
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Reflection
+            </div>
+            <StatusPill label={prep?.reflectionStatus || "None yet"} tone={getReflectionTone(prep?.reflectionStatus)} />
+          </div>
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Mood
+            </div>
+            <StatusPill label={prep?.moodStatus || "No check-in"} tone={getMoodTone(prep?.moodStatus)} />
+          </div>
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI Prep
+            </div>
+            <StatusPill label={prepReadiness} tone={prepReadiness === "Signals ready" ? "purple" : "slate"} />
+          </div>
+        </div>
+
         {event.matchedClient ? (
           <Button
             asChild
-            className="h-10 shrink-0 rounded-2xl bg-[#6D5EF5] px-4 text-white shadow-[0_14px_30px_rgba(109,94,245,0.22)] hover:bg-[#5B4DEA]"
+            className="h-11 rounded-2xl bg-[#6D5EF5] px-4 text-white shadow-[0_14px_30px_rgba(109,94,245,0.18)] hover:bg-[#5B4DEA]"
           >
             <Link href={`/dashboard/clients/${event.matchedClient.id}/session-prep`}>
               Open Session Prep
@@ -339,41 +396,6 @@ function CalendarEventCard({ event }: { event: CalendarSessionEvent }) {
           </Button>
         ) : null}
       </div>
-
-      {event.matchedClient ? (
-        <>
-          <div className="mt-4 rounded-2xl border border-[#18B7A0]/20 bg-[#18B7A0]/10 p-3">
-            <p className="text-sm font-semibold text-[#0F8D7E]">Matched to {event.matchedClient.name}</p>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                <ClipboardCheck className="h-3.5 w-3.5" />
-                Homework
-              </div>
-              <StatusPill label={prep?.homeworkStatus || "No homework"} tone={prep?.homeworkStatus?.includes("ready") ? "green" : prep?.homeworkStatus?.includes("pending") ? "amber" : "slate"} />
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                <MessageSquare className="h-3.5 w-3.5" />
-                Reflections
-              </div>
-              <StatusPill label={prep?.reflectionStatus || "None yet"} tone={prep?.reflectionStatus === "Submitted" ? "green" : "slate"} />
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                <BarChart3 className="h-3.5 w-3.5" />
-                Mood
-              </div>
-              <StatusPill label={prep?.moodStatus || "No check-in"} tone={prep?.moodStatus === "Needs review" ? "red" : prep?.moodStatus?.startsWith("Mood") ? "teal" : "slate"} />
-            </div>
-          </div>
-        </>
-      ) : (
-        <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm leading-6 text-slate-500">
-          No existing client matched this calendar event by name.
-        </p>
-      )}
     </div>
   )
 }
@@ -416,6 +438,7 @@ export default function CalendarPage() {
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckInRecord[]>([])
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventsPayload | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isConnectingCalendar, setIsConnectingCalendar] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -496,6 +519,38 @@ export default function CalendarPage() {
     loadCalendar()
   }, [])
 
+  const connectGoogleCalendar = async () => {
+    setIsConnectingCalendar(true)
+    setError(null)
+
+    try {
+      const supabase = getClient() as any
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setError("You must be logged in to connect Google Calendar.")
+        return
+      }
+
+      const response = await fetch("/api/calendar/google/start", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok || !result?.authUrl) {
+        setError(result?.error || "Failed to start Google Calendar connection.")
+        return
+      }
+
+      window.location.href = result.authUrl
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to connect Google Calendar.")
+    } finally {
+      setIsConnectingCalendar(false)
+    }
+  }
+
   const prepClients = useMemo(() => {
     return clients
       .map((client): PrepClient => {
@@ -565,48 +620,52 @@ export default function CalendarPage() {
   }, [assignments, clients, moodCheckIns, reflections, worksheetAssignments])
 
   const prepReadyClients = prepClients.filter((client) => client.prepScore > 0)
-  const homeworkReadyCount = prepClients.filter((client) => client.homeworkTone === "green").length
-  const reflectionReadyCount = prepClients.filter((client) => client.reflectionTone === "green").length
-  const moodAlertCount = prepClients.filter((client) => client.moodTone === "red").length
   const connectedCalendarEvents = calendarEvents?.connected ? calendarEvents : null
   const todaySessions = connectedCalendarEvents?.sections.today || []
   const tomorrowSessions = connectedCalendarEvents?.sections.tomorrow || []
   const upcomingWeekSessions = connectedCalendarEvents?.sections.upcomingWeek || []
+  const allCalendarSessions = [...todaySessions, ...tomorrowSessions, ...upcomingWeekSessions]
+  const matchedCalendarClientIds = new Set(
+    allCalendarSessions
+      .map((event) => event.matchedClient?.id)
+      .filter((id): id is string => Boolean(id))
+  )
+  const additionalPrepClients = prepReadyClients.filter((prepClient) => !matchedCalendarClientIds.has(prepClient.client.id))
+  const prepNeededCount = additionalPrepClients.length
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="overflow-hidden rounded-[32px] border border-slate-200/75 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.07)]"
+        className="overflow-hidden rounded-[28px] border border-slate-200/75 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
       >
-        <div className="relative p-6 sm:p-8">
-          <div className="absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_18%_0%,rgba(109,94,245,0.18),transparent_34%),radial-gradient(circle_at_88%_8%,rgba(24,183,160,0.15),transparent_32%)]" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <Badge className="mb-4 rounded-full bg-[#6D5EF5]/10 px-3 py-1 text-[#6D5EF5] hover:bg-[#6D5EF5]/10">
+              <Badge className="mb-3 rounded-full bg-[#6D5EF5]/10 px-3 py-1 text-[#6D5EF5] hover:bg-[#6D5EF5]/10">
                 Calendar
               </Badge>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                Today&apos;s session schedule.
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                Session readiness.
               </h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-                Use real client activity to prepare for sessions, review homework, and spot reflections or mood signals before the day begins.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                See who is on the calendar and whether each matched session has homework, reflection, mood, and prep signals ready.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-3 lg:w-[520px]">
+            <div className="grid grid-cols-3 gap-3 lg:w-[480px]">
               {[
-                { label: "Today", value: todaySessions.length, icon: CalendarClock, tone: "purple" as const },
-                { label: "Homework", value: homeworkReadyCount, icon: ClipboardCheck, tone: "green" as const },
-                { label: "Mood alerts", value: moodAlertCount, icon: AlertTriangle, tone: "red" as const },
+                { label: "Sessions Today", value: todaySessions.length, icon: CalendarClock, tone: "purple" as const },
+                { label: "Sessions Tomorrow", value: tomorrowSessions.length, icon: CalendarDays, tone: "teal" as const },
+                { label: "Prep Needed", value: prepNeededCount, icon: AlertTriangle, tone: prepNeededCount > 0 ? "amber" as const : "green" as const },
               ].map((stat) => {
                 const Icon = stat.icon
                 return (
-                  <div key={stat.label} className="rounded-3xl border border-slate-200/75 bg-white/90 p-4 shadow-sm backdrop-blur">
+                  <div key={stat.label} className="rounded-2xl border border-slate-200/75 bg-slate-50/70 p-4">
                     <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClasses[stat.tone]}`}>
                       <Icon className="h-4 w-4" />
                     </div>
-                    <p className="text-3xl font-bold text-slate-950">{stat.value}</p>
+                    <p className="text-2xl font-bold text-slate-950">{stat.value}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">{stat.label}</p>
                   </div>
                 )
@@ -617,9 +676,7 @@ export default function CalendarPage() {
       </motion.div>
 
       {isLoading && (
-        <div className="flex items-center justify-center rounded-[28px] border border-slate-200 bg-white py-20 shadow-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-[#6D5EF5]" />
-        </div>
+        <LoadingRows />
       )}
 
       {error && !isLoading && (
@@ -630,125 +687,86 @@ export default function CalendarPage() {
 
       {!isLoading && !error && (
         <>
-          <div className="grid gap-6 xl:grid-cols-2">
-            {connectedCalendarEvents ? (
-              <>
-                <CalendarSessionSection
-                  eyebrow="Today"
-                  title="Today's Sessions"
-                  icon={CalendarClock}
-                  events={todaySessions}
-                  emptyTitle="No sessions today"
-                  emptyDescription="Google Calendar is connected, but no events were found for today."
-                />
-                <CalendarSessionSection
-                  eyebrow="Tomorrow"
-                  title="Tomorrow's Sessions"
-                  icon={CalendarDays}
-                  events={tomorrowSessions}
-                  emptyTitle="No sessions tomorrow"
-                  emptyDescription="Google Calendar is connected, but no events were found for tomorrow."
-                />
-              </>
-            ) : (
-              <SectionCard eyebrow="Connect" title="Google Calendar disconnected" icon={CalendarDays}>
-              <EmptyState
-                title="Connect Google Calendar to show sessions"
-                description="Upcoming sessions will appear here after Google Calendar is connected in Settings."
-                icon={CalendarDays}
-              />
-              <Button className="mt-4 rounded-2xl" asChild>
-                <Link href="/dashboard/settings">Open Settings</Link>
-              </Button>
-            </SectionCard>
-            )}
-          </div>
-
-          {connectedCalendarEvents && (
-            <CalendarSessionSection
-              eyebrow="Upcoming"
-              title="Upcoming Week"
-              icon={Clock}
-              events={upcomingWeekSessions}
-              emptyTitle="No more sessions this week"
-              emptyDescription="Google Calendar is connected, but no additional events were found in the next week."
-            />
+          {!connectedCalendarEvents && (
+            <div className="rounded-[28px] border border-[#6D5EF5]/20 bg-[#6D5EF5]/10 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-[#5B4DEA]">Calendar disconnected</p>
+                  <h2 className="mt-1 text-xl font-bold text-slate-950">Connect Google Calendar to show session readiness.</h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                    Once connected, Today, Tomorrow, and Upcoming Week will show matched sessions and prep statuses in one list.
+                  </p>
+                </div>
+                <Button
+                  className="h-11 rounded-2xl bg-[#6D5EF5] px-5 text-white hover:bg-[#5B4DEA]"
+                  onClick={connectGoogleCalendar}
+                  disabled={isConnectingCalendar}
+                >
+                  {isConnectingCalendar ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarDays className="mr-2 h-4 w-4" />}
+                  Connect Google Calendar
+                </Button>
+              </div>
+            </div>
           )}
 
-          <SectionCard eyebrow="Prep" title="Session Prep Ready" icon={Sparkles}>
-            {prepReadyClients.length > 0 ? (
-              <div className="space-y-4">
-                {prepReadyClients.map((prepClient) => (
-                  <PrepClientCard key={prepClient.client.id} prepClient={prepClient} />
+          {connectedCalendarEvents ? (
+            <>
+              <CalendarSessionSection
+                eyebrow="Today"
+                title="Today"
+                icon={CalendarClock}
+                events={todaySessions}
+                emptyTitle="No sessions today"
+                emptyDescription="No matched or unmatched Google Calendar events were found for today."
+              />
+              <CalendarSessionSection
+                eyebrow="Tomorrow"
+                title="Tomorrow"
+                icon={CalendarDays}
+                events={tomorrowSessions}
+                emptyTitle="No sessions tomorrow"
+                emptyDescription="No matched or unmatched Google Calendar events were found for tomorrow."
+              />
+              <CalendarSessionSection
+                eyebrow="Week"
+                title="Upcoming Week"
+                icon={Clock}
+                events={upcomingWeekSessions}
+                emptyTitle="No upcoming sessions"
+                emptyDescription="No additional Google Calendar events were found in the upcoming week."
+              />
+            </>
+          ) : (
+            <SectionCard eyebrow="Schedule" title="Upcoming Sessions" icon={CalendarDays}>
+              <EmptyState
+                title="Calendar disconnected"
+                description="Connect Google Calendar to show upcoming sessions here."
+                icon={CalendarDays}
+              />
+            </SectionCard>
+          )}
+
+          <SectionCard eyebrow="Prep" title="Additional Prep Needed" icon={Sparkles}>
+            {additionalPrepClients.length > 0 ? (
+              <div className="space-y-3">
+                {additionalPrepClients.map((prepClient) => (
+                  <AdditionalPrepRow key={prepClient.client.id} prepClient={prepClient} />
                 ))}
               </div>
             ) : clients.length > 0 ? (
-              <div className="space-y-4">
-                {prepClients.map((prepClient) => (
-                  <PrepClientCard key={prepClient.client.id} prepClient={prepClient} />
-                ))}
-              </div>
+              <EmptyState
+                title="All sessions are prepared"
+                description="Clients with prep signals and no matched calendar event will appear here."
+                icon={CheckCircle2}
+              />
             ) : (
               <EmptyState
                 title="No clients to prepare for yet"
-                description="When clients are added, their homework, reflections, and mood check-ins will appear here."
+                description="When clients are added, prep signals will appear here without duplicating the calendar schedule."
                 icon={Users}
               />
             )}
           </SectionCard>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            <SectionCard eyebrow="Homework" title="Homework Status" icon={ClipboardCheck}>
-              {prepClients.length > 0 ? (
-                <div className="space-y-3">
-                  {prepClients.slice(0, 6).map((prepClient) => (
-                    <div key={prepClient.client.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-                      <span className="truncate text-sm font-semibold text-slate-950">{prepClient.client.full_name}</span>
-                      <StatusPill label={prepClient.homeworkStatus} tone={prepClient.homeworkTone} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No homework status yet" description="Homework status appears after clients are added." icon={ClipboardCheck} />
-              )}
-            </SectionCard>
-
-            <SectionCard eyebrow="Reflections" title="Reflection Status" icon={MessageSquare}>
-              {prepClients.length > 0 ? (
-                <div className="space-y-3">
-                  {prepClients.slice(0, 6).map((prepClient) => (
-                    <div key={prepClient.client.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-                      <span className="truncate text-sm font-semibold text-slate-950">{prepClient.client.full_name}</span>
-                      <StatusPill label={prepClient.reflectionStatus} tone={prepClient.reflectionTone} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No reflections yet" description="Reflection status appears after clients submit journal entries." icon={MessageSquare} />
-              )}
-            </SectionCard>
-
-            <SectionCard eyebrow="Mood" title="Mood Check-In Status" icon={BarChart3}>
-              {prepClients.length > 0 ? (
-                <div className="space-y-3">
-                  {prepClients.slice(0, 6).map((prepClient) => (
-                    <div key={prepClient.client.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3">
-                      <span className="truncate text-sm font-semibold text-slate-950">{prepClient.client.full_name}</span>
-                      <StatusPill label={prepClient.moodStatus} tone={prepClient.moodTone} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No mood check-ins yet" description="Mood status appears after clients submit check-ins." icon={BarChart3} />
-              )}
-            </SectionCard>
-          </div>
-
-          {reflectionReadyCount > 0 && (
-            <div className="rounded-[28px] border border-[#18B7A0]/20 bg-[#18B7A0]/10 p-5 text-sm font-medium text-[#109986]">
-              {reflectionReadyCount} client{reflectionReadyCount === 1 ? "" : "s"} submitted reflections that may help with prep today.
-            </div>
-          )}
         </>
       )}
     </div>

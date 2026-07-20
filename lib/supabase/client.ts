@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from "@supabase/ssr"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -34,19 +34,15 @@ export function getSupabaseBrowserConfigStatus() {
 }
 
 export function createClient() {
-  console.info("[v0] Supabase browser client: createClient", getSupabaseBrowserConfigStatus())
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 // Singleton instance for client-side usage
-let clientInstance: ReturnType<typeof createSupabaseClient> | null = null
+let clientInstance: ReturnType<typeof createBrowserClient> | null = null
 
 export function getClient() {
   if (!clientInstance) {
-    console.info("[v0] Supabase browser client: creating singleton", getSupabaseBrowserConfigStatus())
-    clientInstance = createSupabaseClient(supabaseUrl, supabaseAnonKey)
-  } else {
-    console.info("[v0] Supabase browser client: reusing singleton", getSupabaseBrowserConfigStatus())
+    clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
   return clientInstance
 }

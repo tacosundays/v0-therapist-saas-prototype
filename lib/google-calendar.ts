@@ -71,8 +71,8 @@ export function getAuthClient() {
 }
 
 function getSecret() {
-  const secret = process.env.GOOGLE_CALENDAR_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!secret) throw new Error("Calendar token encryption is not configured.")
+  const secret = process.env.GOOGLE_CALENDAR_TOKEN_SECRET
+  if (!secret) throw new Error("Calendar token encryption requires GOOGLE_CALENDAR_TOKEN_SECRET.")
   return crypto.createHash("sha256").update(secret).digest()
 }
 
@@ -108,7 +108,12 @@ export function verifyState<T extends Record<string, unknown>>(state: string): T
   const [body, signature] = state.split(".")
   if (!body || !signature) throw new Error("Calendar connection state is invalid.")
   const expected = crypto.createHmac("sha256", getSecret()).update(body).digest("base64url")
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+  const providedSignature = Buffer.from(signature)
+  const expectedSignature = Buffer.from(expected)
+  if (
+    providedSignature.length !== expectedSignature.length
+    || !crypto.timingSafeEqual(providedSignature, expectedSignature)
+  ) {
     throw new Error("Calendar connection state could not be verified.")
   }
 

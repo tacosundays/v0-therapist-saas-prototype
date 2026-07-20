@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const oauthError = url.searchParams.get("error")
 
     if (oauthError) {
-      return NextResponse.redirect(`${origin}/dashboard/settings?calendar=error&message=${encodeURIComponent(oauthError)}`)
+      return NextResponse.redirect(`${origin}/dashboard/settings?calendar=error&message=${encodeURIComponent("Google Calendar connection was not completed.")}`)
     }
 
     if (!code || !state) {
@@ -30,6 +30,18 @@ export async function GET(request: Request) {
       throw new Error("Calendar connection state is missing therapist context.")
     }
 
+    const adminClient = getAdminClient()
+    const { data: therapist, error: therapistError } = await adminClient
+      .from("therapists")
+      .select("id")
+      .eq("id", payload.therapistId)
+      .ilike("email", payload.email)
+      .maybeSingle()
+
+    if (therapistError || !therapist) {
+      throw new Error("Calendar connection state could not be verified.")
+    }
+
     const tokens = await exchangeCodeForTokens(request, code)
     if (!tokens.access_token || !tokens.refresh_token) {
       throw new Error("Google did not return a refresh token. Try connecting again and approve offline calendar access.")
@@ -38,7 +50,6 @@ export async function GET(request: Request) {
     const profile = await fetchGoogleProfile(tokens.access_token)
     const tokenExpiresAt = new Date(Date.now() + ((tokens.expires_in || 3600) - 60) * 1000).toISOString()
     const scopes = tokens.scope?.split(/\s+/).filter(Boolean) || []
-    const adminClient = getAdminClient()
 
     const { error } = await adminClient
       .from("therapist_calendar_connections")
@@ -57,8 +68,11 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(`${origin}/dashboard/settings?calendar=connected`)
   } catch (error) {
+    console.warn("[security] Calendar OAuth callback failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
     return NextResponse.redirect(
-      `${origin}/dashboard/settings?calendar=error&message=${encodeURIComponent(error instanceof Error ? error.message : "Google Calendar connection failed.")}`,
+      `${origin}/dashboard/settings?calendar=error&message=${encodeURIComponent("Google Calendar connection failed.")}`,
     )
   }
 }

@@ -14,8 +14,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ authUrl: getGoogleAuthUrl(request, state) })
   } catch (error) {
+    console.warn("[security] Calendar OAuth start failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to start Google Calendar connection." },
+      { error: "We couldn't start Google Calendar connection." },
       { status: 500 },
     )
   }

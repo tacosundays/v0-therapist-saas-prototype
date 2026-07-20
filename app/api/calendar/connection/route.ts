@@ -13,15 +13,18 @@ export async function GET(request: Request) {
       .eq("provider", "google")
       .maybeSingle()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: "We couldn't load the calendar connection." }, { status: 500 })
 
     return NextResponse.json({
       connected: Boolean(data),
       connection: data || null,
     })
   } catch (error) {
+    console.warn("[security] Calendar connection load failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load calendar connection." },
+      { error: "We couldn't load the calendar connection." },
       { status: 500 },
     )
   }
@@ -42,13 +45,16 @@ export async function PATCH(request: Request) {
       .select("id, provider, provider_account_email, calendar_id, scopes, generate_ai_prep_overnight, connected_at, updated_at")
       .maybeSingle()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: "We couldn't update the calendar connection." }, { status: 500 })
     if (!data) return NextResponse.json({ error: "No Google Calendar connection found." }, { status: 404 })
 
     return NextResponse.json({ connected: true, connection: data })
   } catch (error) {
+    console.warn("[security] Calendar connection update failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update calendar connection." },
+      { error: "We couldn't update the calendar connection." },
       { status: 500 },
     )
   }
@@ -65,12 +71,15 @@ export async function DELETE(request: Request) {
       .eq("therapist_id", resolved.therapist.id)
       .eq("provider", "google")
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: "We couldn't disconnect the calendar." }, { status: 500 })
 
     return NextResponse.json({ connected: false })
   } catch (error) {
+    console.warn("[security] Calendar disconnect failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to disconnect calendar." },
+      { error: "We couldn't disconnect the calendar." },
       { status: 500 },
     )
   }

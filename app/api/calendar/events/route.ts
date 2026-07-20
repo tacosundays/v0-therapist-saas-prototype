@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       .eq("provider", "google")
       .maybeSingle()
 
-    if (connectionError) return NextResponse.json({ error: connectionError.message }, { status: 500 })
+    if (connectionError) return NextResponse.json({ error: "We couldn't load calendar events." }, { status: 500 })
     if (!connection) return NextResponse.json({ connected: false, sections: { today: [], tomorrow: [], upcomingWeek: [] } })
 
     const [clientsResult, assignmentsResult, worksheetResult, reflectionsResult, moodResult] = await Promise.all([
@@ -210,8 +210,11 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
+    console.warn("[security] Calendar events load failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load Google Calendar events." },
+      { error: "We couldn't load calendar events." },
       { status: 500 },
     )
   }

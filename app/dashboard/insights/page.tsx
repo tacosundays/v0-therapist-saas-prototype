@@ -49,7 +49,9 @@ interface WorksheetAssignmentRecord {
   completed_at: string | null
   worksheet_templates: {
     category: string | null
-  } | null
+  } | Array<{
+    category: string | null
+  }> | null
 }
 
 interface CompletionTrendPoint {
@@ -102,6 +104,13 @@ function formatCategory(category: string | null | undefined) {
     .join(" ")
 }
 
+function getWorksheetCategory(assignment: WorksheetAssignmentRecord) {
+  const template = Array.isArray(assignment.worksheet_templates)
+    ? assignment.worksheet_templates[0]
+    : assignment.worksheet_templates
+  return template?.category
+}
+
 function getCompletionTrend(assignments: AssignmentRecord[], worksheetAssignments: WorksheetAssignmentRecord[]) {
   const currentWeek = startOfWeek(new Date())
   const weeks = Array.from({ length: 6 }, (_, index) => {
@@ -143,7 +152,7 @@ function getHomeworkTypes(assignments: AssignmentRecord[], worksheetAssignments:
   }
 
   worksheetAssignments.forEach((assignment) => {
-    const category = formatCategory(assignment.worksheet_templates?.category)
+    const category = formatCategory(getWorksheetCategory(assignment))
     counts.set(category, (counts.get(category) || 0) + 1)
   })
 

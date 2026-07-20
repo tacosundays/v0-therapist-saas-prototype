@@ -1,4 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+type UntypedSupabaseClient = SupabaseClient<any, "public", any>
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -34,15 +37,15 @@ export function getSupabaseBrowserConfigStatus() {
 }
 
 export function createClient() {
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient<any, "public">(supabaseUrl, supabaseAnonKey)
 }
 
 // Singleton instance for client-side usage
-let clientInstance: ReturnType<typeof createBrowserClient> | null = null
+let clientInstance: UntypedSupabaseClient | null = null
 
 export function getClient() {
   if (!clientInstance) {
-    clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    clientInstance = createBrowserClient<any, "public">(supabaseUrl, supabaseAnonKey)
   }
   return clientInstance
 }

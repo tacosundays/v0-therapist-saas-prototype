@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
-import { AiCopilot } from "@/components/dashboard/ai-copilot"
 import { GlobalSearch } from "@/components/dashboard/global-search"
 import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
 import { Loader2, AlertCircle } from "lucide-react"
@@ -11,6 +11,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getClient } from "@/lib/supabase/client"
 import { SessionTimeout } from "@/components/auth/session-timeout"
+
+const AiCopilot = dynamic(
+  () => import("@/components/dashboard/ai-copilot").then((module) => module.AiCopilot),
+  { ssr: false },
+)
+
+const FeedbackDialog = dynamic(
+  () => import("@/components/dashboard/feedback-dialog").then((module) => module.FeedbackDialog),
+  { ssr: false },
+)
 
 export default function DashboardLayout({
   children,
@@ -107,6 +117,7 @@ export default function DashboardLayout({
       <SessionTimeout />
       <DashboardSidebar />
       <AiCopilot />
+      <FeedbackDialog />
       <div className="pl-64 transition-all duration-300">
         <SubscriptionBanner />
         <div className="mx-auto w-full max-w-[1500px] px-8 pt-6 xl:px-10">

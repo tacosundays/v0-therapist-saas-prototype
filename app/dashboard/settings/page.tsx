@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Upload,
-  Unplug
+  Unplug,
+  Rocket
 } from "lucide-react"
 
 type TherapistRecord = Record<string, unknown> & {
@@ -35,6 +36,8 @@ type TherapistRecord = Record<string, unknown> & {
   profile_photo_url?: string | null
   avatar_url?: string | null
   photo_url?: string | null
+  onboarding_status?: "not_started" | "in_progress" | "skipped" | "completed" | null
+  onboarding_step?: number | null
 }
 
 type CalendarConnection = {
@@ -61,6 +64,12 @@ function getPhotoUrl(therapist: TherapistRecord | null) {
 }
 
 export default function SettingsPage() {
+  const [notifications, setNotifications] = useState({
+    email: true,
+    homework: true,
+    weekly: true,
+    ai: false,
+  })
   const [therapistId, setTherapistId] = useState<string | null>(null)
   const [therapist, setTherapist] = useState<TherapistRecord | null>(null)
   const [firstName, setFirstName] = useState("")
@@ -78,6 +87,26 @@ export default function SettingsPage() {
   const [isCalendarManaging, setIsCalendarManaging] = useState(false)
   const [calendarError, setCalendarError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("shrinkaid:notification-preferences")
+      if (saved) setNotifications((current) => ({ ...current, ...JSON.parse(saved) }))
+    } catch {
+      // Keep safe defaults when browser storage is unavailable.
+    }
+  }, [])
+
+  const updateNotification = (key: keyof typeof notifications, checked: boolean) => {
+    const next = { ...notifications, [key]: checked }
+    setNotifications(next)
+    try {
+      window.localStorage.setItem("shrinkaid:notification-preferences", JSON.stringify(next))
+      setSuccess("Notification preferences saved on this device.")
+    } catch {
+      setError("Notification preferences could not be saved in this browser.")
+    }
+  }
 
   useEffect(() => {
     const loadTherapist = async () => {
@@ -409,6 +438,41 @@ export default function SettingsPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Rocket className="w-5 h-5 text-primary" />
+              Getting Started
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4 rounded-2xl border border-primary/15 bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {therapist?.onboarding_status === "in_progress" ? "Continue setting up ShrinkAid" : "Review the onboarding guide"}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {therapist?.onboarding_status === "in_progress"
+                    ? `Your progress is saved at step ${(therapist.onboarding_step || 0) + 1} of 7.`
+                    : "Revisit the client, worksheet, invitation, and Session Prep walkthrough anytime."}
+                </p>
+              </div>
+              <Button className="shrink-0 rounded-xl" asChild>
+                <Link href={therapist?.onboarding_status === "in_progress" ? "/onboarding" : "/onboarding?step=start"}>
+                  <Rocket className="mr-2 h-4 w-4" />
+                  {therapist?.onboarding_status === "in_progress" ? "Resume onboarding" : "Restart onboarding"}
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
         <Card>
@@ -527,7 +591,7 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-foreground">Email notifications</p>
                 <p className="text-xs text-muted-foreground">Receive emails about client activity</p>
               </div>
-              <Switch defaultChecked />
+              <Switch checked={notifications.email} onCheckedChange={(checked) => updateNotification("email", checked)} aria-label="Email notifications" />
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -535,7 +599,7 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-foreground">Homework completions</p>
                 <p className="text-xs text-muted-foreground">Get notified when clients complete assignments</p>
               </div>
-              <Switch defaultChecked />
+              <Switch checked={notifications.homework} onCheckedChange={(checked) => updateNotification("homework", checked)} aria-label="Homework completion notifications" />
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -543,7 +607,7 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-foreground">Weekly summary</p>
                 <p className="text-xs text-muted-foreground">Receive a weekly digest of practice activity</p>
               </div>
-              <Switch defaultChecked />
+              <Switch checked={notifications.weekly} onCheckedChange={(checked) => updateNotification("weekly", checked)} aria-label="Weekly summary notifications" />
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -551,7 +615,7 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-foreground">AI suggestions</p>
                 <p className="text-xs text-muted-foreground">Get notified about new AI homework recommendations</p>
               </div>
-              <Switch />
+              <Switch checked={notifications.ai} onCheckedChange={(checked) => updateNotification("ai", checked)} aria-label="AI suggestion notifications" />
             </div>
           </CardContent>
         </Card>

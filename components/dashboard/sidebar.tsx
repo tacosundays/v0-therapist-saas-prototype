@@ -21,7 +21,8 @@ import {
   ChevronRight,
   Loader2,
   CreditCard,
-  ShieldCheck
+  ShieldCheck,
+  CircleHelp
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState, useEffect, useRef } from "react"
@@ -62,6 +63,7 @@ const navSections = [
   {
     label: "Account",
     items: [
+      { href: "/dashboard/help", label: "Help & Getting Started", icon: CircleHelp },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
   },

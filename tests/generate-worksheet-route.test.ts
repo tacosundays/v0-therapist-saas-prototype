@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
-import { handleGenerateWorksheetRequest } from "../app/api/generate-worksheet/route.ts"
+import { handleGenerateWorksheetRequest } from "../app/api/generate-worksheet/handler.ts"
 import { checkRateLimit, resetRateLimitsForTests } from "../lib/security/rate-limit.ts"
 
 type MockUser = {

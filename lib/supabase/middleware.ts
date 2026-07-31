@@ -38,6 +38,18 @@ function redirectTo(request: NextRequest, destination: RedirectDestination) {
   return NextResponse.redirect(url)
 }
 
+function redirectExpiredSessionToLogin(request: NextRequest) {
+  const response = redirectTo(request, "/login")
+
+  for (const cookie of request.cookies.getAll()) {
+    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
+      response.cookies.delete(cookie.name)
+    }
+  }
+
+  return response
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
 
@@ -58,7 +70,14 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data.user
+  } catch (error) {
+    console.warn("[Auth] Invalid or expired session; redirecting to login", error)
+    return redirectExpiredSessionToLogin(request)
+  }
   const role = user ? await resolveRole(user.id, user.email) : null
   const decision = getRouteAccessDecision(request.nextUrl.pathname, role, Boolean(user))
 

@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { getTherapistId } from "@/lib/auth/check-user-role"
+import { summaryTextList } from "@/lib/session-summary-safe"
 import { getClient } from "@/lib/supabase/client"
 
 interface ClientRecord {
@@ -1260,7 +1261,10 @@ export default function SessionPrepPage() {
                 <Badge variant="outline" className="rounded-full">Generated {formatDateTime(latestSessionSummary.created_at)}</Badge>
                 <SummaryBlock title="Client Overview" text={latestSessionSummary.summary_json?.clientOverview || "No client overview available."} />
                 <SummaryBlock title="Homework Progress" text={latestSessionSummary.summary_json?.homeworkProgress || "No homework progress summary available."} />
-                <SummaryBlock title="Suggested Discussion Topics" text={latestSessionSummary.summary_json?.suggestedDiscussionTopics?.join("\n") || "No discussion topics available."} />
+                <SummaryBlock
+                  title="Suggested Discussion Topics"
+                  text={summaryTextList(latestSessionSummary.summary_json?.suggestedDiscussionTopics).join("\n") || "No discussion topics available."}
+                />
               </CardContent>
             </Card>
           )}

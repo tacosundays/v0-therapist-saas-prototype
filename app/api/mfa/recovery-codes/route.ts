@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { hasAal2 } from "@/lib/security/aal"
 
 function normalizeEmail(email: string | null | undefined) {
   return email ? email.trim().toLowerCase() : null
@@ -24,7 +25,7 @@ function getBearerToken(request: Request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : null
 }
 
-async function getTherapistForRequest(request: Request) {
+async function getTherapistForRequest(request: Request, requireAal2 = true) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -37,6 +38,9 @@ async function getTherapistForRequest(request: Request) {
 
   if (!bearerToken) {
     return { error: NextResponse.json({ error: "Missing authentication token" }, { status: 401 }) }
+  }
+  if (requireAal2 && !hasAal2(bearerToken)) {
+    return { error: NextResponse.json({ error: "Multi-factor authentication is required" }, { status: 403 }) }
   }
 
   const authClient = createClient(supabaseUrl, supabaseAnonKey)
@@ -67,7 +71,7 @@ async function getTherapistForRequest(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const result = await getTherapistForRequest(request)
+    const result = await getTherapistForRequest(request, false)
     if (result.error) return result.error
 
     const { adminClient, therapist } = result
@@ -135,7 +139,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Recovery code is required" }, { status: 400 })
     }
 
-    const result = await getTherapistForRequest(request)
+    const result = await getTherapistForRequest(request, false)
     if (result.error) return result.error
 
     const { adminClient, therapist } = result

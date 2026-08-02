@@ -85,7 +85,6 @@ export async function POST(request: Request) {
     await writeAuditLog({
       therapistId: therapist?.id || client?.therapist_id || null,
       userId: user.id,
-      userEmail: normalizedEmail,
       actorRole: therapist ? "therapist" : client ? "client" : "unknown",
       action,
       resourceType,
@@ -96,8 +95,7 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.warn("[audit] Failed to handle audit event", error)
+  } catch {
     return NextResponse.json({ error: "Failed to log audit event" }, { status: 500 })
   }
 }

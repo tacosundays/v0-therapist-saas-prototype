@@ -17,11 +17,19 @@ test("unauthenticated users are redirected away from client portal routes", () =
 })
 
 test("therapists can access dashboard routes but not client portal routes", () => {
-  assert.deepEqual(getRouteAccessDecision("/dashboard/clients", "therapist", true), { action: "allow" })
+  assert.deepEqual(getRouteAccessDecision("/dashboard/clients", "therapist", true, true), { action: "allow" })
   assert.deepEqual(getRouteAccessDecision("/client-portal", "therapist", true), {
     action: "redirect",
     destination: "/dashboard",
   })
+})
+
+test("AAL1 therapists are restricted to the MFA security page", () => {
+  assert.deepEqual(getRouteAccessDecision("/dashboard/clients", "therapist", true, false), {
+    action: "redirect",
+    destination: "/dashboard/security",
+  })
+  assert.deepEqual(getRouteAccessDecision("/dashboard/security", "therapist", true, false), { action: "allow" })
 })
 
 test("clients can access client portal routes but not therapist dashboard routes", () => {

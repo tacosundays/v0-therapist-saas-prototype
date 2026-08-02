@@ -21,7 +21,8 @@ test("feedback API authenticates and limits accepted input", () => {
   assert.match(route, /resolveTherapistId/)
   assert.match(route, /message\.length < 3/)
   assert.match(route, /message\.length > 4000/)
-  assert.match(route, /screenshotPath\.startsWith/)
+  assert.match(route, /const screenshotPath = null/)
+  assert.match(route, /likelySensitiveIdentifier/)
 })
 
 test("admin feedback endpoint uses the existing admin allowlist", () => {

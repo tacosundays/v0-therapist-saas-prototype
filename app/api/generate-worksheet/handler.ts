@@ -4,6 +4,7 @@ import { z } from "zod"
 import { writeAuditLog } from "../../../lib/audit-log.ts"
 import { checkRateLimit } from "../../../lib/security/rate-limit.ts"
 import { genericError, getBearerToken, getRequestIp } from "../../../lib/security/request.ts"
+import { hasAal2 } from "../../../lib/security/aal.ts"
 
 const worksheetSchema = z.object({
   title: z.string().describe("A clear, engaging title for the worksheet"),
@@ -72,6 +73,7 @@ type GenerateWorksheetDeps = {
   generateWorksheet: (input: z.infer<typeof requestSchema>) => Promise<unknown>
   audit: typeof writeAuditLog
   rateLimit: typeof checkRateLimit
+  requireAal2?: typeof hasAal2
 }
 
 function normalizeEmail(email: string) {
@@ -136,6 +138,7 @@ export function createGenerateWorksheetDeps(): GenerateWorksheetDeps {
     generateWorksheet: defaultGenerateWorksheet,
     audit: writeAuditLog,
     rateLimit: checkRateLimit,
+    requireAal2: hasAal2,
   }
 }
 
@@ -176,6 +179,7 @@ export async function handleGenerateWorksheetRequest(req: Request, deps = create
     if (!bearerToken) {
       return genericError(401)
     }
+    if (deps.requireAal2 && !deps.requireAal2(bearerToken)) return genericError(403)
 
     const authClient = deps.createAuthClient()
     const { data: { user: authUser }, error: userError } = await authClient.auth.getUser(bearerToken)

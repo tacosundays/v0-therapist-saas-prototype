@@ -1,6 +1,6 @@
 export type AppRole = "therapist" | "client" | "unknown"
 
-export type RedirectDestination = "/login" | "/dashboard" | "/client-portal"
+export type RedirectDestination = "/login" | "/dashboard" | "/dashboard/security" | "/client-portal"
 
 export type RouteAccessDecision =
   | { action: "allow" }
@@ -20,12 +20,15 @@ function isPublicPath(pathname: string) {
   return publicPathPrefixes.some((path) => pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)))
 }
 
-export function getRouteAccessDecision(pathname: string, role: AppRole | null, isAuthenticated: boolean): RouteAccessDecision {
+export function getRouteAccessDecision(pathname: string, role: AppRole | null, isAuthenticated: boolean, isAal2 = false): RouteAccessDecision {
   if (isPublicPath(pathname)) return { action: "allow" }
 
   if (pathname.startsWith("/dashboard")) {
     if (!isAuthenticated) return { action: "redirect", destination: "/login" }
     if (role === "client") return { action: "redirect", destination: "/client-portal" }
+    if (role === "therapist" && !isAal2 && pathname !== "/dashboard/security") {
+      return { action: "redirect", destination: "/dashboard/security" }
+    }
     if (role === "therapist") return { action: "allow" }
     return { action: "redirect", destination: "/login" }
   }

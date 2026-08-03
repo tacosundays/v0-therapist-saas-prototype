@@ -69,23 +69,7 @@ export async function getCheckoutAvailability() {
   )
 }
 
-function getStripeSecretKeyPrefix() {
-  const secretKey = process.env.STRIPE_SECRET_KEY
-  if (!secretKey) return null
-
-  return secretKey.slice(0, 8)
-}
-
-function logStripeCheckoutEnv(stage: string, productId: string, priceId: string) {
-  console.error(`[v0] Stripe checkout ${stage}`, {
-    stripeSecretKeyPrefix: getStripeSecretKeyPrefix(),
-    stripeSoloPriceId: process.env.STRIPE_SOLO_PRICE_ID || null,
-    stripeGrowingPriceId: process.env.STRIPE_GROWING_PRICE_ID || null,
-    stripeGroupPriceId: process.env.STRIPE_GROUP_PRICE_ID || null,
-    selectedPlanId: productId,
-    selectedPriceId: priceId,
-  })
-}
+function logStripeCheckoutEnv(_stage: string, _productId: string, _priceId: string) {}
 
 export async function startSubscriptionCheckout(productId: string, userData: UserData) {
   try {

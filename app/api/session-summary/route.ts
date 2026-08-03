@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { hasAal2 } from "@/lib/security/aal"
+import { writeAuditLog } from "@/lib/audit-log"
 
 const defaultModel = "gpt-4o-mini"
 
@@ -106,6 +108,7 @@ export async function POST(request: Request) {
     if (!bearerToken) {
       return NextResponse.json({ error: "Missing authentication token" }, { status: 401 })
     }
+    if (!hasAal2(bearerToken)) return NextResponse.json({ error: "Multi-factor authentication is required" }, { status: 403 })
 
     const authClient = createClient(supabaseUrl, supabaseAnonKey)
     const { data: { user }, error: userError } = await authClient.auth.getUser(bearerToken)
@@ -119,7 +122,7 @@ export async function POST(request: Request) {
 
     const { data: therapist, error: therapistError } = await adminClient
       .from("therapists")
-      .select("id, full_name, email")
+      .select("id")
       .ilike("email", normalizedTherapistEmail)
       .maybeSingle()
 
@@ -133,7 +136,7 @@ export async function POST(request: Request) {
 
     const { data: client, error: clientError } = await adminClient
       .from("clients")
-      .select("id, therapist_id, full_name, email, status, created_at, user_id, invite_sent_at, invite_accepted_at")
+      .select("id, therapist_id, status, created_at")
       .eq("id", clientId)
       .eq("therapist_id", therapist.id)
       .maybeSingle()
@@ -202,7 +205,7 @@ export async function POST(request: Request) {
         "progress_notes query failed",
         adminClient
           .from("progress_notes")
-          .select("id, note_type, subjective, objective, assessment, plan, private_note, created_at")
+          .select("id, note_type, subjective, objective, assessment, plan, created_at")
           .eq("client_id", client.id)
           .eq("therapist_id", therapist.id)
           .order("created_at", { ascending: false })
@@ -268,11 +271,7 @@ export async function POST(request: Request) {
     const model = process.env.OPENAI_MODEL || defaultModel
     const context = {
       generatedAt: new Date().toISOString(),
-      therapist: {
-        id: therapist.id,
-        name: therapist.full_name,
-      },
-      client,
+      client: { alias: "Client", status: client.status, created_at: client.created_at },
       assignments,
       worksheetAssignments,
       worksheetResponses,
@@ -283,6 +282,8 @@ export async function POST(request: Request) {
       progressNotes,
       sourceCounts,
     }
+
+    await writeAuditLog({ therapistId: therapist.id, userId: user.id, actorRole: "therapist", action: "ai.session_summary_egress", resourceType: "client", resourceId: client.id, details: { sourceCounts } })
 
     const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -317,12 +318,7 @@ export async function POST(request: Request) {
 
     const openAiResult = await openAiResponse.json().catch(() => null)
 
-    if (!openAiResponse.ok) {
-      return NextResponse.json(
-        { error: openAiResult?.error?.message || "OpenAI session summary generation failed" },
-        { status: 502 },
-      )
-    }
+    if (!openAiResponse.ok) return NextResponse.json({ error: "OpenAI session summary generation failed" }, { status: 502 })
 
     const content = openAiResult?.choices?.[0]?.message?.content
 
@@ -333,8 +329,8 @@ export async function POST(request: Request) {
     let parsedSummary: unknown
     try {
       parsedSummary = JSON.parse(content)
-    } catch (error) {
-      return NextResponse.json({ error: `OpenAI returned invalid JSON: ${getErrorMessage(error)}` }, { status: 502 })
+    } catch {
+      return NextResponse.json({ error: "OpenAI returned invalid JSON" }, { status: 502 })
     }
 
     const summary = normalizeSummary(parsedSummary)
@@ -358,11 +354,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ summary: savedSummary })
-  } catch (error) {
-    console.error("[v0] Session Summary: failed to generate", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate session summary" },
-      { status: 500 },
-    )
+  } catch {
+    return NextResponse.json({ error: "Failed to generate session summary" }, { status: 500 })
   }
 }

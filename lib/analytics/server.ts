@@ -2,6 +2,7 @@ import "server-only"
 
 import { createClient } from "@supabase/supabase-js"
 import { isAnalyticsEventName, sanitizeAnalyticsProperties, type AnalyticsEventInput } from "@/lib/analytics/events"
+import { hasAal2 } from "@/lib/security/aal"
 
 export function getBearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || ""
@@ -26,7 +27,7 @@ export async function authenticateAnalyticsRequest(request: Request) {
   const token = getBearerToken(request)
   if (!clients || !token) return null
   const { data: { user }, error } = await clients.auth.auth.getUser(token)
-  if (error || !user) return null
+  if (error || !user || !hasAal2(token)) return null
   return { ...clients, user }
 }
 

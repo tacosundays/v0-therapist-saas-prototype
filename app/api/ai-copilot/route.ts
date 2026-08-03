@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { hasAal2 } from "@/lib/security/aal"
+import { writeAuditLog } from "@/lib/audit-log"
 
 const defaultModel = "gpt-4o-mini"
 const disclaimer = "AI suggestions are for therapist review and do not replace clinical judgment."
@@ -192,10 +194,7 @@ async function fetchOptionalData<T>(
   fallback: T,
 ) {
   const result = await query
-  if (result.error) {
-    console.warn(`[v0] AI Copilot: ${label} unavailable`, result.error)
-    return fallback
-  }
+  if (result.error) return fallback
   return result.data ?? fallback
 }
 
@@ -331,6 +330,9 @@ export async function POST(request: Request) {
     if (!bearerToken) {
       return NextResponse.json({ error: "Missing authentication token" }, { status: 401 })
     }
+    if (!hasAal2(bearerToken)) {
+      return NextResponse.json({ error: "Multi-factor authentication is required" }, { status: 403 })
+    }
 
     const authClient = createClient(supabaseUrl, supabaseAnonKey)
     const { data: { user }, error: userError } = await authClient.auth.getUser(bearerToken)
@@ -344,13 +346,11 @@ export async function POST(request: Request) {
 
     const { data: therapist, error: therapistError } = await adminClient
       .from("therapists")
-      .select("id, full_name, email")
+      .select("id")
       .ilike("email", normalizedTherapistEmail)
       .maybeSingle()
 
-    if (therapistError) {
-      return NextResponse.json({ error: therapistError.message }, { status: 500 })
-    }
+    if (therapistError) return NextResponse.json({ error: "Unable to authorize request" }, { status: 500 })
 
     if (!therapist) {
       return NextResponse.json({ error: "No therapist account found for your email" }, { status: 403 })
@@ -466,28 +466,36 @@ export async function POST(request: Request) {
     ])
     const dailyBrief = buildDailyBrief(clientRows, assignmentRows, worksheetRows, reflectionRows, moodRows)
 
+    const aliases = new Map(clientRows.map((client, index) => [client.id, `Client ${index + 1}`]))
+    const selectedClientId = primaryClient?.id || null
+    const belongsToSelectedClient = (row: DatedClientRecord) => !selectedClientId || row.client_id === selectedClientId
     const context = {
       generatedAt: new Date().toISOString(),
-      therapist: {
-        id: therapist.id,
-        name: therapist.full_name,
-      },
       question: question.trim(),
-      currentSessionHistory: Array.isArray(history) ? history.slice(-8) : [],
+      currentSessionHistory: Array.isArray(history)
+        ? history.slice(-4).map((item) => typeof item === "string" ? item.slice(0, 1000) : null).filter(Boolean)
+        : [],
       sourceCounts,
       dailyBrief,
-      clients,
+      clients: clientRows.filter((client) => !selectedClientId || client.id === selectedClientId)
+        .map((client) => ({ alias: aliases.get(client.id), status: client.status, created_at: client.created_at })),
       homework: {
-        assignments,
-        worksheetAssignments,
+        assignments: assignmentRows.filter(belongsToSelectedClient).slice(0, 20).map(({ client_id, ...row }) => ({ ...row, client: aliases.get(client_id) })),
+        worksheetAssignments: worksheetRows.filter(belongsToSelectedClient).slice(0, 20).map(({ client_id, ...row }) => ({ ...row, client: aliases.get(client_id) })),
       },
-      reflections,
-      moodCheckIns,
+      reflections: reflectionRows.filter(belongsToSelectedClient).slice(0, 12).map(({ client_id, ...row }) => ({ ...row, client: aliases.get(client_id) })),
+      moodCheckIns: moodRows.filter(belongsToSelectedClient).slice(0, 12).map(({ client_id, ...row }) => ({ ...row, client: aliases.get(client_id) })),
       sessionNotes: {
-        progressNotes,
-        sessionPrepNotes,
+        progressNotes: [],
+        sessionPrepNotes: [],
       },
     }
+
+    await writeAuditLog({
+      therapistId: therapist.id, userId: user.id, actorRole: "therapist",
+      action: "ai.copilot_egress", resourceType: "ai_request", resourceId: selectedClientId,
+      details: { selectedClient: Boolean(selectedClientId), sourceCounts },
+    })
 
     const model = process.env.OPENAI_MODEL || defaultModel
     const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {

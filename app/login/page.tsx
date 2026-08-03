@@ -50,12 +50,7 @@ function getAuthErrorMessage(err: unknown, stage: string) {
   return `${stage} failed: ${message}`
 }
 
-function logLoginStage(stage: string, details?: Record<string, unknown>) {
-  console.info(`[v0] Login debug: ${stage}`, {
-    ...details,
-    timestamp: new Date().toISOString(),
-  })
-}
+function logLoginStage(_stage: string, _details?: Record<string, unknown>) {}
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)

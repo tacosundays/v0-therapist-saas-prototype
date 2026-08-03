@@ -37,6 +37,12 @@ BEGIN
   RETURN NEW;
 END $$;
 
+-- These functions are invoked only by their triggers and must not be callable directly.
+REVOKE EXECUTE ON FUNCTION public.enforce_client_assignment_update()
+FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.enforce_client_worksheet_assignment_update()
+FROM PUBLIC, anon, authenticated;
+
 DROP TRIGGER IF EXISTS enforce_client_assignment_update ON public.assignments;
 CREATE TRIGGER enforce_client_assignment_update BEFORE UPDATE ON public.assignments
 FOR EACH ROW EXECUTE FUNCTION public.enforce_client_assignment_update();

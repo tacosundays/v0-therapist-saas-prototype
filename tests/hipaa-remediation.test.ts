@@ -12,6 +12,8 @@ test("HIPAA migration protects assignment integrity and audit immutability", asy
   assert.match(sql, /enforce_client_assignment_update/)
   assert.match(sql, /audit_logs_append_only/)
   assert.match(sql, /auth\.jwt\(\) ->> 'aal' = 'aal2'/)
+  assert.match(sql, /enforce_client_assignment_update\(\)[\s\S]*FROM PUBLIC, anon, authenticated/)
+  assert.match(sql, /enforce_client_worksheet_assignment_update\(\)[\s\S]*FROM PUBLIC, anon, authenticated/)
 })
 
 test("Security Advisor hardening is reproducible from migrations", async () => {

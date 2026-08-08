@@ -462,7 +462,7 @@ export function GlobalSearch() {
           type="button"
           variant="outline"
           onClick={() => setOpen(true)}
-          className="group h-11 w-full justify-between rounded-2xl border-slate-200/75 bg-white/85 px-4 text-slate-500 shadow-[0_14px_34px_rgba(15,23,42,0.045)] backdrop-blur transition-all hover:border-[#6D5EF5]/25 hover:bg-white hover:text-slate-950 sm:w-[360px]"
+          className="group h-11 w-full justify-between rounded-2xl border-slate-200/75 bg-white/85 px-4 text-slate-500 shadow-[0_14px_34px_rgba(15,23,42,0.045)] backdrop-blur transition-all hover:border-[#6D5EF5]/25 hover:bg-white hover:text-slate-950 sm:w-[430px]"
         >
           <span className="flex items-center gap-2">
             <Search className="h-4 w-4 text-slate-400 group-hover:text-[#6D5EF5]" />

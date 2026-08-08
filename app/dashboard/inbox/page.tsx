@@ -21,6 +21,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClient } from "@/lib/supabase/client"
+import {
+  demoAssignments,
+  demoClients,
+  demoMessages,
+  demoMoodCheckIns,
+  demoReflections,
+  demoSessionSummaries,
+  demoWorksheetAssignments,
+  useDemoMode,
+} from "@/lib/demo-mode"
 
 type InboxFilter = "all" | "homework" | "reflections" | "mood" | "ai" | "team"
 
@@ -383,6 +393,7 @@ function ActivityTimeline({
 }
 
 export default function TherapistInboxPage() {
+  const { isDemoMode } = useDemoMode()
   const [activeFilter, setActiveFilter] = useState<InboxFilter>("all")
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
@@ -399,6 +410,16 @@ export default function TherapistInboxPage() {
       setError(null)
 
       try {
+        if (isDemoMode) {
+          setClients(demoClients)
+          setAssignments(demoAssignments)
+          setWorksheetAssignments(demoWorksheetAssignments)
+          setReflections(demoReflections)
+          setMoodCheckIns(demoMoodCheckIns)
+          setSessionSummaries(demoSessionSummaries)
+          return
+        }
+
         const supabase = getClient() as any
         const { therapistId, userEmail } = await getTherapistId()
 
@@ -469,13 +490,27 @@ export default function TherapistInboxPage() {
     }
 
     loadInbox()
-  }, [])
+  }, [isDemoMode])
 
   const clientsById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients])
 
   const inboxData = useMemo(() => {
     const clientName = (clientId: string) => clientsById.get(clientId)?.full_name || null
-    const sessionPrepHref = (clientId: string) => `/dashboard/clients/${clientId}/session-prep`
+    const sessionPrepHref = (clientId: string, section?: "homework" | "reflections" | "mood" | "ai" | "notes") => {
+      const sectionAnchor = section === "homework"
+        ? "#homework-progress"
+        : section === "reflections"
+          ? "#reflection-preview"
+          : section === "mood"
+            ? "#mood-checkins"
+            : section === "ai"
+              ? "#ai-summary"
+              : section === "notes"
+                ? "#progress-notes"
+                : ""
+
+      return `/dashboard/clients/${clientId}/session-prep${sectionAnchor}`
+    }
 
     const completedAssignmentItems: InboxItem[] = assignments
       .filter((assignment) => assignment.completed || assignment.status === "completed" || Boolean(assignment.reflection))
@@ -492,7 +527,7 @@ export default function TherapistInboxPage() {
           timestamp,
           description: `${assignment.title || "Homework"} is ready for review.`,
           actionLabel: "Review",
-          href: sessionPrepHref(assignment.client_id),
+          href: sessionPrepHref(assignment.client_id, "homework"),
           icon: ClipboardCheck,
           tone: "green" as const,
           event: "Homework completed",
@@ -515,7 +550,7 @@ export default function TherapistInboxPage() {
           timestamp,
           description: `${templateTitle(assignment)} was completed and is ready for review.`,
           actionLabel: "Review",
-          href: sessionPrepHref(assignment.client_id),
+          href: sessionPrepHref(assignment.client_id, "homework"),
           icon: ClipboardCheck,
           tone: "green" as const,
           event: "Homework completed",
@@ -544,7 +579,7 @@ export default function TherapistInboxPage() {
           timestamp,
           description: `${assignment.title || "Homework"} has been open for ${age} days.`,
           actionLabel: "Review",
-          href: sessionPrepHref(assignment.client_id),
+          href: sessionPrepHref(assignment.client_id, "homework"),
           icon: Clock,
           tone: "amber" as const,
           event: "Homework overdue",
@@ -573,7 +608,7 @@ export default function TherapistInboxPage() {
           timestamp,
           description: `${templateTitle(assignment)} has been open for ${age} days.`,
           actionLabel: "Review",
-          href: sessionPrepHref(assignment.client_id),
+          href: sessionPrepHref(assignment.client_id, "homework"),
           icon: Clock,
           tone: "amber" as const,
           event: "Homework overdue",
@@ -596,7 +631,7 @@ export default function TherapistInboxPage() {
             ? `Submitted reflection: ${reflection.title}.`
             : "Submitted a new reflection.",
           actionLabel: "Read",
-          href: "/dashboard/reflections",
+          href: sessionPrepHref(reflection.client_id, "reflections"),
           icon: MessageSquare,
           tone: "green" as const,
           event: "Reflection ready",
@@ -637,7 +672,7 @@ export default function TherapistInboxPage() {
           timestamp: latest.created_at,
           description: `Mood alert: ${alertReasons.join(", ")}.`,
           actionLabel: "View trend",
-          href: sessionPrepHref(clientId),
+          href: sessionPrepHref(clientId, "mood"),
           icon: AlertTriangle,
           tone: "red" as const,
           event: "Mood alert",
@@ -665,6 +700,22 @@ export default function TherapistInboxPage() {
         event: client.user_id || client.invite_accepted_at ? "Invitation accepted" : "Invitation sent",
       }))
 
+    const clientMessageItems: InboxItem[] = isDemoMode
+      ? demoMessages.map((message) => ({
+          id: message.id,
+          filter: "team" as const,
+          clientId: message.clientId,
+          clientName: message.clientName,
+          timestamp: message.timestamp,
+          description: message.description,
+          actionLabel: "Open prep",
+          href: sessionPrepHref(message.clientId, "notes"),
+          icon: MessageSquare,
+          tone: "teal" as const,
+          event: "Client message",
+        }))
+      : []
+
     const aiItems: InboxItem[] = sessionSummaries
       .map((summary) => {
         const name = clientName(summary.client_id)
@@ -678,7 +729,7 @@ export default function TherapistInboxPage() {
           timestamp: summary.created_at,
           description: "AI session summary is available for review.",
           actionLabel: "Open prep",
-          href: sessionPrepHref(summary.client_id),
+          href: sessionPrepHref(summary.client_id, "ai"),
           icon: Sparkles,
           tone: "purple" as const,
           event: "AI summary generated",
@@ -703,7 +754,7 @@ export default function TherapistInboxPage() {
             timestamp: checkIn.created_at,
             description: `Submitted mood check-in: ${checkIn.mood_rating}/10.`,
             actionLabel: "View",
-            href: sessionPrepHref(checkIn.client_id),
+            href: sessionPrepHref(checkIn.client_id, "mood"),
             icon: BarChart3,
             tone: "teal" as const,
             event: "Mood check-in",
@@ -711,6 +762,7 @@ export default function TherapistInboxPage() {
         })
         .filter(Boolean) as InboxItem[],
       ...invitationItems,
+      ...clientMessageItems,
       ...aiItems,
     ]).slice(0, 14)
 
@@ -773,6 +825,7 @@ export default function TherapistInboxPage() {
       reflectionItems: sortNewestFirst(reflectionItems).slice(0, 8),
       moodAlertItems: sortNewestFirst(moodAlertItems).slice(0, 8),
       invitationItems: sortNewestFirst(invitationItems).slice(0, 8),
+      messageItems: sortNewestFirst(clientMessageItems).slice(0, 8),
       inactiveItems: sortNewestFirst(inactiveItems).slice(0, 8),
       overdueHomeworkItems: sortNewestFirst([...overdueAssignmentItems, ...overdueWorksheetItems]).slice(0, 8),
       totalItems: [
@@ -783,10 +836,11 @@ export default function TherapistInboxPage() {
         ...reflectionItems,
         ...moodAlertItems,
         ...invitationItems,
+        ...clientMessageItems,
         ...aiItems,
       ].length,
     }
-  }, [assignments, clients, clientsById, moodCheckIns, reflections, sessionSummaries, worksheetAssignments])
+  }, [assignments, clients, clientsById, isDemoMode, moodCheckIns, reflections, sessionSummaries, worksheetAssignments])
 
   const filtered = (items: InboxItem[]) => {
     if (activeFilter === "all") return items
@@ -960,6 +1014,16 @@ export default function TherapistInboxPage() {
               emptyTitle="No mood alerts"
               emptyDescription="Low mood, high anxiety or stress, and notable drops will appear here when real check-ins are submitted."
             />
+            {isDemoMode && (
+              <InboxSection
+                eyebrow="Messages"
+                title="Client Messages"
+                icon={MessageSquare}
+                items={filtered(inboxData.messageItems)}
+                emptyTitle="No client messages"
+                emptyDescription="Client messages will appear here when there is something to review."
+              />
+            )}
             <InboxSection
               eyebrow="Invitations"
               title="Recent Invitations"

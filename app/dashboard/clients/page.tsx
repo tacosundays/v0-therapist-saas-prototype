@@ -13,11 +13,9 @@ import {
   MoreHorizontal,
   Mail,
   CheckCircle2,
-  Clock,
   FileText,
   Link as LinkIcon,
   AlertTriangle,
-  MessageSquare
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -31,6 +29,14 @@ import { AddClientModal } from "@/components/dashboard/add-client-modal"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { AssignWorksheetModal } from "@/components/dashboard/assign-worksheet-modal"
 import { ViewResponsesModal } from "@/components/dashboard/view-responses-modal"
+import {
+  demoAssignments,
+  demoClients,
+  demoReflections,
+  demoWorksheetAssignments,
+  enableDemoMode,
+  useDemoMode,
+} from "@/lib/demo-mode"
 
 interface Client {
   id: string
@@ -77,6 +83,7 @@ interface ClientReflection {
 type ClientDirectoryFilter = "all" | "needs_attention" | "homework_ready" | "inactive" | "recently_active"
 
 export default function ClientsPage() {
+  const { isDemoMode } = useDemoMode()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<ClientDirectoryFilter>("all")
   const [clients, setClients] = useState<Client[]>([])
@@ -100,6 +107,14 @@ export default function ClientsPage() {
     setError(null)
 
     try {
+      if (isDemoMode) {
+        setClients(demoClients)
+        setAssignments(demoAssignments)
+        setWorksheetAssignments(demoWorksheetAssignments)
+        setClientReflections(demoReflections)
+        return
+      }
+
       const supabase = getClient() as any
       
       // Get current user
@@ -187,7 +202,7 @@ export default function ClientsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isDemoMode])
 
   useEffect(() => {
     fetchData()
@@ -467,7 +482,16 @@ export default function ClientsPage() {
                 className="h-10 rounded-xl border-slate-200 bg-white pl-10"
               />
             </div>
-            <Button onClick={() => setIsAddModalOpen(true)} className="h-10">
+            <Button
+              onClick={() => {
+                if (isDemoMode) {
+                  setClientActionMessage("Demo workspace is read-only. Create your practice to invite real clients.")
+                  return
+                }
+                setIsAddModalOpen(true)
+              }}
+              className="h-10"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Invite Client
             </Button>
@@ -553,6 +577,18 @@ export default function ClientsPage() {
               <Plus className="mr-2 h-4 w-4" />
               Invite Your First Client
             </Button>
+            {!isDemoMode && (
+              <Button
+                variant="outline"
+                className="mt-2"
+                onClick={() => {
+                  enableDemoMode()
+                  window.location.href = "/dashboard?demo=1"
+                }}
+              >
+                View Demo Workspace
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -611,9 +647,13 @@ export default function ClientsPage() {
                     className="grid gap-4 px-4 py-4 transition-colors hover:bg-slate-50/70 sm:px-5 lg:grid-cols-[minmax(220px,1.3fr)_120px_120px_140px_120px_140px_120px] lg:items-center"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/15">
-                        <span className="text-sm font-bold text-primary">{getInitials(client.full_name)}</span>
-                      </div>
+                      {(client as any).avatar ? (
+                        <img src={(client as any).avatar} alt="" className="h-10 w-10 shrink-0 rounded-full ring-1 ring-primary/15" />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/15">
+                          <span className="text-sm font-bold text-primary">{getInitials(client.full_name)}</span>
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <Link
                           href={`/dashboard/clients/${client.id}/session-prep`}
@@ -625,6 +665,11 @@ export default function ClientsPage() {
                           <p className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
                             <Mail className="h-3 w-3 shrink-0" />
                             <span className="truncate">{client.email}</span>
+                          </p>
+                        )}
+                        {isDemoMode && (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {(client as any).age} · {(client as any).pronouns} · {(client as any).clientType}
                           </p>
                         )}
                       </div>
@@ -671,7 +716,7 @@ export default function ClientsPage() {
 
                     <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 lg:border-0 lg:pt-0">
                       <Button asChild size="sm" className="h-9 flex-1 lg:flex-none">
-                        <Link href={`/dashboard/clients/${client.id}/session-prep`}>Open Client</Link>
+                        <Link href={`/dashboard/clients/${client.id}/session-prep`}>Prepare for Session</Link>
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -680,25 +725,29 @@ export default function ClientsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/clients/${client.id}/session-prep`}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              View Profile
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openAssignModal(client.id)}>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              if (isDemoMode) {
+                                setClientActionMessage("Demo homework is read-only. Create your practice to assign real homework.")
+                                return
+                              }
+                              openAssignModal(client.id)
+                            }}
+                          >
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             Assign Homework
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openAssignWorksheetModal(client.id)}>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              if (isDemoMode) {
+                                setClientActionMessage("Demo worksheets are read-only. Create your practice to assign real worksheets.")
+                                return
+                              }
+                              openAssignWorksheetModal(client.id)
+                            }}
+                          >
                             <FileText className="mr-2 h-4 w-4" />
                             Assign Online Worksheet
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/clients/${client.id}/session-prep`}>
-                              <Clock className="mr-2 h-4 w-4" />
-                              Session Prep
-                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/clients/${client.id}/session-prep#progress-notes`}>
@@ -706,7 +755,7 @@ export default function ClientsPage() {
                               View Notes
                             </Link>
                           </DropdownMenuItem>
-                          {stats.completedWorksheets.slice(0, 2).map(ws => (
+                          {!isDemoMode && stats.completedWorksheets.slice(0, 2).map(ws => (
                             <DropdownMenuItem key={ws.id} onClick={() => viewWorksheetResponses(ws.id)}>
                               <CheckCircle2 className="mr-2 h-4 w-4" />
                               View {ws.worksheet_templates?.title}
@@ -724,11 +773,6 @@ export default function ClientsPage() {
                               {resendingClientId === client.id ? "Sending..." : "Resend Invite"}
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem>
-                            <MessageSquare className="mr-2 h-4 w-4" />
-                            Send Message
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">Archive Client</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

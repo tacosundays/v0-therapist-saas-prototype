@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { createSessionSummaryFingerprint } from "@/lib/session-summary-cache"
 
 const defaultModel = "gpt-4o-mini"
 
@@ -10,6 +11,8 @@ interface SessionSummarySections {
   reflectionThemes: string
   homeworkProgress: string
   suggestedDiscussionTopics: string[]
+  suggestedInterventions: Array<{ name: string; rationale: string }>
+  homeworkRecommendation: { title: string; rationale: string } | null
 }
 
 function normalizeEmail(email: string) {
@@ -43,6 +46,8 @@ function buildSummaryText(summary: SessionSummarySections) {
     `Reflection Themes\n${summary.reflectionThemes}`,
     `Homework Progress\n${summary.homeworkProgress}`,
     `Suggested Discussion Topics\n${summary.suggestedDiscussionTopics.map((topic) => `- ${topic}`).join("\n")}`,
+    `Suggested Interventions\n${summary.suggestedInterventions.map((item) => `- ${item.name}: ${item.rationale}`).join("\n")}`,
+    `Homework Recommendation\n${summary.homeworkRecommendation ? `${summary.homeworkRecommendation.title}: ${summary.homeworkRecommendation.rationale}` : "No recommendation available."}`,
   ].join("\n\n")
 }
 
@@ -64,6 +69,27 @@ function normalizeSummary(rawSummary: unknown): SessionSummarySections {
           .map((topic) => topic.trim())
           .slice(0, 6)
       : [],
+    suggestedInterventions: Array.isArray(value.suggestedInterventions)
+      ? value.suggestedInterventions
+          .filter((item): item is { name: string; rationale: string } => (
+            Boolean(item)
+            && typeof item === "object"
+            && typeof (item as { name?: unknown }).name === "string"
+            && typeof (item as { rationale?: unknown }).rationale === "string"
+          ))
+          .map((item) => ({ name: item.name.trim(), rationale: item.rationale.trim() }))
+          .filter((item) => item.name && item.rationale)
+          .slice(0, 5)
+      : [],
+    homeworkRecommendation: value.homeworkRecommendation
+      && typeof value.homeworkRecommendation === "object"
+      && typeof value.homeworkRecommendation.title === "string"
+      && typeof value.homeworkRecommendation.rationale === "string"
+      ? {
+          title: value.homeworkRecommendation.title.trim(),
+          rationale: value.homeworkRecommendation.rationale.trim(),
+        }
+      : null,
   }
 }
 
@@ -82,7 +108,7 @@ async function fetchOptionalData<T>(
 
 export async function POST(request: Request) {
   try {
-    const { clientId } = await request.json()
+    const { clientId, force = false } = await request.json()
 
     if (!clientId) {
       return NextResponse.json({ error: "Missing client id" }, { status: 400 })
@@ -152,6 +178,7 @@ export async function POST(request: Request) {
       clientReflections,
       moodCheckIns,
       progressNotes,
+      sessionPrepNotes,
       couples,
     ] = await Promise.all([
       fetchOptionalData(
@@ -210,6 +237,17 @@ export async function POST(request: Request) {
         [],
       ),
       fetchOptionalData(
+        "session_prep_notes query failed",
+        adminClient
+          .from("session_prep_notes")
+          .select("id, note, created_at, updated_at")
+          .eq("client_id", client.id)
+          .eq("therapist_id", therapist.id)
+          .order("updated_at", { ascending: false })
+          .limit(1),
+        [],
+      ),
+      fetchOptionalData(
         "couples query failed",
         adminClient
           .from("couples")
@@ -263,16 +301,18 @@ export async function POST(request: Request) {
       couples: Array.isArray(couples) ? couples.length : 0,
       coupleCheckIns: Array.isArray(coupleCheckIns) ? coupleCheckIns.length : 0,
       progressNotes: Array.isArray(progressNotes) ? progressNotes.length : 0,
+      sessionPrepNotes: Array.isArray(sessionPrepNotes) ? sessionPrepNotes.length : 0,
     }
 
     const model = process.env.OPENAI_MODEL || defaultModel
     const context = {
       generatedAt: new Date().toISOString(),
-      therapist: {
-        id: therapist.id,
-        name: therapist.full_name,
+      client: {
+        fullName: client.full_name,
+        status: client.status,
+        createdAt: client.created_at,
+        inviteAcceptedAt: client.invite_accepted_at,
       },
-      client,
       assignments,
       worksheetAssignments,
       worksheetResponses,
@@ -281,7 +321,25 @@ export async function POST(request: Request) {
       couples,
       coupleCheckIns,
       progressNotes,
+      sessionPrepNotes,
       sourceCounts,
+    }
+    const sourceFingerprint = createSessionSummaryFingerprint(context)
+
+    if (!force) {
+      const { data: cachedSummary } = await adminClient
+        .from("session_summaries")
+        .select("id, therapist_id, client_id, summary_json, summary_text, source_counts, model, created_at")
+        .eq("client_id", client.id)
+        .eq("therapist_id", therapist.id)
+        .contains("source_counts", { _fingerprint: sourceFingerprint })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (cachedSummary) {
+        return NextResponse.json({ summary: cachedSummary, cached: true })
+      }
     }
 
     const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -303,8 +361,10 @@ export async function POST(request: Request) {
               "If a section lacks data, say that the record does not contain enough information for that section.",
               "Do not include client email addresses or therapist identifiers in the output.",
               "Do not make diagnoses. Suggested discussion topics must be neutral prompts grounded in existing client activity.",
-              "Return only valid JSON with keys: clientOverview, progressSinceLastSession, moodTrends, reflectionThemes, homeworkProgress, suggestedDiscussionTopics.",
+              "Return only valid JSON with keys: clientOverview, progressSinceLastSession, moodTrends, reflectionThemes, homeworkProgress, suggestedDiscussionTopics, suggestedInterventions, homeworkRecommendation.",
               "suggestedDiscussionTopics must be an array of short strings.",
+              "suggestedInterventions must be an array of objects with name and rationale. Recommend evidence-based interventions only when supported by the supplied activity.",
+              "homeworkRecommendation must be either null or an object with title and rationale. Prefer platform content named in the supplied data.",
             ].join(" "),
           },
           {
@@ -347,7 +407,7 @@ export async function POST(request: Request) {
         client_id: client.id,
         summary_json: summary,
         summary_text: summaryText,
-        source_counts: sourceCounts,
+        source_counts: { ...sourceCounts, _fingerprint: sourceFingerprint },
         model,
       })
       .select("id, therapist_id, client_id, summary_json, summary_text, source_counts, model, created_at")

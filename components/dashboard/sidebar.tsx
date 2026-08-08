@@ -22,7 +22,10 @@ import {
   Loader2,
   CreditCard,
   ShieldCheck,
-  CircleHelp
+  FileCheck2,
+  CircleHelp,
+  Menu,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState, useEffect, useRef } from "react"
@@ -30,6 +33,7 @@ import { getClient } from "@/lib/supabase/client"
 import { logClientAuditEvent } from "@/lib/audit-client"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { User } from "@supabase/supabase-js"
+import { demoPractice, useDemoMode } from "@/lib/demo-mode"
 
 const navSections = [
   {
@@ -46,9 +50,9 @@ const navSections = [
   {
     label: "Between Sessions",
     items: [
-      { href: "/dashboard/clients", label: "Homework", icon: ClipboardCheck, neverActive: true },
-      { href: "/dashboard/reflections", label: "Reflections", icon: MessageSquare },
-      { href: "/dashboard/ai-suggestions", label: "AI Suggestions", icon: Sparkles },
+      { href: "/dashboard/clients", label: "Assignments", icon: ClipboardCheck, neverActive: true },
+      { href: "/dashboard/reflections", label: "Check-ins", icon: MessageSquare },
+      { href: "/dashboard/ai-suggestions", label: "AI", icon: Sparkles },
     ],
   },
   {
@@ -58,13 +62,14 @@ const navSections = [
       { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
       { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
       { href: "/dashboard/security", label: "Security", icon: ShieldCheck },
+      { href: "/dashboard/trust-center", label: "Trust Center", icon: FileCheck2 },
     ],
   },
   {
     label: "Account",
     items: [
-      { href: "/dashboard/help", label: "Help & Getting Started", icon: CircleHelp },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
+      { href: "/dashboard/help", label: "Help & Getting Started", icon: CircleHelp },
     ],
   },
 ]
@@ -94,12 +99,37 @@ function formatPlanLabel(plan: string | null) {
 export function DashboardSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [therapistProfile, setTherapistProfile] = useState<TherapistProfile | null>(null)
   const isRedirecting = useRef(false)
+  const { isDemoMode, disableDemoMode } = useDemoMode()
 
   useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!mobileOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [mobileOpen])
+
+  useEffect(() => {
+    if (isDemoMode) {
+      setUser(null)
+      setTherapistProfile({
+        full_name: demoPractice.therapist,
+        email: demoPractice.therapistEmail,
+        plan: "group-practice",
+        subscription_plan: "group-practice",
+        subscription_status: "demo",
+      })
+      return
+    }
+
     const supabase = getClient()
 
     const loadTherapistProfile = async (sessionUser: User | null | undefined) => {
@@ -149,9 +179,15 @@ export function DashboardSidebar() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [isDemoMode])
 
   const handleSignOut = async () => {
+    if (isDemoMode) {
+      disableDemoMode()
+      window.location.href = "/"
+      return
+    }
+
     setIsSigningOut(true)
     const supabase = getClient()
     await logClientAuditEvent({
@@ -186,9 +222,93 @@ export function DashboardSidebar() {
     .slice(0, 2)
 
   return (
+    <>
+      <button
+        type="button"
+        aria-label="Open navigation"
+        aria-expanded={mobileOpen}
+        aria-controls="mobile-dashboard-navigation"
+        onClick={() => setMobileOpen(true)}
+        className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[70] md:hidden">
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside
+            id="mobile-dashboard-navigation"
+            aria-label="Mobile navigation"
+            className="absolute inset-y-0 left-0 flex w-[min(88vw,340px)] flex-col border-r border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+              <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary shadow-[0_12px_28px_rgba(109,94,245,0.24)]">
+                  <Brain className="h-6 w-6 text-white" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-lg font-bold tracking-tight text-slate-950">ShrinkAid</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Therapist workspace</span>
+                </span>
+              </Link>
+              <button type="button" aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto px-4 py-5">
+              <div className="space-y-6">
+                {navSections.map((section, sectionIndex) => (
+                  <div key={section.label} className={cn("space-y-2", sectionIndex > 0 && "border-t border-slate-200/70 pt-5")}>
+                    <p className="px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{section.label}</p>
+                    <div className="space-y-1">
+                      {section.items.map((item) => {
+                        const isActive = "neverActive" in item && item.neverActive
+                          ? false
+                          : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
+                        return (
+                          <Link
+                            key={`${section.label}-${item.label}`}
+                            href={item.href}
+                            className={cn(
+                              "flex min-h-11 items-center gap-3 rounded-2xl px-3.5 text-sm font-medium transition-colors",
+                              isActive ? "bg-primary text-white shadow-[0_10px_24px_rgba(109,94,245,0.2)]" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+                            )}
+                          >
+                            <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-slate-400")} />
+                            <span>{item.label}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </nav>
+
+            <div className="border-t border-slate-200/70 p-4">
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{initials}</span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-950">{displayName}</span><span className="block truncate text-xs text-slate-500">{accountEmail}</span></span>
+              </div>
+              <button type="button" onClick={handleSignOut} disabled={isSigningOut} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                {isSigningOut ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
+                {isSigningOut ? "Signing out..." : "Sign out"}
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[10px_0_36px_rgba(15,23,42,0.035)] backdrop-blur-xl transition-all duration-300",
+        "fixed left-0 top-0 z-40 hidden h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[10px_0_36px_rgba(15,23,42,0.035)] backdrop-blur-xl transition-all duration-300 md:flex",
         collapsed ? "w-[76px]" : "w-[272px]"
       )}
     >
@@ -201,7 +321,9 @@ export function DashboardSidebar() {
           {!collapsed && (
             <div>
               <span className="block text-lg font-bold tracking-tight text-slate-950">ShrinkAid</span>
-              <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Homework</span>
+              <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                {isDemoMode ? "Demo Workspace" : "Homework"}
+              </span>
             </div>
           )}
         </Link>
@@ -294,6 +416,11 @@ export function DashboardSidebar() {
                 <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
                 <p className="truncate text-xs text-[#64748B]">{accountEmail}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {isDemoMode && (
+                    <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+                      Demo
+                    </span>
+                  )}
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
                     {statusLabel}
                   </span>
@@ -344,5 +471,6 @@ export function DashboardSidebar() {
         )}
       </div>
     </aside>
+    </>
   )
 }

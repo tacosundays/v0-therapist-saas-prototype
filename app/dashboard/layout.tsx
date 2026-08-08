@@ -5,22 +5,23 @@ import dynamic from "next/dynamic"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { GlobalSearch } from "@/components/dashboard/global-search"
 import { SubscriptionBanner } from "@/components/dashboard/subscription-banner"
+import { DemoModeBanner } from "@/components/dashboard/demo-mode-banner"
 import { Loader2, AlertCircle } from "lucide-react"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getClient } from "@/lib/supabase/client"
 import { SessionTimeout } from "@/components/auth/session-timeout"
+import { enableDemoMode, isDemoModeEnabled, useDemoMode } from "@/lib/demo-mode"
+import { shouldShowOnboarding, type OnboardingRecord } from "@/lib/onboarding"
+import { AnalyticsTracker } from "@/components/dashboard/analytics-tracker"
 
-const AiCopilot = dynamic(
-  () => import("@/components/dashboard/ai-copilot").then((module) => module.AiCopilot),
-  { ssr: false },
-)
-
-const FeedbackDialog = dynamic(
-  () => import("@/components/dashboard/feedback-dialog").then((module) => module.FeedbackDialog),
-  { ssr: false },
-)
+const AiCopilot = dynamic(() => import("@/components/dashboard/ai-copilot").then((module) => module.AiCopilot), {
+  ssr: false,
+})
+const FeedbackDialog = dynamic(() => import("@/components/dashboard/feedback-dialog").then((module) => module.FeedbackDialog), {
+  ssr: false,
+})
 
 export default function DashboardLayout({
   children,
@@ -30,9 +31,25 @@ export default function DashboardLayout({
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { isDemoMode } = useDemoMode()
 
   useEffect(() => {
     const checkAuth = async () => {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("demo") === "1") {
+        enableDemoMode()
+        window.history.replaceState({}, "", window.location.pathname)
+        setIsAuthorized(true)
+        setIsChecking(false)
+        return
+      }
+
+      if (isDemoModeEnabled()) {
+        setIsAuthorized(true)
+        setIsChecking(false)
+        return
+      }
+
       console.log("[v0] Dashboard layout: Starting auth check")
       
       const result = await checkUserRole()
@@ -57,6 +74,22 @@ export default function DashboardLayout({
       }
 
       if (result.role === "therapist" || result.therapistRecord) {
+        const isOnboardingExcursion = params.get("onboarding") === "1"
+        if (!isOnboardingExcursion && result.therapistRecord?.id) {
+          const supabase = getClient() as any
+          const { data: onboarding, error: onboardingError } = await supabase
+            .from("therapists")
+            .select("onboarding_status, onboarding_step, onboarding_completed_at, onboarding_skipped_at")
+            .eq("id", result.therapistRecord.id)
+            .maybeSingle()
+
+          // Missing columns mean the migration has not been applied yet. Keep the
+          // dashboard usable, but route new accounts once persisted state exists.
+          if (!onboardingError && shouldShowOnboarding(onboarding as OnboardingRecord | null)) {
+            window.location.href = "/onboarding"
+            return
+          }
+        }
         console.log("[v0] Dashboard layout: User is therapist, authorizing")
         setIsAuthorized(true)
         setIsChecking(false)
@@ -114,16 +147,19 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(109,94,245,0.10),transparent_34rem),linear-gradient(180deg,#F8FAFC_0%,#EEF2FF_100%)]">
-      <SessionTimeout />
+      {!isDemoMode && <SessionTimeout />}
+      <AnalyticsTracker />
       <DashboardSidebar />
       <AiCopilot />
-      <FeedbackDialog />
-      <div className="pl-64 transition-all duration-300">
-        <SubscriptionBanner />
-        <div className="mx-auto w-full max-w-[1500px] px-8 pt-6 xl:px-10">
-          <GlobalSearch />
+      {!isDemoMode && <FeedbackDialog />}
+      <div className="min-w-0 pl-0 transition-all duration-300 md:pl-64">
+        {isDemoMode ? <DemoModeBanner /> : <SubscriptionBanner />}
+        <div className="mx-auto w-full max-w-[1500px] px-4 pb-1 pt-4 sm:px-6 md:px-8 md:pt-6 xl:px-10">
+          <div className="pl-14 md:pl-0">
+            <GlobalSearch />
+          </div>
         </div>
-        <main className="mx-auto w-full max-w-[1500px] p-8 pt-6 xl:p-10 xl:pt-6">
+        <main className="mx-auto w-full min-w-0 max-w-[1500px] p-4 pt-4 sm:p-6 sm:pt-5 md:p-8 md:pt-6 xl:p-10 xl:pt-6">
           {children}
         </main>
       </div>

@@ -29,6 +29,7 @@ import {
 } from "recharts"
 import { getClient } from "@/lib/supabase/client"
 import { getTherapistId } from "@/lib/auth/check-user-role"
+import { demoAssignments, demoClients, demoWorksheetAssignments, useDemoMode } from "@/lib/demo-mode"
 
 interface ClientRecord {
   id: string
@@ -193,6 +194,7 @@ function getWeeklyEngagement(assignments: AssignmentRecord[], worksheetAssignmen
 }
 
 export default function InsightsPage() {
+  const { isDemoMode } = useDemoMode()
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignmentRecord[]>([])
@@ -205,6 +207,13 @@ export default function InsightsPage() {
       setError(null)
 
       try {
+        if (isDemoMode) {
+          setClients(demoClients)
+          setAssignments(demoAssignments)
+          setWorksheetAssignments(demoWorksheetAssignments)
+          return
+        }
+
         const supabase = getClient()
         const { therapistId, userEmail } = await getTherapistId()
 
@@ -259,7 +268,7 @@ export default function InsightsPage() {
     }
 
     loadInsights()
-  }, [])
+  }, [isDemoMode])
 
   const totalAssignments = assignments.length + worksheetAssignments.length
   const completedAssignments = assignments.filter((assignment) => assignment.completed).length
@@ -291,7 +300,7 @@ export default function InsightsPage() {
   const insightStats = [
     { label: "Total Assignments", value: totalAssignments.toString(), icon: Target, change: totalAssignments > 0 ? `${activeAssignments} active` : "No assignments yet" },
     { label: "Completion Rate", value: completionRate !== null ? `${completionRate}%` : "--", icon: CheckCircle2, change: totalAssignments > 0 ? `${completedAssignments}/${totalAssignments} completed` : "No completion data yet" },
-    { label: "Active Clients", value: clients.length.toString(), icon: Users, change: clients.length > 0 ? "Real client records" : "No clients yet" },
+    { label: "Active Clients", value: clients.length.toString(), icon: Users, change: clients.length > 0 ? (isDemoMode ? "Demo caseload" : "Real client records") : "No clients yet" },
     { label: "Completed With Dates", value: completedWithDates.toString(), icon: Clock, change: completedWithDates > 0 ? "Tracked from completed_at" : "No completed activity yet" },
   ]
 

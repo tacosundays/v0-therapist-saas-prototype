@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   AlertTriangle,
@@ -36,9 +36,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
+import { CarePlanTab } from "@/components/dashboard/care-plan-tab"
+import { SessionNoteAssistant } from "@/components/dashboard/session-note-assistant"
 import { getTherapistId } from "@/lib/auth/check-user-role"
-import { summaryTextList } from "@/lib/session-summary-safe"
 import { getClient } from "@/lib/supabase/client"
+import { trackAnalyticsEvent } from "@/lib/analytics/client"
+import {
+  DEMO_THERAPIST_ID,
+  DEMO_SESSION_PREP_NOTE_STORAGE_PREFIX,
+  demoAssignments,
+  demoClientById,
+  demoCoupleCheckIns,
+  demoCouples,
+  demoMoodCheckIns,
+  demoProgressNotes,
+  demoReflections,
+  demoSessionPrepNotes,
+  demoSessionSummaries,
+  demoWorksheetAssignments,
+  useDemoMode,
+} from "@/lib/demo-mode"
 
 interface ClientRecord {
   id: string
@@ -123,6 +141,22 @@ interface MoodCheckIn {
   created_at: string
 }
 
+interface CoupleRecord {
+  id: string
+  relationship_name: string
+}
+
+interface CoupleCheckIn {
+  id: string
+  couple_id: string
+  relationship_satisfaction: number
+  trust: number
+  communication: number
+  intimacy: number
+  conflict_level: number
+  check_in_week: string
+}
+
 interface SessionSummarySections {
   clientOverview?: string | null
   progressSinceLastSession?: string | null
@@ -130,6 +164,8 @@ interface SessionSummarySections {
   reflectionThemes?: string | null
   homeworkProgress?: string | null
   suggestedDiscussionTopics?: string[] | null
+  suggestedInterventions?: Array<{ name: string; rationale: string }> | null
+  homeworkRecommendation?: { title: string; rationale: string } | null
 }
 
 interface SessionSummaryRecord {
@@ -301,7 +337,9 @@ function ClientProfileSkeleton() {
 
 export default function SessionPrepPage() {
   const params = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
   const clientId = params.id
+  const { isDemoMode } = useDemoMode()
 
   const [therapistId, setTherapistId] = useState<string | null>(null)
   const [clientRecord, setClientRecord] = useState<ClientRecord | null>(null)
@@ -310,6 +348,8 @@ export default function SessionPrepPage() {
   const [worksheetResponses, setWorksheetResponses] = useState<WorksheetResponseRecord[]>([])
   const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([])
+  const [couples, setCouples] = useState<CoupleRecord[]>([])
+  const [coupleCheckIns, setCoupleCheckIns] = useState<CoupleCheckIn[]>([])
   const [progressNotes, setProgressNotes] = useState<ProgressNote[]>([])
   const [sessionSummaries, setSessionSummaries] = useState<SessionSummaryRecord[]>([])
   const [sessionPrepNote, setSessionPrepNote] = useState<SessionPrepNote | null>(null)
@@ -320,6 +360,8 @@ export default function SessionPrepPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
   const [isProgressNoteOpen, setIsProgressNoteOpen] = useState(false)
+  const [isAssignHomeworkOpen, setIsAssignHomeworkOpen] = useState(false)
+  const [isSessionNoteOpen, setIsSessionNoteOpen] = useState(false)
   const [isProgressNoteSaving, setIsProgressNoteSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -335,11 +377,59 @@ export default function SessionPrepPage() {
   })
 
   useEffect(() => {
-    const loadSessionPrep = async () => {
+    if (isDemoMode) return
+    void trackAnalyticsEvent({
+      name: "first_ai_session_prep_opened",
+      eventKey: "first",
+      properties: { source: "session_prep" },
+    })
+  }, [isDemoMode])
+
+  const loadSessionPrep = useCallback(async () => {
       setIsLoading(true)
       setError(null)
 
       try {
+        if (isDemoMode) {
+          const demoClient = demoClientById(clientId)
+
+          if (!demoClient) {
+            setError("Demo client not found.")
+            return
+          }
+
+          setTherapistId(DEMO_THERAPIST_ID)
+          setClientRecord(demoClient)
+          setAssignments(demoAssignments.filter((assignment) => assignment.client_id === clientId))
+          setWorksheetAssignments(demoWorksheetAssignments.filter((assignment) => assignment.client_id === clientId))
+          setWorksheetResponses([])
+          setClientReflections(demoReflections.filter((reflection) => reflection.client_id === clientId))
+          setMoodCheckIns(demoMoodCheckIns.filter((checkIn) => checkIn.client_id === clientId))
+          const demoClientCouples = demoCouples.filter((couple) => (
+            couple.partner_1_client_id === clientId || couple.partner_2_client_id === clientId
+          ))
+          setCouples(demoClientCouples)
+          setCoupleCheckIns(demoCoupleCheckIns.filter((checkIn) => (
+            demoClientCouples.some((couple) => couple.id === checkIn.couple_id)
+          )))
+          setProgressNotes(demoProgressNotes.filter((note) => note.client_id === clientId))
+          setSessionSummaries(demoSessionSummaries.filter((summary) => summary.client_id === clientId))
+          const storedDemoNote = window.localStorage.getItem(`${DEMO_SESSION_PREP_NOTE_STORAGE_PREFIX}.${clientId}`)
+          const seededDemoNote = demoSessionPrepNotes.find((note) => note.client_id === clientId) || null
+          const latestNote = storedDemoNote === null
+            ? seededDemoNote
+            : {
+                id: seededDemoNote?.id || `demo-local-prep-note-${clientId}`,
+                note: storedDemoNote,
+                created_at: seededDemoNote?.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }
+          setSessionPrepNote(latestNote)
+          setNoteId(latestNote?.id || null)
+          setNote(latestNote?.note || "")
+          return
+        }
+
         const supabase = getClient() as any
         const { therapistId: resolvedTherapistId, userEmail } = await getTherapistId()
 
@@ -360,9 +450,18 @@ export default function SessionPrepPage() {
           .eq("therapist_id", resolvedTherapistId)
           .maybeSingle()
 
-        if (clientError) throwQueryError("clients query failed", clientError)
+        if (clientError) {
+          const errorCode = typeof clientError === "object" && clientError && "code" in clientError
+            ? String(clientError.code)
+            : ""
+          if (errorCode === "22P02") {
+            setError("This session-prep link is invalid. Return to Clients and choose a client from your caseload.")
+            return
+          }
+          throwQueryError("clients query failed", clientError)
+        }
         if (!clientData) {
-          setError("Client not found.")
+          setError("This client was not found or you do not have permission to view their session prep.")
           return
         }
 
@@ -374,6 +473,7 @@ export default function SessionPrepPage() {
           clientReflectionsResult,
           moodCheckInsResult,
           sessionSummariesResult,
+          couplesResult,
         ] = await Promise.all([
           supabase
             .from("assignments")
@@ -432,17 +532,45 @@ export default function SessionPrepPage() {
             .eq("therapist_id", resolvedTherapistId)
             .order("created_at", { ascending: false })
             .limit(25),
+          supabase
+            .from("couples")
+            .select("id, relationship_name")
+            .eq("therapist_id", resolvedTherapistId)
+            .or(`partner_1_client_id.eq.${clientId},partner_2_client_id.eq.${clientId}`),
         ])
 
-        if (assignmentsResult.error) throwQueryError("assignments query failed", assignmentsResult.error)
-        if (worksheetsResult.error) throwQueryError("worksheet_assignments query failed", worksheetsResult.error)
-        if (notesResult.error) throwQueryError("session_prep_notes query failed", notesResult.error)
-        if (progressNotesResult.error) throwQueryError("progress_notes query failed", progressNotesResult.error)
-        if (clientReflectionsResult.error) throwQueryError("client_reflections query failed", clientReflectionsResult.error)
-        if (moodCheckInsResult.error) throwQueryError("client_mood_checkins query failed", moodCheckInsResult.error)
-        if (sessionSummariesResult.error) throwQueryError("session_summaries query failed", sessionSummariesResult.error)
+        const optionalResults = [
+          ["assignments", assignmentsResult],
+          ["worksheet assignments", worksheetsResult],
+          ["session prep notes", notesResult],
+          ["progress notes", progressNotesResult],
+          ["reflections", clientReflectionsResult],
+          ["mood check-ins", moodCheckInsResult],
+          ["AI summaries", sessionSummariesResult],
+          ["couples", couplesResult],
+        ] as const
+        optionalResults.forEach(([label, result]) => {
+          if (result.error) {
+            console.warn(`[v0] Session Prep: optional ${label} data unavailable`, result.error)
+          }
+        })
 
-        const worksheetData = (worksheetsResult.data || []) as WorksheetAssignmentRecord[]
+        const coupleData = couplesResult.error ? [] : (couplesResult.data || []) as CoupleRecord[]
+        const coupleCheckInsResult = coupleData.length > 0
+          ? await supabase
+              .from("couple_check_ins")
+              .select("id, couple_id, relationship_satisfaction, trust, communication, intimacy, conflict_level, check_in_week")
+              .eq("therapist_id", resolvedTherapistId)
+              .in("couple_id", coupleData.map((couple) => couple.id))
+              .order("check_in_week", { ascending: false })
+              .limit(60)
+          : { data: [], error: null }
+
+        if (coupleCheckInsResult.error) {
+          console.warn("[v0] Session Prep: optional couple check-ins unavailable", coupleCheckInsResult.error)
+        }
+
+        const worksheetData = worksheetsResult.error ? [] : (worksheetsResult.data || []) as WorksheetAssignmentRecord[]
         const worksheetAssignmentIds = worksheetData.map((assignment) => assignment.id)
         const responsesResult = worksheetAssignmentIds.length > 0
           ? await supabase
@@ -454,17 +582,21 @@ export default function SessionPrepPage() {
               .limit(50)
           : { data: [], error: null }
 
-        if (responsesResult.error) throwQueryError("worksheet_responses query failed", responsesResult.error)
+        if (responsesResult.error) {
+          console.warn("[v0] Session Prep: optional worksheet responses unavailable", responsesResult.error)
+        }
 
-        const latestNote = (notesResult.data?.[0] || null) as SessionPrepNote | null
+        const latestNote = (notesResult.error ? null : notesResult.data?.[0] || null) as SessionPrepNote | null
         setClientRecord(clientData as ClientRecord)
-        setAssignments((assignmentsResult.data || []) as AssignmentRecord[])
+        setAssignments((assignmentsResult.error ? [] : assignmentsResult.data || []) as AssignmentRecord[])
         setWorksheetAssignments(worksheetData)
-        setWorksheetResponses((responsesResult.data || []) as WorksheetResponseRecord[])
-        setClientReflections((clientReflectionsResult.data || []) as ClientReflection[])
-        setMoodCheckIns((moodCheckInsResult.data || []) as MoodCheckIn[])
-        setProgressNotes((progressNotesResult.data || []) as ProgressNote[])
-        setSessionSummaries((sessionSummariesResult.data || []) as SessionSummaryRecord[])
+        setWorksheetResponses((responsesResult.error ? [] : responsesResult.data || []) as WorksheetResponseRecord[])
+        setClientReflections((clientReflectionsResult.error ? [] : clientReflectionsResult.data || []) as ClientReflection[])
+        setMoodCheckIns((moodCheckInsResult.error ? [] : moodCheckInsResult.data || []) as MoodCheckIn[])
+        setCouples(coupleData)
+        setCoupleCheckIns((coupleCheckInsResult.error ? [] : coupleCheckInsResult.data || []) as CoupleCheckIn[])
+        setProgressNotes((progressNotesResult.error ? [] : progressNotesResult.data || []) as ProgressNote[])
+        setSessionSummaries((sessionSummariesResult.error ? [] : sessionSummariesResult.data || []) as SessionSummaryRecord[])
         setSessionPrepNote(latestNote)
         setNoteId(latestNote?.id || null)
         setNote(latestNote?.note || "")
@@ -474,10 +606,17 @@ export default function SessionPrepPage() {
       } finally {
         setIsLoading(false)
       }
-    }
+  }, [clientId, isDemoMode])
 
+  useEffect(() => {
     loadSessionPrep()
-  }, [clientId])
+  }, [loadSessionPrep])
+
+  useEffect(() => {
+    if (searchParams.get("note") === "1") {
+      setIsSessionNoteOpen(true)
+    }
+  }, [searchParams])
 
   const worksheetTitleById = useMemo(() => {
     const map = new Map<string, string>()
@@ -510,6 +649,14 @@ export default function SessionPrepPage() {
         : "stable"
     : "stable"
   const latestSessionSummary = sessionSummaries[0] || null
+  const sessionNoteDefaults = useMemo(() => ({
+    date: searchParams.get("date"),
+    start: searchParams.get("start"),
+    end: searchParams.get("end"),
+    sessionType: searchParams.get("sessionType") || "Individual therapy",
+    location: searchParams.get("location"),
+    participants: searchParams.get("participants") || "Client",
+  }), [searchParams])
 
   const totalAssignments = assignments.length + worksheetAssignments.length
   const completedAssignments = assignments.filter((assignment) => assignment.completed || assignment.status === "completed").length
@@ -561,6 +708,17 @@ export default function SessionPrepPage() {
         type: "all",
         actionLabel: "Open Client",
         actionHref: `/dashboard/clients#client-${clientRecord.id}`,
+      })
+    }
+    if (isDemoMode && (clientRecord as any)?.therapy_start_date) {
+      items.push({
+        id: `goals-updated-${clientId}`,
+        date: (clientRecord as any).therapy_start_date,
+        label: "Goals updated",
+        detail: ((clientRecord as any).treatment_goals || []).slice(0, 2).join("; ") || "Treatment goals updated.",
+        type: "notes",
+        actionLabel: "Open Session Prep",
+        actionHref: `/dashboard/clients/${clientId}/session-prep#progress-notes`,
       })
     }
 
@@ -730,6 +888,7 @@ export default function SessionPrepPage() {
     clientId,
     clientRecord,
     clientReflections,
+    isDemoMode,
     moodCheckIns,
     progressNotes,
     sessionPrepNote,
@@ -806,6 +965,24 @@ export default function SessionPrepPage() {
     setError(null)
 
     try {
+      if (isDemoMode) {
+        const now = new Date().toISOString()
+        setProgressNotes((current) => [{
+          id: `demo-local-progress-note-${Date.now()}`,
+          note_type: progressNoteForm.note_type,
+          subjective: progressNoteForm.subjective.trim() || null,
+          objective: progressNoteForm.objective.trim() || null,
+          assessment: progressNoteForm.assessment.trim() || null,
+          plan: progressNoteForm.plan.trim() || null,
+          private_note: progressNoteForm.private_note.trim() || null,
+          created_at: now,
+          updated_at: now,
+        }, ...current].slice(0, 50))
+        setSuccess("Demo progress note added locally. Create your practice to save real notes.")
+        setIsProgressNoteOpen(false)
+        return
+      }
+
       const supabase = getClient() as any
       const { data, error: insertError } = await supabase
         .from("progress_notes")
@@ -843,6 +1020,15 @@ export default function SessionPrepPage() {
     setError(null)
 
     try {
+      if (isDemoMode) {
+        const existingSummary = demoSessionSummaries.find((summary) => summary.client_id === clientRecord.id)
+        if (existingSummary) {
+          setSessionSummaries((current) => [existingSummary, ...current.filter((summary) => summary.id !== existingSummary.id)].slice(0, 25))
+        }
+        setSuccess("Demo AI session prep refreshed from fictional practice data.")
+        return
+      }
+
       const supabase = getClient() as any
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
 
@@ -894,6 +1080,21 @@ export default function SessionPrepPage() {
     setNoteSaveError(null)
 
     try {
+      if (isDemoMode) {
+        const updatedNote = {
+          id: noteId || `demo-local-prep-note-${Date.now()}`,
+          note,
+          created_at: sessionPrepNote?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setNoteId(updatedNote.id)
+        setSessionPrepNote(updatedNote)
+        window.localStorage.setItem(`${DEMO_SESSION_PREP_NOTE_STORAGE_PREFIX}.${clientRecord.id}`, note)
+        setSuccess("Demo note updated locally. Create your practice to save real notes.")
+        setNoteSaveMessage("Demo note updated locally.")
+        return
+      }
+
       const supabase = getClient() as any
       const notePayload = {
         therapist_id: therapistId,
@@ -968,27 +1169,24 @@ export default function SessionPrepPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <ClientProfileSkeleton />
-    )
-  }
+  useEffect(() => {
+    if (
+      isLoading
+      || !therapistId
+      || !clientRecord
+      || note === (sessionPrepNote?.note || "")
+    ) return
 
-  if (error && !clientRecord) {
-    return (
-      <div className="space-y-6 max-w-3xl">
-        <Button variant="ghost" className="rounded-xl" asChild>
-          <Link href="/dashboard/clients">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to clients
-          </Link>
-        </Button>
-        <Card className="rounded-2xl">
-          <CardContent className="p-8 text-destructive">{error}</CardContent>
-        </Card>
-      </div>
-    )
-  }
+    setNoteSaveMessage("Saving draft…")
+    const timer = window.setTimeout(() => {
+      void saveNote()
+    }, 900)
+
+    return () => window.clearTimeout(timer)
+    // saveNote intentionally follows the current note draft; the equality guard
+    // prevents a save loop after the server returns the persisted value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientRecord, isLoading, note, sessionPrepNote?.note, therapistId])
 
   const activityDates = [
     clientRecord?.created_at,
@@ -1059,6 +1257,38 @@ export default function SessionPrepPage() {
     })),
   ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
   const latestReflection = clientReflections[0] || null
+  const sessionNoteContext = useMemo(() => {
+    const demoGoals = ((clientRecord as any)?.treatment_goals || []) as string[]
+    const focus = Array.isArray((clientRecord as any)?.focus)
+      ? (clientRecord as any).focus
+      : (clientRecord as any)?.focus
+        ? [(clientRecord as any).focus]
+        : []
+    const carePlanGoals = demoGoals.length > 0
+      ? demoGoals
+      : [
+          focus.length > 0 ? `Improve functioning related to ${focus.join(", ")}` : "Review current treatment goals",
+          "Strengthen between-session practice and reflection",
+        ]
+
+    return {
+      carePlanGoals,
+      objectives: [
+        "Review recent triggers, patterns, and protective factors.",
+        "Connect session themes to current homework and next-step practice.",
+      ],
+      interventions: ["CBT", "ACT", "Motivational Interviewing"],
+      homework: homeworkProgressItems.slice(0, 4).map((item) => `${item.title}: ${item.status}`),
+      reflections: clientReflections.slice(0, 3).map((reflection) => `${reflection.title || "Reflection"}: ${reflection.reflection_text}`),
+      moodCheckIns: moodCheckIns.slice(0, 4).map((checkIn) => (
+        `Mood ${checkIn.mood_rating}/10${checkIn.anxiety_rating !== null ? `, anxiety ${checkIn.anxiety_rating}/10` : ""}${checkIn.stress_rating !== null ? `, stress ${checkIn.stress_rating}/10` : ""}${checkIn.note ? `: ${checkIn.note}` : ""}`
+      )),
+      previousSessionSummary: latestSessionSummary?.summary_json?.progressSinceLastSession
+        || latestSessionSummary?.summary_json?.clientOverview
+        || latestSessionSummary?.summary_text
+        || null,
+    }
+  }, [clientRecord, clientReflections, homeworkProgressItems, latestSessionSummary, moodCheckIns])
   const filteredJourneyItems = journeyFilter === "all"
     ? timeline
     : timeline.filter((item) => item.type === journeyFilter)
@@ -1070,6 +1300,33 @@ export default function SessionPrepPage() {
     { value: "notes", label: "Notes" },
     { value: "ai", label: "AI" },
   ]
+
+  // Keep all hooks above these early returns. Returning before sessionNoteContext's
+  // useMemo caused React's hook order to change after loading, crashing this route.
+  if (isLoading) {
+    return <ClientProfileSkeleton />
+  }
+
+  if (!clientRecord) {
+    return (
+      <div className="max-w-3xl space-y-6">
+        <Button variant="ghost" className="rounded-xl" asChild>
+          <Link href="/dashboard/clients">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to clients
+          </Link>
+        </Button>
+        <Card className="rounded-2xl">
+          <CardContent className="space-y-3 p-8">
+            <h1 className="text-xl font-semibold">Session prep is unavailable</h1>
+            <p className="text-sm text-muted-foreground">
+              {error || "This client could not be loaded. Return to Clients and try again."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-[1500px] space-y-6">
@@ -1103,21 +1360,50 @@ export default function SessionPrepPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge className="rounded-full bg-[#18B7A0]/10 text-[#0F8D7E] hover:bg-[#18B7A0]/10">{getClientStatus(clientRecord)}</Badge>
                 <Badge variant="outline" className="rounded-full">Last session: {progressNotes[0] ? formatDate(progressNotes[0].created_at) : "Not available"}</Badge>
-                <Badge variant="outline" className="rounded-full">Next session: Not scheduled</Badge>
+                <Badge variant="outline" className="rounded-full">
+                  Next session: {(clientRecord as any)?.upcoming_appointment ? formatDate((clientRecord as any).upcoming_appointment) : "Not scheduled"}
+                </Badge>
                 <Badge variant="outline" className="rounded-full">Engagement {engagementScore}/100</Badge>
+                {isDemoMode && (
+                  <>
+                    <Badge variant="outline" className="rounded-full">{(clientRecord as any)?.age} · {(clientRecord as any)?.pronouns}</Badge>
+                    <Badge variant="outline" className="rounded-full">{(clientRecord as any)?.focus?.join(" + ")}</Badge>
+                  </>
+                )}
               </div>
+              {isDemoMode && (clientRecord as any)?.treatment_goals?.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(clientRecord as any).treatment_goals.map((goal: string) => (
+                    <span key={goal} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {goal}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="rounded-xl" asChild>
-              <Link href="/dashboard/clients">
-                <FileText className="w-4 h-4 mr-2" />
-                Assign Homework
-              </Link>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => {
+                if (isDemoMode) {
+                  setSuccess("Demo homework is read-only. Create your practice to assign real homework.")
+                  return
+                }
+                setIsAssignHomeworkOpen(true)
+              }}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Assign Homework
             </Button>
             <Button variant="outline" className="rounded-xl" onClick={openProgressNoteForm}>
               <Plus className="w-4 h-4 mr-2" />
               Add Note
+            </Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => setIsSessionNoteOpen(true)}>
+              <ClipboardCheck className="w-4 h-4 mr-2" />
+              Create Session Note
             </Button>
             <Button className="rounded-xl" onClick={generateSessionSummary} disabled={isSummaryLoading}>
               {isSummaryLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
@@ -1135,8 +1421,9 @@ export default function SessionPrepPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-slate-100 p-1 sm:w-auto sm:inline-grid">
+        <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl bg-slate-100 p-1 sm:w-auto sm:inline-grid">
           <TabsTrigger value="overview" className="rounded-xl">Overview</TabsTrigger>
+          <TabsTrigger value="care-plan" className="rounded-xl">Care Plan</TabsTrigger>
           <TabsTrigger value="journey" className="rounded-xl">Journey</TabsTrigger>
         </TabsList>
 
@@ -1165,7 +1452,7 @@ export default function SessionPrepPage() {
         </div>
 
         <div className="space-y-6">
-          <Card className="rounded-[1.75rem]">
+          <Card id="homework-progress" className="rounded-[1.75rem]">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <FileText className="w-5 h-5 text-primary" />
@@ -1187,7 +1474,7 @@ export default function SessionPrepPage() {
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="rounded-[1.75rem]">
+            <Card id="reflection-preview" className="rounded-[1.75rem]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <MessageSquare className="w-5 h-5 text-primary" />
@@ -1212,7 +1499,7 @@ export default function SessionPrepPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[1.75rem]">
+            <Card id="mood-checkins" className="rounded-[1.75rem]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <BarChart3 className="w-5 h-5 text-primary" />
@@ -1220,34 +1507,21 @@ export default function SessionPrepPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {!mostRecentMood ? (
+                {moodLast30Days.length === 0 ? (
                   <EmptyPanel icon={BarChart3} title="Mood check-ins will appear here" description="Client mood tracking collects here after portal check-ins." compact />
                 ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-4xl font-bold text-slate-950">{mostRecentMood.mood_rating}/10</p>
-                        <p className="text-xs text-slate-500">{formatDateTime(mostRecentMood.created_at)}</p>
-                      </div>
-                      <Badge variant="outline" className="capitalize">{moodTrend}</Badge>
-                    </div>
-                    <MoodBars items={moodCheckIns.slice(0, 8).reverse()} />
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <p className="text-slate-400">7-day avg</p>
-                        <p className="font-semibold text-slate-700">{averageMood7 !== null ? `${averageMood7}/10` : "--"}</p>
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <p className="text-slate-400">30-day avg</p>
-                        <p className="font-semibold text-slate-700">{averageMood30 !== null ? `${averageMood30}/10` : "--"}</p>
-                      </div>
-                    </div>
-                    {mostRecentMood.note && <p className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">{mostRecentMood.note}</p>}
-                  </div>
+                  <MoodTrendPanel items={moodLast30Days} trend={moodTrend} />
                 )}
               </CardContent>
             </Card>
           </div>
+
+          {couples.length > 0 && (
+            <CouplesSummaryCard
+              relationshipName={couples[0].relationship_name}
+              items={coupleCheckIns.filter((item) => item.couple_id === couples[0].id)}
+            />
+          )}
 
           {latestSessionSummary && (
             <Card id="ai-summary" className="rounded-[1.75rem]">
@@ -1260,11 +1534,17 @@ export default function SessionPrepPage() {
               <CardContent className="space-y-4">
                 <Badge variant="outline" className="rounded-full">Generated {formatDateTime(latestSessionSummary.created_at)}</Badge>
                 <SummaryBlock title="Client Overview" text={latestSessionSummary.summary_json?.clientOverview || "No client overview available."} />
+                <SummaryBlock title="Between-Session Summary" text={latestSessionSummary.summary_json?.progressSinceLastSession || "Not enough activity is available for a meaningful between-session summary."} />
+                <SummaryBlock title="Reflection Themes" text={latestSessionSummary.summary_json?.reflectionThemes || "No reflection themes available."} />
                 <SummaryBlock title="Homework Progress" text={latestSessionSummary.summary_json?.homeworkProgress || "No homework progress summary available."} />
-                <SummaryBlock
-                  title="Suggested Discussion Topics"
-                  text={summaryTextList(latestSessionSummary.summary_json?.suggestedDiscussionTopics).join("\n") || "No discussion topics available."}
-                />
+                <SummaryBlock title="Suggested Discussion Topics" text={latestSessionSummary.summary_json?.suggestedDiscussionTopics?.join("\n") || "No discussion topics available."} />
+                <InterventionsPanel items={latestSessionSummary.summary_json?.suggestedInterventions || []} />
+                {latestSessionSummary.summary_json?.homeworkRecommendation && (
+                  <SummaryBlock
+                    title={`Recommended Homework · ${latestSessionSummary.summary_json.homeworkRecommendation.title}`}
+                    text={latestSessionSummary.summary_json.homeworkRecommendation.rationale}
+                  />
+                )}
               </CardContent>
             </Card>
           )}
@@ -1314,6 +1594,10 @@ export default function SessionPrepPage() {
                 {isSummaryLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
                 Generate Summary
               </Button>
+              <Button className="mt-2 w-full rounded-xl bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15" onClick={() => setIsSessionNoteOpen(true)}>
+                <ClipboardCheck className="w-4 h-4 mr-2" />
+                Generate Note
+              </Button>
             </CardContent>
           </Card>
 
@@ -1355,6 +1639,7 @@ export default function SessionPrepPage() {
                 className="min-h-36 rounded-xl"
                 placeholder="Private notes for session prep..."
               />
+              <p className="text-xs text-slate-500">Drafts save automatically after you pause typing.</p>
               <Button className="w-full rounded-xl" onClick={saveNote} disabled={isSaving}>
                 {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Save Notes
@@ -1365,6 +1650,22 @@ export default function SessionPrepPage() {
           </Card>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="care-plan" className="mt-0">
+          <CarePlanTab
+            client={clientRecord}
+            assignments={assignments}
+            worksheetAssignments={worksheetAssignments}
+            reflections={clientReflections}
+            moodCheckIns={moodCheckIns}
+            progressNotes={progressNotes}
+            sessionSummaries={sessionSummaries}
+            timeline={timeline}
+            primaryTherapist={isDemoMode ? "Dr. Emily Carter, LMHC" : "Primary therapist"}
+            isDemoMode={isDemoMode}
+            onCreateSessionNote={() => setIsSessionNoteOpen(true)}
+          />
         </TabsContent>
 
         <TabsContent value="journey" className="mt-0 space-y-6">
@@ -1394,6 +1695,10 @@ export default function SessionPrepPage() {
                     <Plus className="w-4 h-4 mr-2" />
                     Add Therapist Note
                   </Link>
+                </Button>
+                <Button variant="outline" className="rounded-xl" onClick={() => setIsSessionNoteOpen(true)}>
+                  <ClipboardCheck className="w-4 h-4 mr-2" />
+                  Create Session Note
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1536,6 +1841,21 @@ export default function SessionPrepPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AssignHomeworkModal
+        open={isAssignHomeworkOpen}
+        onOpenChange={setIsAssignHomeworkOpen}
+        onAssignmentCreated={loadSessionPrep}
+        preselectedClientId={clientRecord?.id}
+      />
+
+      <SessionNoteAssistant
+        open={isSessionNoteOpen}
+        onOpenChange={setIsSessionNoteOpen}
+        client={clientRecord ? { id: clientRecord.id, full_name: clientRecord.full_name } : null}
+        defaults={sessionNoteDefaults}
+        context={sessionNoteContext}
+      />
     </div>
   )
 }
@@ -1771,6 +2091,124 @@ function MoodBars({ items }: { items: MoodCheckIn[] }) {
           title={`${item.mood_rating}/10`}
         />
       ))}
+    </div>
+  )
+}
+
+function MoodTrendPanel({ items, trend }: { items: MoodCheckIn[]; trend: string }) {
+  const chronological = [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  const metrics = [
+    { key: "mood_rating" as const, label: "Mood", color: "bg-[#18B7A0]" },
+    { key: "anxiety_rating" as const, label: "Anxiety", color: "bg-amber-500" },
+    { key: "stress_rating" as const, label: "Stress", color: "bg-primary" },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-4xl font-bold text-slate-950">{chronological.at(-1)?.mood_rating}/10</p>
+          <p className="text-xs text-slate-500">Last 30 days · {items.length} check-ins</p>
+        </div>
+        <Badge variant="outline" className="capitalize">{trend}</Badge>
+      </div>
+      <div className="space-y-4">
+        {metrics.map((metric) => {
+          const values = chronological
+            .map((item) => item[metric.key])
+            .filter((value): value is number => typeof value === "number")
+          const average = values.length > 0
+            ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)
+            : null
+
+          return (
+            <div key={metric.key}>
+              <div className="mb-2 flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-600">{metric.label}</span>
+                <span className="text-slate-500">{average ? `${average}/10 average` : "No data"}</span>
+              </div>
+              <div className="flex h-12 items-end gap-1 rounded-2xl bg-slate-50 p-2">
+                {chronological.map((item) => {
+                  const value = item[metric.key]
+                  return (
+                    <div
+                      key={`${metric.key}-${item.id}`}
+                      className={`min-w-0 flex-1 rounded-t ${typeof value === "number" ? metric.color : "bg-slate-200"}`}
+                      style={{ height: `${typeof value === "number" ? Math.max(10, value * 10) : 5}%` }}
+                      title={typeof value === "number" ? `${metric.label}: ${value}/10` : `${metric.label}: no entry`}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CouplesSummaryCard({ relationshipName, items }: { relationshipName: string; items: CoupleCheckIn[] }) {
+  const latest = items[0]
+  const previous = items[1]
+  const metrics = [
+    { key: "relationship_satisfaction" as const, label: "Satisfaction", inverse: false },
+    { key: "trust" as const, label: "Trust", inverse: false },
+    { key: "communication" as const, label: "Communication", inverse: false },
+    { key: "conflict_level" as const, label: "Conflict", inverse: true },
+    { key: "intimacy" as const, label: "Intimacy", inverse: false },
+  ]
+
+  return (
+    <Card className="rounded-[1.75rem]">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between gap-3 text-lg">
+          <span>Couples Summary</span>
+          <Badge variant="outline" className="rounded-full">{relationshipName}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!latest ? (
+          <EmptyPanel icon={BarChart3} title="No couples check-ins yet" description="Relationship metrics will appear after either partner completes a check-in." compact />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {metrics.map((metric) => {
+              const delta = previous ? latest[metric.key] - previous[metric.key] : 0
+              const improving = metric.inverse ? delta < 0 : delta > 0
+              const worsening = metric.inverse ? delta > 0 : delta < 0
+              return (
+                <div key={metric.key} className="rounded-3xl bg-slate-50 p-4">
+                  <p className="text-xs font-semibold text-slate-500">{metric.label}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <p className="text-2xl font-bold text-slate-950">{latest[metric.key]}/10</p>
+                    {improving ? <TrendingUp className="h-4 w-4 text-[#0F8D7E]" /> : worsening ? <TrendingDown className="h-4 w-4 text-red-600" /> : <span className="text-xs text-slate-400">Stable</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function InterventionsPanel({ items }: { items: Array<{ name: string; rationale: string }> }) {
+  return (
+    <div className="rounded-3xl bg-slate-50 p-4">
+      <p className="mb-2 text-sm font-semibold text-slate-950">Suggested Interventions</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-slate-600">No grounded intervention suggestions are available.</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div key={`${item.name}-${item.rationale}`} className="rounded-2xl bg-white p-3">
+              <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{item.rationale}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

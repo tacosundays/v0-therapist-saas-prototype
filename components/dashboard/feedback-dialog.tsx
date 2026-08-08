@@ -73,8 +73,13 @@ export function FeedbackDialog() {
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) reset() }}>
       <DialogTrigger asChild>
-        <Button className="fixed bottom-5 left-5 z-50 rounded-full shadow-lg sm:left-auto sm:right-24" variant="secondary">
-          <MessageSquarePlus className="mr-2 h-4 w-4" /> Send Feedback
+        <Button
+          aria-label="Send feedback"
+          className="fixed bottom-4 left-4 z-30 h-12 w-12 rounded-full p-0 shadow-lg sm:bottom-5 sm:left-auto sm:right-24 sm:h-10 sm:w-auto sm:px-4"
+          variant="secondary"
+        >
+          <MessageSquarePlus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Send Feedback</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg rounded-3xl">

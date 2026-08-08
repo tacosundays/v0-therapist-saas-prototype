@@ -38,20 +38,24 @@ function redirectTo(request: NextRequest, destination: RedirectDestination) {
   return NextResponse.redirect(url)
 }
 
-function redirectExpiredSessionToLogin(request: NextRequest) {
-  const response = redirectTo(request, "/login")
-
-  for (const cookie of request.cookies.getAll()) {
-    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
-      response.cookies.delete(cookie.name)
-    }
-  }
-
-  return response
-}
-
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
+  const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard")
+  const isDemoRequest = request.nextUrl.searchParams.get("demo") === "1"
+  const hasDemoCookie = request.cookies.get("shrinkaId.demoMode")?.value === "true"
+
+  // The demo workspace uses static, synthetic data and never queries protected
+  // therapist records. Keep the public "View demo" flow ahead of auth routing.
+  if (isDashboardRoute && (isDemoRequest || hasDemoCookie)) {
+    if (isDemoRequest) {
+      response.cookies.set("shrinkaId.demoMode", "true", {
+        path: "/",
+        maxAge: 60 * 60 * 24,
+        sameSite: "lax",
+      })
+    }
+    return response
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -70,14 +74,7 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  let user = null
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-  } catch (error) {
-    console.warn("[Auth] Invalid or expired session; redirecting to login", error)
-    return redirectExpiredSessionToLogin(request)
-  }
+  const { data: { user } } = await supabase.auth.getUser()
   const role = user ? await resolveRole(user.id, user.email) : null
   const decision = getRouteAccessDecision(request.nextUrl.pathname, role, Boolean(user))
 

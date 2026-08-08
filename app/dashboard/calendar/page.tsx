@@ -21,6 +21,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClient } from "@/lib/supabase/client"
+import {
+  demoAssignments,
+  demoCalendarPayload,
+  demoClients,
+  demoMoodCheckIns,
+  demoReflections,
+  demoWorksheetAssignments,
+  useDemoMode,
+} from "@/lib/demo-mode"
 
 type ClientRecord = {
   id: string
@@ -197,6 +206,26 @@ function getPrepReadiness(event: CalendarSessionEvent) {
   return hasPrepSignal ? "Signals ready" : "No prep signals"
 }
 
+function buildSessionNoteHref(event: CalendarSessionEvent) {
+  if (!event.matchedClient) return "#"
+  const params = new URLSearchParams({
+    note: "1",
+    eventId: event.id,
+    sessionType: "Individual therapy",
+    participants: "Client",
+  })
+  const start = event.start.dateTime || event.start.date
+  const end = event.end.dateTime || event.end.date
+  if (start) {
+    params.set("start", start)
+    params.set("date", start)
+  }
+  if (end) params.set("end", end)
+  if (event.location) params.set("location", event.location)
+
+  return `/dashboard/clients/${event.matchedClient.id}/session-prep?${params.toString()}`
+}
+
 function EmptyState({
   title,
   description,
@@ -313,7 +342,7 @@ function AdditionalPrepRow({ prepClient }: { prepClient: PrepClient }) {
         className="h-11 rounded-2xl bg-[#6D5EF5] px-5 text-white shadow-[0_14px_30px_rgba(109,94,245,0.18)] hover:bg-[#5B4DEA]"
       >
         <Link href={`/dashboard/clients/${client.id}/session-prep`}>
-          Open Session Prep
+          Prepare
           <ArrowRight className="ml-2 h-4 w-4" />
         </Link>
       </Button>
@@ -342,6 +371,7 @@ function CalendarEventCard({ event }: { event: CalendarSessionEvent }) {
               {event.matchedClient?.name || "Not matched to a client"}
             </p>
             {!event.matchedClient && <StatusPill label="Not matched to a client" tone="slate" />}
+            {(event as any).status && <StatusPill label={(event as any).status} tone={(event as any).status === "Completed" ? "green" : "purple"} />}
           </div>
           <p className="mt-1 truncate text-sm text-slate-500">{event.title}</p>
           {event.location && <p className="mt-1 truncate text-xs text-slate-400">{event.location}</p>}
@@ -379,15 +409,22 @@ function CalendarEventCard({ event }: { event: CalendarSessionEvent }) {
         </div>
 
         {event.matchedClient ? (
-          <Button
-            asChild
-            className="h-11 rounded-2xl bg-[#6D5EF5] px-4 text-white shadow-[0_14px_30px_rgba(109,94,245,0.18)] hover:bg-[#5B4DEA]"
-          >
-            <Link href={`/dashboard/clients/${event.matchedClient.id}/session-prep`}>
-              Open Session Prep
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              asChild
+              className="h-11 rounded-2xl bg-[#6D5EF5] px-4 text-white shadow-[0_14px_30px_rgba(109,94,245,0.18)] hover:bg-[#5B4DEA]"
+            >
+              <Link href={`/dashboard/clients/${event.matchedClient.id}/session-prep`}>
+                Prepare
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-10 rounded-2xl">
+              <Link href={buildSessionNoteHref(event)}>
+                Create Session Note
+              </Link>
+            </Button>
+          </div>
         ) : event.htmlLink ? (
           <Button asChild variant="outline" className="h-10 shrink-0 rounded-2xl">
             <a href={event.htmlLink} target="_blank" rel="noreferrer">View</a>
@@ -429,6 +466,7 @@ function CalendarSessionSection({
 }
 
 export default function CalendarPage() {
+  const { isDemoMode } = useDemoMode()
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignmentRecord[]>([])
@@ -445,6 +483,16 @@ export default function CalendarPage() {
       setError(null)
 
       try {
+        if (isDemoMode) {
+          setClients(demoClients)
+          setAssignments(demoAssignments)
+          setWorksheetAssignments(demoWorksheetAssignments)
+          setReflections(demoReflections)
+          setMoodCheckIns(demoMoodCheckIns)
+          setCalendarEvents(demoCalendarPayload)
+          return
+        }
+
         const supabase = getClient() as any
         const { therapistId, userEmail } = await getTherapistId()
 
@@ -515,7 +563,7 @@ export default function CalendarPage() {
     }
 
     loadCalendar()
-  }, [])
+  }, [isDemoMode])
 
   const connectGoogleCalendar = async () => {
     setIsConnectingCalendar(true)

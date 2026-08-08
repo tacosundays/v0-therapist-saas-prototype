@@ -23,6 +23,14 @@ import { Progress } from "@/components/ui/progress"
 import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClient } from "@/lib/supabase/client"
+import {
+  demoAssignments,
+  demoClients,
+  demoMoodCheckIns,
+  demoReflections,
+  demoWorksheetAssignments,
+  useDemoMode,
+} from "@/lib/demo-mode"
 
 interface ClientRecord {
   id: string
@@ -165,6 +173,7 @@ function getLatestDate(dates: Array<string | null | undefined>) {
 }
 
 export default function DailyWorkflowPage() {
+  const { isDemoMode } = useDemoMode()
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
   const [worksheetAssignments, setWorksheetAssignments] = useState<WorksheetAssignmentRecord[]>([])
@@ -184,6 +193,15 @@ export default function DailyWorkflowPage() {
     setError(null)
 
     try {
+      if (isDemoMode) {
+        setClients(demoClients)
+        setAssignments(demoAssignments)
+        setWorksheetAssignments(demoWorksheetAssignments)
+        setReflections(demoReflections)
+        setMoodCheckIns(demoMoodCheckIns)
+        return
+      }
+
       const supabase = getClient() as any
       const { therapistId, userEmail } = await getTherapistId()
 
@@ -248,7 +266,7 @@ export default function DailyWorkflowPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isDemoMode])
 
   useEffect(() => {
     loadDailyWorkflow()
@@ -382,19 +400,36 @@ export default function DailyWorkflowPage() {
 
   const getLaunchHref = (stepId: WorkflowStepId) => {
     if (!currentClient) return "/dashboard"
-    if (stepId === "client") return `/dashboard/clients#client-${currentClient.client.id}`
-    if (stepId === "reflection") return "/dashboard/reflections"
-    if (stepId === "homework") return `/dashboard/clients/${currentClient.client.id}/session-prep`
-    if (stepId === "mood") return `/dashboard/clients/${currentClient.client.id}/session-prep`
+    if (stepId === "client") return `/dashboard/clients/${currentClient.client.id}/session-prep`
+    if (stepId === "reflection") return `/dashboard/clients/${currentClient.client.id}/session-prep#reflection-preview`
+    if (stepId === "homework") return `/dashboard/clients/${currentClient.client.id}/session-prep#homework-progress`
+    if (stepId === "mood") return `/dashboard/clients/${currentClient.client.id}/session-prep#mood-checkins`
     if (stepId === "prep") return `/dashboard/clients/${currentClient.client.id}/session-prep#ai-summary`
     return "/dashboard/clients"
+  }
+
+  const getLaunchLabel = (stepId: WorkflowStepId) => {
+    if (stepId === "client") return "Open Client"
+    if (stepId === "homework") return "Review Homework"
+    if (stepId === "reflection") return "Review Reflection"
+    if (stepId === "mood") return "Review Mood"
+    if (stepId === "prep") return "Open AI Prep"
+    return "Open Existing Page"
   }
 
   const getPrimaryAction = () => {
     if (!currentStep) return null
     if (currentStep.id === "assign") {
       return (
-        <Button onClick={() => setIsAssignModalOpen(true)}>
+        <Button
+          onClick={() => {
+            if (isDemoMode) {
+              markStepReviewed()
+              return
+            }
+            setIsAssignModalOpen(true)
+          }}
+        >
           Assign Homework
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
@@ -412,7 +447,7 @@ export default function DailyWorkflowPage() {
     return (
       <Button asChild>
         <Link href={getLaunchHref(currentStep.id)}>
-          Open Existing Page
+          {getLaunchLabel(currentStep.id)}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Link>
       </Button>
@@ -484,19 +519,19 @@ export default function DailyWorkflowPage() {
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/45">AI Daily Brief</p>
                 <h2 className="mt-2 text-2xl font-bold tracking-tight">Begin with the brief</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-                  Start with the existing morning review context, then this workflow will walk client by client through homework, reflections, mood, AI prep, and assignment.
+                  Your review queue is already summarized above. Start the client queue now, or open Inbox only when you need the full detail view.
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-                <Button className="bg-white text-slate-950 hover:bg-white/90" asChild>
-                  <Link href="/dashboard/inbox">
-                    Open Daily Brief
-                    <Inbox className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => setBriefComplete(true)}>
+                <Button className="bg-white text-slate-950 hover:bg-white/90" onClick={() => setBriefComplete(true)}>
                   Start Client Queue
                   <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" asChild>
+                  <Link href="/dashboard/inbox">
+                    Review Inbox
+                    <Inbox className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -591,7 +626,7 @@ export default function DailyWorkflowPage() {
                   </div>
                   <Button variant="outline" asChild>
                     <Link href={`/dashboard/clients/${currentClient.client.id}/session-prep`}>
-                      Open Session Prep
+                      Prepare
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>

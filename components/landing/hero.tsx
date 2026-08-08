@@ -66,7 +66,7 @@ export function Hero() {
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="text-base h-12 px-8" asChild>
-                <Link href="#how-it-works">See how it works</Link>
+                <Link href="/dashboard?demo=1">Explore demo workspace</Link>
               </Button>
             </div>
 

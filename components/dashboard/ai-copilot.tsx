@@ -30,6 +30,15 @@ import {
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
 import { getClient } from "@/lib/supabase/client"
+import {
+  demoAssignments,
+  demoClients,
+  demoMoodCheckIns,
+  demoProgressNotes,
+  demoReflections,
+  demoSessionSummaries,
+  useDemoMode,
+} from "@/lib/demo-mode"
 
 const disclaimer = "AI suggestions are for therapist review and do not replace clinical judgment."
 
@@ -120,6 +129,91 @@ function formatAnswerForClipboard(result: CopilotResult) {
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function buildDemoCopilotResult(prompt: string): CopilotResult {
+  const homeworkWaiting = demoAssignments.filter((assignment) => assignment.completed || assignment.status === "completed").length
+  const moodAlertClients = new Set(demoMoodCheckIns.filter((checkIn) => (
+    checkIn.mood_rating < 4 || (checkIn.anxiety_rating || 0) > 8 || (checkIn.stress_rating || 0) > 8
+  )).map((checkIn) => checkIn.client_id))
+  const primaryClient = demoClients.find((client) => prompt.toLowerCase().includes(client.full_name.toLowerCase().split(" ")[0].toLowerCase()))
+    || demoClients.find((client) => moodAlertClients.has(client.id))
+    || demoClients[0]
+  const clientAssignments = demoAssignments.filter((assignment) => assignment.client_id === primaryClient.id)
+  const clientReflections = demoReflections.filter((reflection) => reflection.client_id === primaryClient.id)
+  const clientMoods = demoMoodCheckIns.filter((checkIn) => checkIn.client_id === primaryClient.id)
+  const latestMood = clientMoods[0]
+  const latestSummary = demoSessionSummaries.find((summary) => summary.client_id === primaryClient.id)
+
+  return {
+    answer: `Demo response for ${primaryClient.full_name}.`,
+    structuredAnswer: {
+      summary: `${primaryClient.full_name} is the clearest demo priority based on homework, reflection, and mood activity in North Hills Counseling.`,
+      keyFindings: [
+        `${clientAssignments.filter((assignment) => assignment.completed).length} completed homework items are available to review.`,
+        clientReflections[0]?.reflection_text || "A recent reflection is available for review.",
+        latestMood ? `Latest mood check-in is ${latestMood.mood_rating}/10 with stress ${latestMood.stress_rating ?? "not rated"}/10.` : "No recent mood check-in is available.",
+      ],
+      recommendedNextSteps: [
+        "Open Session Prep, review homework and mood trend, then decide whether to adjust the next assignment.",
+      ],
+      supportingData: [
+        "Demo data includes homework history, reflections, mood check-ins, notes, and AI session summaries.",
+      ],
+      clinicalReminder: disclaimer,
+    },
+    suggestedFollowUps: [
+      `Prepare ${primaryClient.full_name}'s next session`,
+      "Who has mood alerts today?",
+      "What homework is waiting for review?",
+    ],
+    recommendedHomework: {
+      clientId: primaryClient.id,
+      clientName: primaryClient.full_name,
+      title: "Thought Record",
+      description: "Review one recent activating event and note thoughts, feelings, and alternative responses.",
+    },
+    primaryClient: {
+      id: primaryClient.id,
+      name: primaryClient.full_name,
+    },
+    dailyBrief: {
+      homeworkWaiting,
+      reflectionsSubmitted: demoReflections.length,
+      moodAlerts: moodAlertClients.size,
+      inactiveClients: 1,
+      estimatedReviewTime: Math.max(8, homeworkWaiting * 2 + moodAlertClients.size * 3),
+      highlights: [
+        `${primaryClient.full_name}: ${latestSummary?.summary_json.progressSinceLastSession || "review recent activity."}`,
+        `${moodAlertClients.size} demo clients have mood signals worth reviewing.`,
+        `${homeworkWaiting} demo homework items are ready for therapist review.`,
+      ],
+    },
+    sources: {
+      homework: {
+        summary: clientAssignments.map((assignment) => assignment.title).join(", "),
+        citations: clientAssignments.map((assignment) => assignment.title),
+      },
+      reflections: {
+        summary: clientReflections.map((reflection) => reflection.reflection_text).join(" "),
+        citations: clientReflections.map((reflection) => reflection.title),
+      },
+      moodCheckIns: {
+        summary: clientMoods.slice(0, 3).map((checkIn) => `Mood ${checkIn.mood_rating}/10`).join(", "),
+        citations: clientMoods.slice(0, 3).map((checkIn) => new Date(checkIn.created_at).toLocaleDateString()),
+      },
+      sessionNotes: {
+        summary: demoProgressNotes.find((note) => note.client_id === primaryClient.id)?.private_note || "Recent demo note available.",
+        citations: ["Demo progress note"],
+      },
+    },
+    sourceCounts: {
+      assignments: clientAssignments.length,
+      reflections: clientReflections.length,
+      moodCheckIns: clientMoods.length,
+      sessionNotes: demoProgressNotes.filter((note) => note.client_id === primaryClient.id).length,
+    },
+  }
 }
 
 function StructuredResponse({ result }: { result: CopilotResult }) {
@@ -265,6 +359,7 @@ function SourceSummary({
 }
 
 export function AiCopilot() {
+  const { isDemoMode } = useDemoMode()
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -302,6 +397,21 @@ export function AiCopilot() {
     if (!options?.silentUserMessage) setQuestion(prompt)
 
     try {
+      if (isDemoMode) {
+        const payload = buildDemoCopilotResult(prompt)
+        const assistantMessage: ChatMessage = {
+          id: createId(),
+          role: "assistant",
+          content: payload.answer,
+          result: payload,
+        }
+        setDailyBrief(payload.dailyBrief || null)
+        if (!options?.silentUserMessage) {
+          setMessages((current) => [...current, assistantMessage])
+        }
+        return
+      }
+
       const supabase = getClient()
       const { data: { session } } = await supabase.auth.getSession()
 
@@ -363,10 +473,11 @@ export function AiCopilot() {
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 h-14 rounded-full bg-[#6D5EF5] px-5 text-white shadow-[0_20px_48px_rgba(109,94,245,0.34)] transition-all hover:-translate-y-0.5 hover:bg-[#5B4DEA] hover:shadow-[0_24px_58px_rgba(109,94,245,0.42)]"
+        aria-label="Open AI Copilot"
+        className="fixed bottom-4 right-4 z-30 h-12 w-12 rounded-full bg-[#6D5EF5] p-0 text-white shadow-[0_20px_48px_rgba(109,94,245,0.34)] transition-all hover:-translate-y-0.5 hover:bg-[#5B4DEA] hover:shadow-[0_24px_58px_rgba(109,94,245,0.42)] sm:bottom-6 sm:right-6 sm:h-14 sm:w-auto sm:px-5"
       >
-        <Sparkles className="mr-2 h-5 w-5" />
-        AI Copilot
+        <Sparkles className="h-5 w-5 sm:mr-2" />
+        <span className="hidden sm:inline">AI Copilot</span>
       </Button>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -455,7 +566,7 @@ export function AiCopilot() {
                               <Button asChild variant="outline" className="h-10 justify-start rounded-[8px]">
                                 <Link href={`/dashboard/clients/${message.result.primaryClient.id}/session-prep`}>
                                   <FileText className="mr-2 h-4 w-4" />
-                                  Open Session Prep
+                                  Prepare
                                 </Link>
                               </Button>
                             )}

@@ -14,7 +14,7 @@ export default function SessionPrepError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error("[Session Prep] Uncaught page error", error)
+    console.error("[v0] Session Prep: uncaught rendering error", error)
   }, [error])
 
   return (

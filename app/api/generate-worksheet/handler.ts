@@ -229,7 +229,3 @@ export async function handleGenerateWorksheetRequest(req: Request, deps = create
     return genericError(500)
   }
 }
-
-export async function POST(req: Request) {
-  return handleGenerateWorksheetRequest(req)
-}

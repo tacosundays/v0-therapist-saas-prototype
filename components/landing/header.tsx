@@ -41,6 +41,9 @@ export function Header() {
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard?demo=1">View demo</Link>
+            </Button>
             <Button variant="ghost" asChild>
               <Link href="/login">Log in</Link>
             </Button>
@@ -99,6 +102,9 @@ export function Header() {
               Practice fit
             </Link>
             <div className="pt-4 space-y-2">
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/dashboard?demo=1">View demo</Link>
+              </Button>
               <Button variant="outline" className="w-full" asChild>
                 <Link href="/login">Log in</Link>
               </Button>

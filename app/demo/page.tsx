@@ -1,13 +1,14 @@
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Brain, ClipboardCheck, UserRound } from "lucide-react"
+import { ArrowLeft, ArrowRight, ClipboardCheck, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BrandMark } from "@/components/brand-mark"
 
 export default function DemoChooserPage() {
   return <main className="min-h-screen bg-[radial-gradient(circle_at_20%_10%,rgba(99,91,255,.16),transparent_32rem),radial-gradient(circle_at_85%_25%,rgba(24,183,160,.12),transparent_30rem),#f8fafc] px-4 py-10 sm:px-6">
     <div className="mx-auto max-w-5xl">
       <Button variant="ghost" asChild><Link href="/"><ArrowLeft className="mr-2 h-4 w-4" />Back to SessionSteps</Link></Button>
       <div className="mx-auto mt-12 max-w-2xl text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#635BFF] shadow-lg shadow-[#635BFF]/25"><Brain className="h-7 w-7 text-white" /></div>
+        <BrandMark className="mx-auto h-14 w-14 shadow-lg shadow-[#635BFF]/25" />
         <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">Choose your demo</h1>
         <p className="mt-4 text-lg leading-8 text-slate-600">Explore both sides of SessionSteps with safe, synthetic sample data.</p>
       </div>

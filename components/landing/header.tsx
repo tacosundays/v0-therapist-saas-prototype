@@ -3,8 +3,9 @@
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Brain, Menu, X } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { useState } from "react"
+import { BrandMark } from "@/components/brand-mark"
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -19,10 +20,8 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <Brain className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg text-foreground">SessionSteps</span>
+            <BrandMark className="h-10 w-10" />
+            <span className="text-xl font-bold tracking-tight text-slate-950">SessionSteps</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">

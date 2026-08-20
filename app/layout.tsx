@@ -4,7 +4,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'SessionSteps - Keep therapy working between sessions',
-  description: 'Assign evidence-informed worksheets, exercises, and psychoeducation to clients — then track completion, reflections, and progress from one calm therapist dashboard.',
+  description: 'The clinical continuity platform for behavioral health—connecting session intelligence, between-session engagement, and longitudinal outcomes.',
   generator: 'v0.app',
   icons: {
     icon: [

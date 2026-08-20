@@ -73,4 +73,9 @@ test("primary surfaces use the SessionSteps brand", () => {
     assert.match(source, /SessionSteps/, path)
     assert.doesNotMatch(source, /ShrinkAid/, path)
   }
+  const mark = readFileSync("components/brand-mark.tsx", "utf8")
+  const hero = readFileSync("components/landing/hero.tsx", "utf8")
+  assert.match(mark, /SessionSteps logo/)
+  assert.match(hero, /Clinical continuity for behavioral health/)
+  assert.match(hero, /longitudinal outcomes/)
 })

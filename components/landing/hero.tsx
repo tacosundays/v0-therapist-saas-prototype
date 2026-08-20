@@ -46,16 +46,16 @@ export function Hero() {
               className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#635BFF]/15 bg-white/80 px-4 py-2 text-sm font-semibold text-[#635BFF] shadow-sm backdrop-blur"
             >
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#18B7A0]" />
-              Therapy homework that fits real practice
+              Clinical continuity for behavioral health
             </motion.div>
 
             <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-[#0F172A] sm:text-5xl lg:text-6xl">
-              Keep therapy homework moving{" "}
-              <span className="text-[#635BFF]">between sessions.</span>
+              Connect care from one session{" "}
+              <span className="text-[#635BFF]">to the next.</span>
             </h1>
 
             <p className="mx-auto mt-7 max-w-xl text-pretty text-lg leading-8 text-slate-600 lg:mx-0">
-              SessionSteps helps therapists assign worksheets, collect client reflections, and review progress before the next appointment.
+              SessionSteps brings before-session intelligence, between-session engagement, and longitudinal outcomes into one secure platform for behavioral health providers.
             </p>
 
             <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">

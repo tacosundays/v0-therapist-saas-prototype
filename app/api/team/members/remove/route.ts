@@ -67,27 +67,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No therapist account found for your email" }, { status: 403 })
     }
 
-    const { data: ownerMembership, error: ownerMembershipError } = await adminClient
-      .from("practice_members")
-      .select("practice_id, role, status")
-      .eq("therapist_id", owner.id)
-      .eq("role", "owner")
-      .eq("status", "active")
-      .maybeSingle()
-
-    if (ownerMembershipError) {
-      return NextResponse.json({ error: ownerMembershipError.message }, { status: 500 })
-    }
-
-    if (!ownerMembership?.practice_id) {
-      return NextResponse.json({ error: "Only practice owners can remove team members" }, { status: 403 })
-    }
-
     const { data: member, error: memberError } = await adminClient
-      .from("practice_members")
-      .select("id, practice_id, therapist_id, role, status")
+      .from("organization_members")
+      .select("id, organization_id, therapist_id, role, status")
       .eq("id", memberId)
-      .eq("practice_id", ownerMembership.practice_id)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (memberError) {
@@ -104,7 +88,6 @@ export async function POST(request: Request) {
 
     const { error: removeError } = await adminClient.rpc("remove_clinician_from_organization", {
       target_organization_id: tenant.organizationId,
-      target_practice_id: ownerMembership.practice_id,
       target_therapist_id: member.therapist_id,
     })
 
@@ -118,10 +101,10 @@ export async function POST(request: Request) {
       userEmail: normalizeEmail(user.email),
       actorRole: "therapist",
       action: "team.member_removed",
-      resourceType: "practice_member",
+      resourceType: "organization_member",
       resourceId: member.id,
       details: {
-        practiceId: ownerMembership.practice_id,
+        organizationId: tenant.organizationId,
         removedTherapistId: member.therapist_id,
       },
       ipAddress: getRequestIp(request),

@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     const { adminClient, tenant, therapist } = result
     const { data: organization, error: organizationError } = await adminClient
       .from("organizations")
-      .select("id, owner_therapist_id, name, plan, subscription_plan, max_seats, legacy_practice_id, created_at")
+      .select("id, owner_therapist_id, name, plan, subscription_plan, max_seats, created_at")
       .eq("id", tenant.organizationId)
       .single()
 
@@ -95,26 +95,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: membersError.message }, { status: 500 })
     }
 
-    let invites: any[] = []
-    if (organization.legacy_practice_id) {
-      const { data, error: invitesError } = await adminClient
-        .from("therapist_invites")
-        .select("id, email, role, accepted_at, revoked_at, expires_at, created_at")
-        .eq("practice_id", organization.legacy_practice_id)
-        .is("accepted_at", null)
-        .is("revoked_at", null)
-        .order("created_at", { ascending: false })
+    const { data: invites, error: invitesError } = await adminClient
+      .from("organization_invitations")
+      .select("id, email, role, accepted_at, revoked_at, expires_at, created_at")
+      .eq("organization_id", tenant.organizationId)
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false })
 
-      if (invitesError) {
-        return NextResponse.json({ error: invitesError.message }, { status: 500 })
-      }
-      invites = data || []
+    if (invitesError) {
+      return NextResponse.json({ error: invitesError.message }, { status: 500 })
     }
 
     const activeMembers = (members || []).filter((member: any) => member.status === "active")
-    const pendingInvites = invites
+    const pendingInvites = invites || []
     const practice = {
-      id: organization.legacy_practice_id,
+      id: organization.id,
       owner_therapist_id: organization.owner_therapist_id,
       name: organization.name,
       plan: planId,

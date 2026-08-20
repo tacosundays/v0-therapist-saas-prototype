@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 
     const { data: organization } = await adminClient
       .from("organizations")
-      .select("plan, subscription_plan, legacy_practice_id")
+      .select("id, name, plan, subscription_plan, max_seats")
       .eq("id", tenant.organizationId)
       .single()
     const planId = normalizeProductId(organization?.plan || organization?.subscription_plan) || "free"
@@ -101,40 +101,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Team invitations require the Group Practice plan" }, { status: 403 })
     }
 
-    const { data: membership, error: membershipError } = await adminClient
-      .from("practice_members")
-      .select("practice_id, role, status")
-      .eq("therapist_id", owner.id)
-      .eq("role", "owner")
-      .eq("status", "active")
-      .maybeSingle()
-
-    if (membershipError) {
-      return NextResponse.json({ error: membershipError.message }, { status: 500 })
-    }
-
-    if (!membership?.practice_id) {
-      return NextResponse.json({ error: "Open the Team page before inviting therapists" }, { status: 400 })
-    }
-    if (membership.practice_id !== organization?.legacy_practice_id) {
-      return NextResponse.json({ error: "Practice does not belong to the active organization" }, { status: 403 })
-    }
-
-    const { data: practice, error: practiceError } = await adminClient
-      .from("practices")
-      .select("id, name, max_seats")
-      .eq("id", membership.practice_id)
-      .eq("owner_therapist_id", owner.id)
-      .single()
-
-    if (practiceError) {
-      return NextResponse.json({ error: practiceError.message }, { status: 500 })
-    }
-
     const { count: activeMemberCount, error: memberCountError } = await adminClient
-      .from("practice_members")
+      .from("organization_members")
       .select("*", { count: "exact", head: true })
-      .eq("practice_id", practice.id)
+      .eq("organization_id", tenant.organizationId)
       .eq("status", "active")
 
     if (memberCountError) {
@@ -142,9 +112,9 @@ export async function POST(request: Request) {
     }
 
     const { count: pendingInviteCount, error: inviteCountError } = await adminClient
-      .from("therapist_invites")
+      .from("organization_invitations")
       .select("*", { count: "exact", head: true })
-      .eq("practice_id", practice.id)
+      .eq("organization_id", tenant.organizationId)
       .is("accepted_at", null)
       .is("revoked_at", null)
 
@@ -152,7 +122,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: inviteCountError.message }, { status: 500 })
     }
 
-    const maxSeats = practice.max_seats || 5
+    const maxSeats = organization?.max_seats || 1
     const seatsUsed = (activeMemberCount || 0) + (pendingInviteCount || 0)
 
     if (seatsUsed >= maxSeats) {
@@ -171,9 +141,9 @@ export async function POST(request: Request) {
 
     if (existingMember) {
       const { data: existingMembership, error: existingMembershipError } = await adminClient
-        .from("practice_members")
+        .from("organization_members")
         .select("id, status")
-        .eq("practice_id", practice.id)
+        .eq("organization_id", tenant.organizationId)
         .eq("therapist_id", existingMember.id)
         .maybeSingle()
 
@@ -192,12 +162,12 @@ export async function POST(request: Request) {
     const inviteLink = buildTherapistInviteLink(origin, normalizedInviteEmail, inviteToken)
 
     const { data: invite, error: inviteError } = await adminClient
-      .from("therapist_invites")
+      .from("organization_invitations")
       .insert({
-        practice_id: practice.id,
+        organization_id: tenant.organizationId,
         invited_by_therapist_id: owner.id,
         email: normalizedInviteEmail,
-        role: "therapist",
+        role: "clinician",
         token_hash: tokenHash,
       })
       .select("id, email, created_at")
@@ -218,7 +188,7 @@ export async function POST(request: Request) {
         resourceId: invite.id,
         details: {
           invitedEmail: normalizedInviteEmail,
-          practiceId: practice.id,
+          organizationId: tenant.organizationId,
           emailSent: false,
           reason: "RESEND_API_KEY not configured",
         },
@@ -237,7 +207,7 @@ export async function POST(request: Request) {
 
     const emailContent = renderTherapistInviteEmail({
       inviterName: owner.full_name || owner.email || "A practice owner",
-      practiceName: practice.name,
+      practiceName: organization?.name || "Your organization",
       inviteLink,
     })
 
@@ -269,7 +239,7 @@ export async function POST(request: Request) {
         resourceId: invite.id,
         details: {
           invitedEmail: normalizedInviteEmail,
-          practiceId: practice.id,
+          organizationId: tenant.organizationId,
           emailSent: false,
           resendError: resendResult?.message || resendResult?.error || "Email delivery failed",
         },
@@ -296,7 +266,7 @@ export async function POST(request: Request) {
       resourceId: invite.id,
       details: {
         invitedEmail: normalizedInviteEmail,
-        practiceId: practice.id,
+        organizationId: tenant.organizationId,
         emailSent: true,
       },
       ipAddress: getRequestIp(request),

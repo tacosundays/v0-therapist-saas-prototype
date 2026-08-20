@@ -39,13 +39,13 @@ test("client invitation delivery scopes every client mutation to the organizatio
 })
 
 test("membership removal is atomic and service-role only", () => {
-  const migration = readFileSync("supabase/migrations/028_secure_organization_membership_transitions.sql", "utf8")
+  const migration = readFileSync("supabase/migrations/030_canonical_organization_team_management.sql", "utf8")
   const route = readFileSync("app/api/team/members/remove/route.ts", "utf8")
   assert.match(migration, /UPDATE public\.organization_members/)
-  assert.match(migration, /UPDATE public\.practice_members/)
   assert.match(migration, /UPDATE public\.clients/)
   assert.match(migration, /FROM PUBLIC, anon, authenticated/)
   assert.match(route, /rpc\("remove_clinician_from_organization"/)
+  assert.doesNotMatch(route, /practice_members|practice_id/)
 })
 
 test("client-authenticated invite acceptance remains token and user bound", () => {
@@ -59,9 +59,26 @@ test("client-authenticated invite acceptance remains token and user bound", () =
 test("team reads use organization state without creating legacy practices", () => {
   const source = readFileSync("app/api/team/route.ts", "utf8")
   assert.match(source, /from\("organization_members"\)/)
-  assert.match(source, /legacy_practice_id/)
+  assert.match(source, /from\("organization_invitations"\)/)
   assert.doesNotMatch(source, /\.from\("practices"\)[\s\S]{0,160}\.insert\(/)
   assert.doesNotMatch(source, /ensurePractice/)
+})
+
+test("team invitations and transitions no longer depend on legacy practices", () => {
+  const migration = readFileSync("supabase/migrations/030_canonical_organization_team_management.sql", "utf8")
+  assert.match(migration, /CREATE TABLE public\.organization_invitations/)
+  assert.match(migration, /accept_organization_invitation/)
+  assert.match(migration, /DROP TABLE public\.therapist_invites/)
+
+  for (const path of [
+    "app/api/team/route.ts",
+    "app/api/team/invites/create/route.ts",
+    "app/api/team/invites/accept/route.ts",
+    "app/api/team/members/remove/route.ts",
+  ]) {
+    const source = readFileSync(path, "utf8")
+    assert.doesNotMatch(source, /practice_members|therapist_invites|practice_id|legacy_practice_id/, path)
+  }
 })
 
 test("audit logs allow only reference nulling during account cleanup", () => {

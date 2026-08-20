@@ -73,8 +73,8 @@ export async function POST(request: Request) {
     }
 
     const { data: invite, error: inviteError } = await adminClient
-      .from("therapist_invites")
-      .select("id, practice_id, email, role, accepted_at, revoked_at, expires_at")
+      .from("organization_invitations")
+      .select("id, organization_id, email, role, accepted_at, revoked_at, expires_at")
       .eq("token_hash", tokenHash)
       .ilike("email", normalizedEmail)
       .maybeSingle()
@@ -87,70 +87,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid or expired team invite" }, { status: 400 })
     }
 
-    const { data: practice, error: practiceError } = await adminClient
-      .from("practices")
-      .select("id, max_seats")
-      .eq("id", invite.practice_id)
-      .single()
-
-    if (practiceError) {
-      return NextResponse.json({ error: practiceError.message }, { status: 500 })
-    }
-
-    const { count: activeMemberCount, error: countError } = await adminClient
-      .from("practice_members")
-      .select("*", { count: "exact", head: true })
-      .eq("practice_id", practice.id)
-      .eq("status", "active")
-
-    if (countError) {
-      return NextResponse.json({ error: countError.message }, { status: 500 })
-    }
-
-    const maxSeats = practice.max_seats || 5
-    if ((activeMemberCount || 0) >= maxSeats) {
-      return NextResponse.json({ error: `Seat limit reached (${activeMemberCount}/${maxSeats})` }, { status: 403 })
-    }
-
-    const { error: memberError } = await adminClient
-      .from("practice_members")
-      .upsert(
-        {
-          practice_id: invite.practice_id,
-          therapist_id: therapist.id,
-          role: invite.role || "therapist",
-          status: "active",
-          joined_at: new Date().toISOString(),
-          removed_at: null,
-        },
-        { onConflict: "practice_id,therapist_id" },
-      )
-
-    if (memberError) {
-      return NextResponse.json({ error: memberError.message }, { status: 500 })
-    }
-
-    const { error: tenantJoinError } = await adminClient.rpc("join_organization_for_practice", {
+    const { error: tenantJoinError } = await adminClient.rpc("accept_organization_invitation", {
+      target_invitation_id: invite.id,
       target_therapist_id: therapist.id,
-      target_practice_id: invite.practice_id,
     })
 
     if (tenantJoinError) {
       return NextResponse.json({ error: tenantJoinError.message }, { status: 500 })
-    }
-
-    await adminClient
-      .from("therapists")
-      .update({ plan: "group-practice" })
-      .eq("id", therapist.id)
-
-    const { error: updateInviteError } = await adminClient
-      .from("therapist_invites")
-      .update({ accepted_at: new Date().toISOString() })
-      .eq("id", invite.id)
-
-    if (updateInviteError) {
-      return NextResponse.json({ error: updateInviteError.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

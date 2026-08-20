@@ -39,7 +39,7 @@ import {
 interface TeamMember {
   id: string
   therapist_id: string
-  role: "owner" | "therapist"
+  role: "owner" | "admin" | "clinician"
   status: "active" | "removed"
   joined_at: string
   therapists?: {
@@ -52,7 +52,7 @@ interface TeamMember {
 interface TeamInvite {
   id: string
   email: string
-  role: "therapist"
+  role: "admin" | "clinician"
   expires_at: string
   created_at: string
 }
@@ -64,7 +64,7 @@ interface TeamData {
     max_seats: number
   }
   currentTherapistId: string
-  currentRole: "owner" | "therapist"
+  currentRole: "owner" | "admin" | "clinician"
   plan: string
   canManageTeam: boolean
   maxSeats: number
@@ -259,7 +259,7 @@ export default function TeamPage() {
         type: "member",
         name: displayName,
         email: member.therapists?.email || "No email",
-        role: member.role === "owner" ? "Owner" : "Therapist",
+        role: member.role === "owner" ? "Owner" : member.role === "admin" ? "Admin" : "Therapist",
         status: member.role === "owner" ? "Owner" : "Active",
         dateLabel: "Joined",
         dateValue: member.joined_at,

@@ -49,15 +49,22 @@ test("API routes remain protected by their route handlers", () => {
 })
 
 test("public demo entry establishes demo mode before entering the dashboard", () => {
-  const route = readFileSync("app/demo/route.ts", "utf8")
+  const chooser = readFileSync("app/demo/page.tsx", "utf8")
   const demoMode = readFileSync("lib/demo-mode.ts", "utf8")
   const header = readFileSync("components/landing/header.tsx", "utf8")
   const sidebar = readFileSync("components/dashboard/sidebar.tsx", "utf8")
-  assert.match(route, /\/dashboard\?demo=1/)
-  assert.match(route, /shrinkaId\.demoMode/)
+  const middleware = readFileSync("lib/supabase/middleware.ts", "utf8")
+  const clientLayout = readFileSync("app/client-portal/layout.tsx", "utf8")
+  const clientPage = readFileSync("app/client-portal/page.tsx", "utf8")
+  assert.match(chooser, /\/dashboard\?demo=therapist/)
+  assert.match(chooser, /\/client-portal\?demo=client/)
+  assert.match(middleware, /startsWith\("\/client-portal"\)/)
+  assert.match(middleware, /shrinkaId\.demoMode/)
   assert.match(demoMode, /document\.cookie/)
   assert.match(header, /href="\/demo"/)
   assert.match(sidebar, /isDemoMode \|\| isDemoModeEnabled\(\)/)
+  assert.match(clientLayout, /params\.get\("demo"\) === "client"/)
+  assert.match(clientPage, /demoAssignments/)
 })
 
 test("primary surfaces use the SessionSteps brand", () => {

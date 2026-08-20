@@ -28,6 +28,7 @@ import Link from "next/link"
 import { WorksheetForm } from "@/components/client-portal/worksheet-form"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
+import { demoAssignments, demoClients, demoMoodCheckIns, demoWorksheetAssignments, isDemoModeEnabled } from "@/lib/demo-mode"
 
 interface Assignment {
   id: string
@@ -149,6 +150,15 @@ function ClientPortalContent() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (isDemoModeEnabled()) {
+        const client = demoClients[0]
+        setClientRecord({ id: client.id, therapist_id: client.therapist_id, full_name: client.full_name, email: client.email })
+        setAssignments(demoAssignments.filter((item) => item.client_id === client.id).map((item) => ({ ...item, description: "A practice activity selected by your therapist.", due_date: item.due_date, completed_at: item.completed_at })))
+        setWorksheetAssignments(demoWorksheetAssignments.filter((item) => item.client_id === client.id).map((item) => ({ ...item, due_date: null, worksheet_templates: { ...item.worksheet_templates, description: "Complete this guided worksheet and share it with your therapist." } })))
+        setMoodCheckIns(demoMoodCheckIns.filter((item) => item.client_id === client.id))
+        setIsLoading(false)
+        return
+      }
       const supabase = getClient()
       
       // Use the auth utility to get the client record
@@ -260,6 +270,14 @@ function ClientPortalContent() {
     const supabase = getClient() as any
     const completedAt = new Date().toISOString()
 
+    if (isDemoModeEnabled()) {
+      setAssignments(prev => prev.map(a => a.id === selectedAssignment ? { ...a, completed: true, status: "completed", reflection: reflection.trim() || null, started_at: a.started_at || completedAt, completed_at: completedAt } : a))
+      setSubmitSuccess(true)
+      setIsSubmitting(false)
+      setTimeout(() => { setSelectedAssignment(null); setReflection(""); setSubmitSuccess(false) }, 700)
+      return
+    }
+
     const { error: updateError } = await supabase
       .from("assignments")
       .update({
@@ -316,6 +334,10 @@ function ClientPortalContent() {
     if (assignment.completed || assignment.status === "started" || assignment.started_at) return
 
     const startedAt = new Date().toISOString()
+    if (isDemoModeEnabled()) {
+      setAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, status: "started", started_at: startedAt } : a))
+      return
+    }
     const supabase = getClient() as any
 
     const { error: updateError } = await supabase

@@ -37,13 +37,13 @@ function redirectTo(request: NextRequest, destination: RedirectDestination) {
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
-  const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard")
-  const isDemoRequest = request.nextUrl.searchParams.get("demo") === "1"
+  const isDemoProtectedRoute = request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/client-portal")
+  const isDemoRequest = ["1", "therapist", "client"].includes(request.nextUrl.searchParams.get("demo") || "")
   const hasDemoCookie = request.cookies.get("shrinkaId.demoMode")?.value === "true"
 
   // The demo workspace uses static, synthetic data and never queries protected
   // therapist records. Keep the public "View demo" flow ahead of auth routing.
-  if (isDashboardRoute && (isDemoRequest || hasDemoCookie)) {
+  if (isDemoProtectedRoute && (isDemoRequest || hasDemoCookie)) {
     if (isDemoRequest) {
       response.cookies.set("shrinkaId.demoMode", "true", {
         path: "/",

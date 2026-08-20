@@ -32,7 +32,7 @@ export function Hero() {
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#635BFF]/30 to-transparent" />
       
       <div className="max-w-7xl mx-auto relative">
-        <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-16">
+        <div className="grid items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -127,7 +127,7 @@ function FeatureStrip() {
 
 function DashboardPreview() {
   return (
-    <div className="relative mx-auto max-w-xl">
+    <div className="relative mx-auto max-w-3xl">
       <div className="absolute -inset-5 rounded-[2rem] bg-gradient-to-r from-[#635BFF]/24 via-[#18B7A0]/16 to-[#635BFF]/16 blur-3xl" />
       <div className="relative overflow-hidden rounded-[1.75rem] border border-white/80 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.18)]">
         <div className="flex items-center gap-2 border-b border-slate-200/80 bg-slate-50/80 px-4 py-3">
@@ -141,8 +141,8 @@ function DashboardPreview() {
           </div>
         </div>
         
-        <div className="grid gap-4 p-4 sm:p-5">
-          <div className="rounded-3xl bg-[#0F172A] p-5 text-white">
+        <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-2">
+          <div className="rounded-3xl bg-[#0F172A] p-5 text-white lg:col-span-2">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">Today&apos;s Session Prep</div>
@@ -154,11 +154,6 @@ function DashboardPreview() {
                 <div className="text-[11px] text-white/55">completion</div>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <PreviewMetric label="Homework ready to review" value="5" icon={BookOpen} tone="purple" />
-            <PreviewMetric label="Upcoming session" value="2:30" icon={CalendarClock} tone="teal" />
           </div>
 
           <div className="space-y-3">
@@ -185,7 +180,12 @@ function DashboardPreview() {
             />
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <PreviewMetric label="Homework ready" value="5" icon={BookOpen} tone="purple" />
+              <PreviewMetric label="Next session" value="2:30" icon={CalendarClock} tone="teal" />
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-900">Session readiness</div>
               <div className="text-xs font-medium text-[#635BFF]">Live summary</div>
@@ -203,6 +203,7 @@ function DashboardPreview() {
                   </div>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>

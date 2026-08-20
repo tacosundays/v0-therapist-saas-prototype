@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
 import { SessionTimeout } from "@/components/auth/session-timeout"
+import { demoClients, enableDemoMode, isDemoModeEnabled } from "@/lib/demo-mode"
 
 export default function ClientPortalLayout({
   children,
@@ -20,6 +21,15 @@ export default function ClientPortalLayout({
 
   useEffect(() => {
     const checkAuth = async () => {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("demo") === "client") enableDemoMode()
+      if (params.get("demo") === "client" || isDemoModeEnabled()) {
+        window.history.replaceState({}, "", window.location.pathname)
+        setClientName(demoClients[0].full_name)
+        setIsAuthorized(true)
+        setIsChecking(false)
+        return
+      }
       console.log("[v0] Client portal layout: Starting auth check")
       
       const result = await checkUserRole()
@@ -63,6 +73,10 @@ export default function ClientPortalLayout({
   }, [])
 
   const handleSignOut = async () => {
+    if (isDemoModeEnabled()) {
+      window.location.href = "/demo"
+      return
+    }
     const supabase = getClient()
     await logClientAuditEvent({
       action: "logout",

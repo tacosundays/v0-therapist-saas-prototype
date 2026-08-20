@@ -28,7 +28,7 @@ const featureStrip = [
 export function Hero() {
   return (
     <section className="relative overflow-hidden px-4 pb-16 pt-32 sm:px-6 sm:pb-20 sm:pt-36 lg:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(99,91,255,0.14),transparent_34rem),radial-gradient(circle_at_82%_28%,rgba(24,183,160,0.12),transparent_30rem),linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_72%,#EEF2FF_100%)]" />
+      <HeroBackground />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#635BFF]/30 to-transparent" />
       
       <div className="max-w-7xl mx-auto relative">
@@ -97,6 +97,72 @@ export function Hero() {
         <FeatureStrip />
       </div>
     </section>
+  )
+}
+
+function HeroBackground() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_22%,rgba(99,91,255,0.22),transparent_28rem),radial-gradient(circle_at_86%_24%,rgba(24,183,160,0.18),transparent_30rem),radial-gradient(circle_at_62%_88%,rgba(99,91,255,0.12),transparent_34rem),linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_68%,#EEF2FF_100%)]" />
+      <div className="absolute inset-0 opacity-[0.24] [background-image:linear-gradient(rgba(99,91,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(99,91,255,0.08)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
+
+      <svg
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <defs>
+          <linearGradient id="hero-step-line" x1="0" y1="0" x2="1" y2="1">
+            <stop stopColor="#635BFF" stopOpacity="0.32" />
+            <stop offset="0.55" stopColor="#8B7CFF" stopOpacity="0.16" />
+            <stop offset="1" stopColor="#18B7A0" stopOpacity="0.28" />
+          </linearGradient>
+          <linearGradient id="hero-step-fill" x1="0" y1="0" x2="1" y2="1">
+            <stop stopColor="#635BFF" stopOpacity="0.1" />
+            <stop offset="1" stopColor="#18B7A0" stopOpacity="0.04" />
+          </linearGradient>
+        </defs>
+
+        <path
+          d="M-80 748H92V676H208V604H324V532H440"
+          stroke="url(#hero-step-line)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M-80 748H92V676H208V604H324V532H440V900H-80Z"
+          fill="url(#hero-step-fill)"
+        />
+        <circle cx="92" cy="676" r="6" fill="#635BFF" fillOpacity="0.28" />
+        <circle cx="324" cy="532" r="6" fill="#18B7A0" fillOpacity="0.32" />
+
+        <path
+          d="M1010 188H1112V134H1214V80H1316V26H1480"
+          stroke="url(#hero-step-line)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="1112" cy="134" r="6" fill="#18B7A0" fillOpacity="0.3" />
+        <circle cx="1316" cy="26" r="6" fill="#635BFF" fillOpacity="0.3" />
+
+        <path
+          d="M780 824H908V772H1036V720H1164V668H1292"
+          stroke="url(#hero-step-line)"
+          strokeWidth="2"
+          strokeDasharray="7 12"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.72"
+        />
+      </svg>
+
+      <div className="absolute left-[8%] top-28 h-28 w-28 rounded-full border border-[#635BFF]/10" />
+      <div className="absolute left-[11%] top-[8.5rem] h-16 w-16 rounded-full border border-[#635BFF]/10" />
+      <div className="absolute right-[8%] top-44 h-36 w-36 rounded-full border border-[#18B7A0]/10" />
+    </div>
   )
 }
 

@@ -80,7 +80,7 @@ export default function PortalLayout({
               <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
                 <Brain className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-lg text-foreground">ShrinkAid</span>
+              <span className="font-semibold text-lg text-foreground">SessionSteps</span>
             </Link>
 
             <div className="flex items-center gap-4">

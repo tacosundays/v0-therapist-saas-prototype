@@ -51,7 +51,7 @@ type Client = {
 }
 
 const steps = [
-  { title: "Welcome to ShrinkAid", short: "Welcome", icon: Brain },
+  { title: "Welcome to SessionSteps", short: "Welcome", icon: Brain },
   { title: "Complete your profile", short: "Profile", icon: UserRound },
   { title: "Add your first client", short: "Client", icon: UserPlus },
   { title: "Assign meaningful work", short: "Worksheet", icon: BookOpenCheck },
@@ -243,7 +243,7 @@ export default function OnboardingPage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary"><Brain className="h-5 w-5 text-primary-foreground" /></span>
-            <span className="text-lg font-semibold">ShrinkAid</span>
+            <span className="text-lg font-semibold">SessionSteps</span>
           </Link>
           <Button variant="ghost" onClick={skip} disabled={isSaving}>Skip for now</Button>
         </div>
@@ -293,7 +293,7 @@ export default function OnboardingPage() {
                 )}
                 {step === 2 && <ActionStep complete={stepComplete.client} title={stepComplete.client ? `${clients.length} client${clients.length === 1 ? "" : "s"} ready` : "Start with one client"} body="Add a client through the same secure flow you’ll use every day. Their portal invitation is created automatically." tip="Tip: The Clients page is your home for assignments, activity, and Session Prep." actionLabel={stepComplete.client ? "Add another client" : "Add client"} onAction={() => setAddClientOpen(true)} />}
                 {step === 3 && <ActionStep complete={stepComplete.assignment} title={stepComplete.assignment ? "First assignment created" : "Give your client a useful next step"} body="Assign a simple homework prompt now, or visit the Content Library to choose a worksheet or generate one with AI." tip="Tip: “Generate with AI” lives in the Content Library and saves the result for reuse." actionLabel="Assign homework" onAction={() => setAssignOpen(true)} secondary={{ label: "Open Content Library", href: "/dashboard/library?onboarding=1" }} disabled={!stepComplete.client} />}
-                {step === 4 && <ActionStep complete={stepComplete.invite} title={stepComplete.invite ? "Invitation is ready" : "Connect your client portal"} body={firstClient ? `${firstClient.full_name} can use the secure invitation created when you added them. You can resend or copy it from Clients.` : "Add a client first, then ShrinkAid will create their secure portal invitation."} tip="Tip: Invitation status appears beside each client in the Clients list." actionLabel="View invitation" href={firstClient ? `/dashboard/clients?onboarding=invite#client-${firstClient.id}` : undefined} disabled={!firstClient} />}
+                {step === 4 && <ActionStep complete={stepComplete.invite} title={stepComplete.invite ? "Invitation is ready" : "Connect your client portal"} body={firstClient ? `${firstClient.full_name} can use the secure invitation created when you added them. You can resend or copy it from Clients.` : "Add a client first, then SessionSteps will create their secure portal invitation."} tip="Tip: Invitation status appears beside each client in the Clients list." actionLabel="View invitation" href={firstClient ? `/dashboard/clients?onboarding=invite#client-${firstClient.id}` : undefined} disabled={!firstClient} />}
                 {step === 5 && <ActionStep complete={false} title="Walk into the session prepared" body="AI Session Prep combines recent homework, reflections, mood trends, and therapist notes into a concise briefing grounded in client activity." tip="Tip: “Prepare for Session” appears on every client card and opens the same page." actionLabel="Preview Session Prep" href={firstClient ? `/dashboard/clients/${firstClient.id}/session-prep?onboarding=1` : undefined} disabled={!firstClient} />}
                 {step === 6 && (
                   <div className="flex flex-1 flex-col justify-center text-center">
@@ -330,7 +330,7 @@ export default function OnboardingPage() {
 function Welcome() {
   return (
     <div className="space-y-6">
-      <p className="max-w-2xl text-lg leading-8 text-muted-foreground">ShrinkAid helps you extend care between sessions, see what needs attention, and prepare for each client in less time.</p>
+      <p className="max-w-2xl text-lg leading-8 text-muted-foreground">SessionSteps helps you extend care between sessions, see what needs attention, and prepare for each client in less time.</p>
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           ["Assign with purpose", "Send interactive worksheets and focused homework.", ClipboardCheck],

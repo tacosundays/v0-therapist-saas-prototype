@@ -123,7 +123,7 @@ export default function ClientPortalLayout({
                 <Brain className="h-5 w-5 text-white" />
               </div>
               <div>
-                <span className="block font-bold tracking-tight text-slate-950">ShrinkAid</span>
+                <span className="block font-bold tracking-tight text-slate-950">SessionSteps</span>
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Client Portal</span>
               </div>
             </div>

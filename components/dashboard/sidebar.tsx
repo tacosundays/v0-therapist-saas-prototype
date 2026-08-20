@@ -255,7 +255,7 @@ export function DashboardSidebar() {
                   <Brain className="h-6 w-6 text-white" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-lg font-bold tracking-tight text-slate-950">ShrinkAid</span>
+                  <span className="block truncate text-lg font-bold tracking-tight text-slate-950">SessionSteps</span>
                   <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Therapist workspace</span>
                 </span>
               </Link>
@@ -322,7 +322,7 @@ export function DashboardSidebar() {
           </div>
           {!collapsed && (
             <div>
-              <span className="block text-lg font-bold tracking-tight text-slate-950">ShrinkAid</span>
+              <span className="block text-lg font-bold tracking-tight text-slate-950">SessionSteps</span>
               <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                 {isDemoMode ? "Demo Workspace" : "Homework"}
               </span>

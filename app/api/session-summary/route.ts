@@ -359,7 +359,7 @@ export async function POST(request: Request) {
           {
             role: "system",
             content: [
-              "You create therapist-facing session briefings from structured ShrinkAid client data.",
+              "You create therapist-facing session briefings from structured SessionSteps client data.",
               "Only summarize facts present in the supplied JSON. Never fabricate progress, risks, diagnoses, attendance, symptoms, or clinical conclusions.",
               "If a section lacks data, say that the record does not contain enough information for that section.",
               "Do not include client email addresses or therapist identifiers in the output.",

@@ -3,7 +3,7 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'ShrinkAid Homework - Keep therapy working between sessions',
+  title: 'SessionSteps - Keep therapy working between sessions',
   description: 'Assign evidence-informed worksheets, exercises, and psychoeducation to clients — then track completion, reflections, and progress from one calm therapist dashboard.',
   generator: 'v0.app',
   icons: {

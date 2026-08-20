@@ -139,7 +139,7 @@ export default function AISuggestionsPage() {
               <div>
                 <h3 className="font-semibold text-foreground mb-2">AI Suggestions</h3>
                 <p className="text-sm text-muted-foreground">
-                  Recommendations will appear here only after ShrinkAid has a real recommendation record for one of your clients.
+                  Recommendations will appear here only after SessionSteps has a real recommendation record for one of your clients.
                 </p>
               </div>
             </div>

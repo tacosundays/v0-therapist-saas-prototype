@@ -331,7 +331,7 @@ export default function SignupPage() {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
               <Brain className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-xl text-foreground">ShrinkAid</span>
+            <span className="font-semibold text-xl text-foreground">SessionSteps</span>
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Create your account</h1>
@@ -530,7 +530,7 @@ export default function SignupPage() {
           className="max-w-md"
         >
           <h2 className="text-2xl font-bold text-foreground mb-8">
-            Why therapists love ShrinkAid
+            Why therapists love SessionSteps
           </h2>
           <ul className="space-y-4">
             {[

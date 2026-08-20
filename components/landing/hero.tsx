@@ -55,7 +55,7 @@ export function Hero() {
             </h1>
 
             <p className="mx-auto mt-7 max-w-xl text-pretty text-lg leading-8 text-slate-600 lg:mx-0">
-              ShrinkAid Homework helps therapists assign worksheets, collect client reflections, and review progress before the next appointment.
+              SessionSteps helps therapists assign worksheets, collect client reflections, and review progress before the next appointment.
             </p>
 
             <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
@@ -66,7 +66,7 @@ export function Hero() {
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="text-base h-12 px-8" asChild>
-                <Link href="/dashboard?demo=1">Explore demo workspace</Link>
+                <Link href="/demo">Explore demo workspace</Link>
               </Button>
             </div>
 
@@ -137,7 +137,7 @@ function DashboardPreview() {
             <div className="h-3 w-3 rounded-full bg-emerald-300" />
           </div>
           <div className="flex-1 text-center">
-            <div className="text-xs font-medium text-slate-500">ShrinkAid Therapist Workspace</div>
+            <div className="text-xs font-medium text-slate-500">SessionSteps Therapist Workspace</div>
           </div>
         </div>
         

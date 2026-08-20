@@ -4,7 +4,7 @@ import { renderClientInviteEmail } from "@/components/emails/client-invite-email
 import { resolveTenantContext } from "@/lib/tenant-context"
 
 const resendApiUrl = "https://api.resend.com/emails"
-const defaultFromEmail = "ShrinkAid <onboarding@resend.dev>"
+const defaultFromEmail = "SessionSteps <onboarding@resend.dev>"
 
 function getBearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || ""

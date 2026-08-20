@@ -85,7 +85,7 @@ export function Features() {
           className="text-center mb-12 sm:mb-16"
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground text-balance">
-            How ShrinkAid Homework works
+            How SessionSteps works
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
             A simple loop for between-session care: assign work, collect responses, and review progress before the next appointment.

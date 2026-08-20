@@ -5,7 +5,7 @@ import { renderClientInviteEmail } from "@/components/emails/client-invite-email
 import { resolveTenantContext } from "@/lib/tenant-context"
 
 const resendApiUrl = "https://api.resend.com/emails"
-const defaultFromEmail = "ShrinkAid <onboarding@resend.dev>"
+const defaultFromEmail = "SessionSteps <onboarding@resend.dev>"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()

@@ -103,7 +103,7 @@ export default function TrustCenterPage() {
             Trust Center
           </h1>
           <p className="saas-muted mt-2 max-w-3xl">
-            A centralized administrative view of ShrinkAid security, privacy, compliance readiness, vendor oversight, and operational procedures.
+            A centralized administrative view of SessionSteps security, privacy, compliance readiness, vendor oversight, and operational procedures.
           </p>
         </div>
         <Badge variant="outline" className="w-fit rounded-full px-3 py-1">

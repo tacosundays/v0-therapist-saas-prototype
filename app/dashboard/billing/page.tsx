@@ -567,7 +567,7 @@ function BillingHelpCard() {
       </CardHeader>
       <CardContent>
         <p className="text-sm leading-6 text-slate-500">
-          For invoices, plan changes, cancellation questions, or Stripe portal issues, contact ShrinkAid support.
+          For invoices, plan changes, cancellation questions, or Stripe portal issues, contact SessionSteps support.
         </p>
       </CardContent>
     </Card>

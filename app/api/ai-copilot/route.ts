@@ -507,7 +507,7 @@ export async function POST(request: Request) {
           {
             role: "system",
             content: [
-              "You are ShrinkAid AI Copilot, a therapist-facing workflow assistant.",
+              "You are SessionSteps AI Copilot, a therapist-facing workflow assistant.",
               "Use only the supplied JSON data. Never fabricate client names, diagnoses, symptoms, homework, progress, risks, attendance, or clinical facts.",
               "Never infer access to data outside the supplied therapist-owned records.",
               "Do not diagnose. Do not present AI output as clinical fact. Keep language neutral and framed for therapist review.",

@@ -22,17 +22,17 @@ export function renderClientInviteEmail({ clientName, therapistName, inviteLink 
   const safeTherapistName = escapeHtml(therapistName || "Your therapist")
   const safeInviteLink = escapeHtml(inviteLink)
 
-  const subject = `${safeTherapistName} invited you to ShrinkAid`
+  const subject = `${safeTherapistName} invited you to SessionSteps`
 
   const text = [
     `Hi ${firstName},`,
     "",
-    `${safeTherapistName} invited you to create your ShrinkAid account.`,
+    `${safeTherapistName} invited you to create your SessionSteps account.`,
     "",
     "Create your account:",
     inviteLink,
     "",
-    "ShrinkAid helps you access homework, worksheets, and reflections shared by your therapist.",
+    "SessionSteps helps you access homework, worksheets, and reflections shared by your therapist.",
   ].join("\n")
 
   const html = `<!doctype html>
@@ -49,7 +49,7 @@ export function renderClientInviteEmail({ clientName, therapistName, inviteLink 
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e6e8f0;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:28px 32px 16px;">
-                <div style="font-size:22px;font-weight:700;color:#172033;">ShrinkAid</div>
+                <div style="font-size:22px;font-weight:700;color:#172033;">SessionSteps</div>
                 <div style="font-size:13px;color:#647085;margin-top:4px;">Secure therapy homework portal</div>
               </td>
             </tr>
@@ -58,7 +58,7 @@ export function renderClientInviteEmail({ clientName, therapistName, inviteLink 
                 <h1 style="font-size:24px;line-height:1.25;margin:0 0 16px;color:#172033;">Create your account</h1>
                 <p style="font-size:16px;line-height:1.6;margin:0 0 14px;color:#344054;">Hi ${firstName},</p>
                 <p style="font-size:16px;line-height:1.6;margin:0;color:#344054;">
-                  ${safeTherapistName} invited you to ShrinkAid so you can access assignments, worksheets, and reflections from your therapist.
+                  ${safeTherapistName} invited you to SessionSteps so you can access assignments, worksheets, and reflections from your therapist.
                 </p>
               </td>
             </tr>

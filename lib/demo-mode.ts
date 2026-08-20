@@ -571,6 +571,7 @@ export const demoMessages = [
 export function isDemoModeEnabled() {
   if (typeof window === "undefined") return false
   return window.localStorage.getItem(DEMO_MODE_STORAGE_KEY) === "true"
+    || document.cookie.split(";").some((item) => item.trim() === `${DEMO_MODE_STORAGE_KEY}=true`)
 }
 
 export function enableDemoMode() {

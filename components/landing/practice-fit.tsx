@@ -36,7 +36,7 @@ export function PracticeFit() {
             Fits the way therapy practices actually run
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
-            ShrinkAid Homework is built for solo therapists and group practices with up to 5 seats, without blending therapist caseloads together.
+            SessionSteps is built for solo therapists and group practices with up to 5 seats, without blending therapist caseloads together.
           </p>
         </motion.div>
 

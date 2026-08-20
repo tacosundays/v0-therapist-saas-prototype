@@ -308,8 +308,8 @@ export default function SecurityPage() {
       const supabase = getClient() as any
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "ShrinkAid",
-        issuer: "ShrinkAid Homework",
+        friendlyName: "SessionSteps",
+        issuer: "SessionSteps",
       })
 
       if (enrollError) {

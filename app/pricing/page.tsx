@@ -50,8 +50,8 @@ const faqs = [
     answer: "An active client is anyone with at least one homework assignment in the last 90 days. Archived clients don't count toward your limit, and you can reactivate them anytime."
   },
   {
-    question: "How does ShrinkAid approach security?",
-    answer: "ShrinkAid is built with HIPAA-conscious security controls, including encrypted data in transit and authenticated access patterns. Business Associate Agreement availability depends on plan and operational setup."
+    question: "How does SessionSteps approach security?",
+    answer: "SessionSteps is built with HIPAA-conscious security controls, including encrypted data in transit and authenticated access patterns. Business Associate Agreement availability depends on plan and operational setup."
   },
   {
     question: "Can clients use the portal on mobile?",
@@ -76,7 +76,7 @@ export default function PricingPage() {
               <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
                 <Brain className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-lg text-foreground">ShrinkAid</span>
+              <span className="font-semibold text-lg text-foreground">SessionSteps</span>
             </Link>
             <Button variant="ghost" asChild>
               <Link href="/">

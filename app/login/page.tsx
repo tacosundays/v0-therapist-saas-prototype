@@ -488,7 +488,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
               <Brain className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-xl text-foreground">ShrinkAid</span>
+            <span className="font-semibold text-xl text-foreground">SessionSteps</span>
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Verify your login</h1>
@@ -594,7 +594,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
               <Brain className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-xl text-foreground">ShrinkAid</span>
+            <span className="font-semibold text-xl text-foreground">SessionSteps</span>
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Welcome back</h1>

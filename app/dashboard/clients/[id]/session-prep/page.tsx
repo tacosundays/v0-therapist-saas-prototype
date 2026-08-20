@@ -1439,7 +1439,7 @@ export default function SessionPrepPage() {
             </CardHeader>
             <CardContent>
               {timeline.length === 0 ? (
-                <EmptyPanel icon={Clock} title="Activity will appear here" description="Sessions, homework, reflections, mood check-ins, and summaries collect here as this client uses ShrinkAid." />
+                <EmptyPanel icon={Clock} title="Activity will appear here" description="Sessions, homework, reflections, mood check-ins, and summaries collect here as this client uses SessionSteps." />
               ) : (
                 <div className="space-y-0">
                   {[...timeline].reverse().slice(0, 12).map((item, index) => (
@@ -1741,7 +1741,7 @@ export default function SessionPrepPage() {
           <DialogHeader>
             <DialogTitle>Write Progress Note</DialogTitle>
             <DialogDescription>
-              Use real session context from this page. Do not add diagnoses unless clinically established outside ShrinkAid.
+              Use real session context from this page. Do not add diagnoses unless clinically established outside SessionSteps.
             </DialogDescription>
           </DialogHeader>
 

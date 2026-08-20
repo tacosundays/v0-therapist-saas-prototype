@@ -451,7 +451,7 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-4 rounded-2xl border border-primary/15 bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  {therapist?.onboarding_status === "in_progress" ? "Continue setting up ShrinkAid" : "Review the onboarding guide"}
+                  {therapist?.onboarding_status === "in_progress" ? "Continue setting up SessionSteps" : "Review the onboarding guide"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {therapist?.onboarding_status === "in_progress"
@@ -688,7 +688,7 @@ export default function SettingsPage() {
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-5">
                 <p className="text-sm font-semibold text-foreground">No calendar connected</p>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Connect Google Calendar to show today&apos;s sessions, tomorrow&apos;s sessions, and the upcoming week inside ShrinkAid.
+                  Connect Google Calendar to show today&apos;s sessions, tomorrow&apos;s sessions, and the upcoming week inside SessionSteps.
                 </p>
                 <Button className="mt-4 rounded-xl" onClick={connectGoogleCalendar} disabled={isCalendarManaging}>
                   {isCalendarManaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarDays className="mr-2 h-4 w-4" />}

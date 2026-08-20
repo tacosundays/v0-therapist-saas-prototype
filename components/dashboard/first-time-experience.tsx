@@ -315,7 +315,7 @@ export function FirstTimeExperience({
             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <Sparkles className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-2xl">Welcome to ShrinkAid</DialogTitle>
+            <DialogTitle className="text-2xl">Welcome to SessionSteps</DialogTitle>
             <DialogDescription className="leading-6">
               The fastest first run is simple: invite a client, assign one homework item, then use review surfaces before session.
             </DialogDescription>

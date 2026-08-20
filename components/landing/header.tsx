@@ -22,7 +22,7 @@ export function Header() {
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
               <Brain className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg text-foreground">ShrinkAid</span>
+            <span className="font-semibold text-lg text-foreground">SessionSteps</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
@@ -42,7 +42,7 @@ export function Header() {
 
           <div className="hidden md:flex items-center gap-3">
             <Button variant="outline" asChild>
-              <Link href="/dashboard?demo=1">View demo</Link>
+              <Link href="/demo">View demo</Link>
             </Button>
             <Button variant="ghost" asChild>
               <Link href="/login">Log in</Link>
@@ -103,7 +103,7 @@ export function Header() {
             </Link>
             <div className="pt-4 space-y-2">
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/dashboard?demo=1">View demo</Link>
+                <Link href="/demo">View demo</Link>
               </Button>
               <Button variant="outline" className="w-full" asChild>
                 <Link href="/login">Log in</Link>

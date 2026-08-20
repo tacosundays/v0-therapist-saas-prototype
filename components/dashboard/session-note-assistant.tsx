@@ -139,7 +139,7 @@ export function SessionNoteAssistant({
     const timeout = window.setTimeout(() => {
       try {
         window.localStorage.setItem(
-          `shrinkaid:session-note-draft:${client.id}`,
+          `sessionsteps:session-note-draft:${client.id}`,
           JSON.stringify({ fields, draft, savedAt: new Date().toISOString() }),
         )
         setSaveState("Saved")
@@ -220,7 +220,7 @@ export function SessionNoteAssistant({
     if (!client || !draft) return
     try {
       window.localStorage.setItem(
-        `shrinkaid:session-note-draft:${client.id}`,
+        `sessionsteps:session-note-draft:${client.id}`,
         JSON.stringify({ fields, draft, savedAt: new Date().toISOString() }),
       )
       setHasExplicitSave(true)
@@ -265,7 +265,7 @@ export function SessionNoteAssistant({
 
   const saveDefaultFormat = () => {
     try {
-      window.localStorage.setItem("shrinkaid:session-note-default-format", fields.format)
+      window.localStorage.setItem("sessionsteps:session-note-default-format", fields.format)
       setMessage(`${fields.format} set as your default note format in this browser.`)
     } catch {
       setMessage("Default format could not be saved in this browser.")
@@ -588,7 +588,7 @@ function initialFields(defaults?: SessionDefaults): SessionFields {
 
 function readDefaultFormat(): NoteFormat {
   if (typeof window === "undefined") return "SOAP"
-  const saved = window.localStorage.getItem("shrinkaid:session-note-default-format")
+  const saved = window.localStorage.getItem("sessionsteps:session-note-default-format")
   return noteFormats.includes(saved as NoteFormat) ? (saved as NoteFormat) : "SOAP"
 }
 

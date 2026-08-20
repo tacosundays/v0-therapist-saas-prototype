@@ -59,7 +59,7 @@ test("public demo entry establishes demo mode before entering the dashboard", ()
   assert.match(chooser, /\/dashboard\?demo=therapist/)
   assert.match(chooser, /\/client-portal\?demo=client/)
   assert.match(middleware, /startsWith\("\/client-portal"\)/)
-  assert.match(middleware, /shrinkaId\.demoMode/)
+  assert.match(middleware, /sessionsteps\.demoMode/)
   assert.match(demoMode, /document\.cookie/)
   assert.match(header, /href="\/demo"/)
   assert.match(sidebar, /isDemoMode \|\| isDemoModeEnabled\(\)/)
@@ -71,7 +71,7 @@ test("primary surfaces use the SessionSteps brand", () => {
   for (const path of ["app/layout.tsx", "app/login/page.tsx", "components/landing/header.tsx", "components/dashboard/sidebar.tsx"]) {
     const source = readFileSync(path, "utf8")
     assert.match(source, /SessionSteps/, path)
-    assert.doesNotMatch(source, /ShrinkAid/, path)
+    assert.doesNotMatch(source, new RegExp(["Shrink", "Aid"].join("")), path)
   }
   const mark = readFileSync("components/brand-mark.tsx", "utf8")
   const hero = readFileSync("components/landing/hero.tsx", "utf8")

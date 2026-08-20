@@ -5,7 +5,7 @@ ALTER TABLE public.therapists
   ADD COLUMN IF NOT EXISTS onboarding_completed_at timestamptz,
   ADD COLUMN IF NOT EXISTS onboarding_skipped_at timestamptz;
 
--- Do not interrupt therapists who were already using ShrinkAid before this feature.
+-- Do not interrupt therapists who were already using the product before this feature.
 UPDATE public.therapists
 SET onboarding_status = 'completed',
     onboarding_step = 6,

@@ -3,7 +3,7 @@
 import { getClient } from "@/lib/supabase/client"
 import type { AnalyticsEventInput } from "@/lib/analytics/events"
 
-const sessionStorageKey = "shrinkaid.analytics.session"
+const sessionStorageKey = "sessionsteps.analytics.session"
 
 function getAnonymousSessionId() {
   if (typeof window === "undefined") return null

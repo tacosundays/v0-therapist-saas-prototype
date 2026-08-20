@@ -150,7 +150,7 @@ function todayKey() {
 }
 
 function storageKey() {
-  return `shrinkaId:daily-workflow:${todayKey()}`
+  return `sessionsteps:daily-workflow:${todayKey()}`
 }
 
 function formatShortDate(date: string | null) {

@@ -39,8 +39,8 @@ type FirstTimeExperienceProps = {
   onDismissCelebration: () => void
 }
 
-const storageKey = "shrinkaId:first-time-experience:v1"
-const demoStorageKey = "shrinkaId:first-time-demo:v1"
+const storageKey = "sessionsteps:first-time-experience:v1"
+const demoStorageKey = "sessionsteps:first-time-demo:v1"
 
 const tourSteps = [
   {

@@ -39,13 +39,13 @@ export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
   const isDemoProtectedRoute = request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/client-portal")
   const isDemoRequest = ["1", "therapist", "client"].includes(request.nextUrl.searchParams.get("demo") || "")
-  const hasDemoCookie = request.cookies.get("shrinkaId.demoMode")?.value === "true"
+  const hasDemoCookie = request.cookies.get("sessionsteps.demoMode")?.value === "true"
 
   // The demo workspace uses static, synthetic data and never queries protected
   // therapist records. Keep the public "View demo" flow ahead of auth routing.
   if (isDemoProtectedRoute && (isDemoRequest || hasDemoCookie)) {
     if (isDemoRequest) {
-      response.cookies.set("shrinkaId.demoMode", "true", {
+      response.cookies.set("sessionsteps.demoMode", "true", {
         path: "/",
         maxAge: 60 * 60 * 24,
         sameSite: "lax",

@@ -90,7 +90,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem("shrinkaid:notification-preferences")
+      const saved = window.localStorage.getItem("sessionsteps:notification-preferences")
       if (saved) setNotifications((current) => ({ ...current, ...JSON.parse(saved) }))
     } catch {
       // Keep safe defaults when browser storage is unavailable.
@@ -101,7 +101,7 @@ export default function SettingsPage() {
     const next = { ...notifications, [key]: checked }
     setNotifications(next)
     try {
-      window.localStorage.setItem("shrinkaid:notification-preferences", JSON.stringify(next))
+      window.localStorage.setItem("sessionsteps:notification-preferences", JSON.stringify(next))
       setSuccess("Notification preferences saved on this device.")
     } catch {
       setError("Notification preferences could not be saved in this browser.")

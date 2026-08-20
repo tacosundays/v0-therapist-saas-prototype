@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react"
 
-export const DEMO_MODE_STORAGE_KEY = "shrinkaId.demoMode"
+export const DEMO_MODE_STORAGE_KEY = "sessionsteps.demoMode"
 export const DEMO_THERAPIST_ID = "demo-therapist-emily-carter"
-export const DEMO_SESSION_PREP_NOTE_STORAGE_PREFIX = "shrinkaId.demoSessionPrepNote"
+export const DEMO_SESSION_PREP_NOTE_STORAGE_PREFIX = "sessionsteps.demoSessionPrepNote"
 
 export type DemoClient = {
   id: string

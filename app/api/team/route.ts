@@ -66,105 +66,69 @@ async function getAuthenticatedTherapist(request: Request) {
   return { adminClient, tenant, therapist }
 }
 
-async function ensurePractice(adminClient: any, therapist: any, organizationId: string) {
-  const { data: existingMembership, error: membershipError } = await adminClient
-    .from("practice_members")
-    .select("id, role, status, practice_id")
-    .eq("therapist_id", therapist.id)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle()
-
-  if (membershipError) throw membershipError
-
-  if (existingMembership?.practice_id) {
-    const { data: practice, error: practiceError } = await adminClient
-      .from("practices")
-      .select("id, owner_therapist_id, name, plan, max_seats, created_at")
-      .eq("id", existingMembership.practice_id)
-      .single()
-
-    if (practiceError) throw practiceError
-    return { practice, membership: existingMembership }
-  }
-
-  const practiceName = therapist.practice_name || `${therapist.full_name || "My"} Practice`
-  const { data: practice, error: createPracticeError } = await adminClient
-    .from("practices")
-    .insert({
-      owner_therapist_id: therapist.id,
-      name: practiceName,
-      plan: "group-practice",
-      max_seats: 5,
-    })
-    .select("id, owner_therapist_id, name, plan, max_seats, created_at")
-    .single()
-
-  if (createPracticeError) throw createPracticeError
-
-  const { data: membership, error: createMembershipError } = await adminClient
-    .from("practice_members")
-    .insert({
-      practice_id: practice.id,
-      therapist_id: therapist.id,
-      role: "owner",
-      status: "active",
-    })
-    .select("id, role, status, practice_id")
-    .single()
-
-  if (createMembershipError) throw createMembershipError
-  const { error: organizationLinkError } = await adminClient
-    .from("organizations")
-    .update({ legacy_practice_id: practice.id })
-    .eq("id", organizationId)
-    .eq("owner_therapist_id", therapist.id)
-  if (organizationLinkError) throw organizationLinkError
-  return { practice, membership }
-}
-
 export async function GET(request: Request) {
   try {
     const result = await getAuthenticatedTherapist(request)
     if (result.error) return result.error
 
     const { adminClient, tenant, therapist } = result
-    const { practice, membership } = await ensurePractice(adminClient, therapist, tenant.organizationId)
-    const planId = normalizeProductId(therapist.plan || therapist.subscription_plan) || "free"
-    const canManageTeam = membership.role === "owner" && planId === "group-practice"
+    const { data: organization, error: organizationError } = await adminClient
+      .from("organizations")
+      .select("id, owner_therapist_id, name, plan, subscription_plan, max_seats, legacy_practice_id, created_at")
+      .eq("id", tenant.organizationId)
+      .single()
+
+    if (organizationError) throw organizationError
+
+    const planId = normalizeProductId(
+      organization.subscription_plan || organization.plan || therapist.plan || therapist.subscription_plan,
+    ) || "free"
+    const canManageTeam = ["owner", "admin"].includes(tenant.role) && planId === "group-practice"
 
     const { data: members, error: membersError } = await adminClient
-      .from("practice_members")
+      .from("organization_members")
       .select("id, therapist_id, role, status, joined_at, removed_at, therapists(id, full_name, email, credentials)")
-      .eq("practice_id", practice.id)
+      .eq("organization_id", tenant.organizationId)
       .order("joined_at", { ascending: true })
 
     if (membersError) {
       return NextResponse.json({ error: membersError.message }, { status: 500 })
     }
 
-    const { data: invites, error: invitesError } = await adminClient
-      .from("therapist_invites")
-      .select("id, email, role, accepted_at, revoked_at, expires_at, created_at")
-      .eq("practice_id", practice.id)
-      .is("accepted_at", null)
-      .is("revoked_at", null)
-      .order("created_at", { ascending: false })
+    let invites: any[] = []
+    if (organization.legacy_practice_id) {
+      const { data, error: invitesError } = await adminClient
+        .from("therapist_invites")
+        .select("id, email, role, accepted_at, revoked_at, expires_at, created_at")
+        .eq("practice_id", organization.legacy_practice_id)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .order("created_at", { ascending: false })
 
-    if (invitesError) {
-      return NextResponse.json({ error: invitesError.message }, { status: 500 })
+      if (invitesError) {
+        return NextResponse.json({ error: invitesError.message }, { status: 500 })
+      }
+      invites = data || []
     }
 
     const activeMembers = (members || []).filter((member: any) => member.status === "active")
-    const pendingInvites = invites || []
+    const pendingInvites = invites
+    const practice = {
+      id: organization.legacy_practice_id,
+      owner_therapist_id: organization.owner_therapist_id,
+      name: organization.name,
+      plan: planId,
+      max_seats: organization.max_seats,
+      created_at: organization.created_at,
+    }
 
     return NextResponse.json({
       practice,
       currentTherapistId: therapist.id,
-      currentRole: membership.role,
+      currentRole: tenant.role,
       plan: planId,
       canManageTeam,
-      maxSeats: practice.max_seats || 5,
+      maxSeats: organization.max_seats,
       seatsUsed: activeMembers.length + pendingInvites.length,
       members: members || [],
       invites: pendingInvites,

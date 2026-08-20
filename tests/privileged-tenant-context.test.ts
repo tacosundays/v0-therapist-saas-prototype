@@ -55,3 +55,20 @@ test("client-authenticated invite acceptance remains token and user bound", () =
   assert.match(source, /\.eq\("id", clientId\)/)
   assert.match(source, /normalizeEmail\(user\.email\) !== normalizedEmail/)
 })
+
+test("team reads use organization state without creating legacy practices", () => {
+  const source = readFileSync("app/api/team/route.ts", "utf8")
+  assert.match(source, /from\("organization_members"\)/)
+  assert.match(source, /legacy_practice_id/)
+  assert.doesNotMatch(source, /\.from\("practices"\)[\s\S]{0,160}\.insert\(/)
+  assert.doesNotMatch(source, /ensurePractice/)
+})
+
+test("audit logs allow only reference nulling during account cleanup", () => {
+  const migration = readFileSync("supabase/migrations/029_allow_audit_reference_cleanup.sql", "utf8")
+  assert.match(migration, /to_jsonb\(NEW\) - ARRAY\['therapist_id', 'user_id'\]/)
+  assert.match(migration, /OLD\.therapist_id IS NOT NULL AND NEW\.therapist_id IS NULL/)
+  assert.match(migration, /OLD\.user_id IS NOT NULL AND NEW\.user_id IS NULL/)
+  assert.match(migration, /IF TG_OP = 'DELETE'/)
+  assert.match(migration, /audit_logs_are_append_only/)
+})

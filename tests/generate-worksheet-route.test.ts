@@ -45,13 +45,21 @@ function deps({
       },
     }),
     createAdminClient: () => ({
-      from: () => ({
-        select: () => ({
-          ilike: () => ({
-            maybeSingle: async () => ({ data: therapist, error: null }),
+      from: (table: string) => {
+        const query: any = {
+          select: () => query,
+          eq: () => query,
+          is: () => query,
+          ilike: () => query,
+          maybeSingle: async () => ({
+            data: table === "organization_members"
+              ? therapist && { organization_id: "org-1", therapist_id: therapist.id, role: "clinician", status: "active" }
+              : therapist && { ...therapist, organization_id: "org-1", auth_user_id: user?.id },
+            error: null,
           }),
-        }),
-      }),
+        }
+        return query
+      },
     }),
     generateWorksheet: async () => generated,
     audit: async (event: { action: string }) => {

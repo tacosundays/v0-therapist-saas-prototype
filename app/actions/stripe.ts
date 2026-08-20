@@ -3,6 +3,8 @@
 import { stripe } from '../../lib/stripe'
 import { getProductById, getStripePriceId, normalizeProductId, PRODUCTS } from '../../lib/products'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { resolveTenantContext } from '@/lib/tenant-context'
 import type Stripe from 'stripe'
 
 // Create admin client for server-side operations (doesn't rely on cookies)
@@ -10,6 +12,18 @@ function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
   return createAdminClient(supabaseUrl, supabaseServiceKey)
+}
+
+async function getBillingContext(requireBillingAdmin = false) {
+  const sessionClient = await createServerClient()
+  const { data: { user }, error } = await sessionClient.auth.getUser()
+  if (error || !user?.email) return null
+
+  const admin = getSupabaseAdmin()
+  const tenant = await resolveTenantContext(admin, user)
+  if (!tenant || (requireBillingAdmin && !['owner', 'admin'].includes(tenant.role))) return null
+
+  return { admin, tenant, user }
 }
 
 interface UserData {
@@ -101,51 +115,40 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
       return { error: `${product.name} checkout is not configured yet. Please contact sales.` }
     }
 
-    // Validate user data
-    if (!userData?.id || !userData?.email) {
+    const context = await getBillingContext(true)
+    if (!context) {
       return { error: 'You must be logged in to subscribe' }
     }
 
-    const supabase = getSupabaseAdmin()
-
-    // Upsert therapist row - create if doesn't exist, update if it does
-    // Only use columns that exist: id, full_name, practice_name, email
-    const { data: therapist, error: upsertError } = await supabase
-      .from('therapists')
-      .upsert({
-        id: userData.id,
-        full_name: userData.fullName || userData.email,
-        practice_name: userData.practiceName || 'My Practice',
-        email: userData.email,
-      }, {
-        onConflict: 'id',
-        ignoreDuplicates: false
-      })
-      .select('stripe_customer_id')
+    const { admin: supabase, tenant, user } = context
+    const { data: organization, error: organizationError } = await supabase
+      .from('organizations')
+      .select('id, name, stripe_customer_id')
+      .eq('id', tenant.organizationId)
       .single()
 
-    if (upsertError) {
-      console.error('Therapist upsert error:', upsertError)
-      return { error: `Failed to create therapist profile: ${upsertError.message}` }
+    if (organizationError || !organization) {
+      return { error: `Failed to load organization billing: ${organizationError?.message || 'not found'}` }
     }
 
-    let customerId = therapist?.stripe_customer_id
+    let customerId = organization.stripe_customer_id
 
     // Create a Stripe customer if one doesn't exist
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: userData.email,
+        email: user.email,
+        name: organization.name,
         metadata: {
-          therapist_id: userData.id,
+          organization_id: tenant.organizationId,
+          billing_therapist_id: tenant.therapistId,
         },
       })
       customerId = customer.id
 
-      // Save customer ID to therapist record
       await supabase
-        .from('therapists')
+        .from('organizations')
         .update({ stripe_customer_id: customerId })
-        .eq('id', userData.id)
+        .eq('id', tenant.organizationId)
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -165,7 +168,8 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
       cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
       subscription_data: {
         metadata: {
-          therapist_id: userData.id,
+          organization_id: tenant.organizationId,
+          therapist_id: tenant.therapistId,
           product_id: product.id,
         },
       },
@@ -189,32 +193,32 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
 }
 
 export async function getSubscriptionStatus(userData?: UserData) {
-  if (!userData?.id) {
+  const context = await getBillingContext()
+  if (!context) {
     return { status: 'unauthenticated', subscription: null }
   }
 
-  const supabase = getSupabaseAdmin()
-  const { data: therapist } = await supabase
-    .from('therapists')
-    .select('subscription_status, subscription_plan, subscription_end_date, trial_end_date, plan, current_period_end, trial_ends_at')
-    .eq('id', userData.id)
+  const { data: organization } = await context.admin
+    .from('organizations')
+    .select('subscription_status, subscription_plan, plan, current_period_end, trial_ends_at')
+    .eq('id', context.tenant.organizationId)
     .single()
 
-  if (!therapist) {
-    return { status: 'no_therapist', subscription: null }
+  if (!organization) {
+    return { status: 'no_organization', subscription: null }
   }
 
   // Check trial status
   const now = new Date()
-  const trialEndValue = therapist.trial_ends_at || therapist.trial_end_date
-  const currentPeriodEndValue = therapist.current_period_end || therapist.subscription_end_date
+  const trialEndValue = organization.trial_ends_at
+  const currentPeriodEndValue = organization.current_period_end
   const trialEndDate = trialEndValue ? new Date(trialEndValue) : null
-  const isInTrial = trialEndDate && trialEndDate > now && therapist.subscription_status !== 'active'
+  const isInTrial = trialEndDate && trialEndDate > now && organization.subscription_status !== 'active'
 
-  const normalizedPlan = normalizeProductId(therapist.plan || therapist.subscription_plan) || 'free'
+  const normalizedPlan = normalizeProductId(organization.plan || organization.subscription_plan) || 'free'
 
   return {
-    status: therapist.subscription_status || (isInTrial ? 'trialing' : 'inactive'),
+    status: organization.subscription_status || (isInTrial ? 'trialing' : 'inactive'),
     subscription: {
       plan: normalizedPlan,
       endDate: currentPeriodEndValue,
@@ -225,23 +229,23 @@ export async function getSubscriptionStatus(userData?: UserData) {
 }
 
 export async function createCustomerPortalSession(userData: UserData) {
-  if (!userData?.id) {
+  const context = await getBillingContext(true)
+  if (!context) {
     throw new Error('You must be logged in')
   }
 
-  const supabase = getSupabaseAdmin()
-  const { data: therapist } = await supabase
-    .from('therapists')
+  const { data: organization } = await context.admin
+    .from('organizations')
     .select('stripe_customer_id')
-    .eq('id', userData.id)
+    .eq('id', context.tenant.organizationId)
     .single()
 
-  if (!therapist?.stripe_customer_id) {
+  if (!organization?.stripe_customer_id) {
     throw new Error('No subscription found')
   }
 
   const session = await stripe.billingPortal.sessions.create({
-    customer: therapist.stripe_customer_id,
+    customer: organization.stripe_customer_id,
     return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/billing`,
   })
 
@@ -251,11 +255,13 @@ export async function createCustomerPortalSession(userData: UserData) {
 // Verify and activate subscription after successful checkout
 // This is a fallback in case the webhook is delayed or not configured
 export async function verifyAndActivateSubscription(sessionId: string, userData: UserData) {
-  if (!userData?.id || !sessionId) {
+  if (!sessionId) {
     return { success: false, error: 'Missing required data' }
   }
 
   try {
+    const context = await getBillingContext(true)
+    if (!context) return { success: false, error: 'You must be logged in' }
     // Retrieve the checkout session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['subscription', 'subscription.default_payment_method']
@@ -284,14 +290,13 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
       : session.subscription
 
     const productId = normalizeProductId(subscription.metadata.product_id)
-    const therapistId = subscription.metadata.therapist_id
+    const organizationId = subscription.metadata.organization_id
 
-    // Verify the therapist ID matches (if present in metadata)
-    if (therapistId && therapistId !== userData.id) {
-      return { success: false, error: 'Subscription does not belong to this user' }
+    if (!organizationId || organizationId !== context.tenant.organizationId) {
+      return { success: false, error: 'Subscription does not belong to this organization' }
     }
 
-    const supabase = getSupabaseAdmin()
+    const supabase = context.admin
 
     console.log('[v0] Date conversion:', {
       raw_current_period_end: (subscription as StripeSubscriptionWithPeriod).current_period_end,
@@ -300,15 +305,22 @@ export async function verifyAndActivateSubscription(sessionId: string, userData:
       converted_trial_end_date: getTrialEnd(subscription),
     })
 
-    // Update the therapist record with subscription info
     const updateData = billingUpdateData(subscription, session.customer as string, productId)
 
-    console.log('[v0] Updating therapist with:', updateData)
+    console.log('[v0] Updating organization billing with:', updateData)
 
     const { error: updateError } = await supabase
-      .from('therapists')
-      .update(updateData)
-      .eq('id', userData.id)
+      .from('organizations')
+      .update({
+        subscription_status: updateData.subscription_status,
+        subscription_plan: updateData.subscription_plan,
+        stripe_subscription_id: updateData.stripe_subscription_id,
+        stripe_customer_id: updateData.stripe_customer_id,
+        current_period_end: updateData.current_period_end,
+        trial_ends_at: updateData.trial_ends_at,
+        plan: updateData.plan,
+      })
+      .eq('id', organizationId)
 
     if (updateError) {
       console.error('[v0] Failed to update subscription:', updateError)

@@ -2,6 +2,7 @@ import "server-only"
 
 import { createClient } from "@supabase/supabase-js"
 import { isAnalyticsEventName, sanitizeAnalyticsProperties, type AnalyticsEventInput } from "@/lib/analytics/events"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 export function getBearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || ""
@@ -34,11 +35,8 @@ export async function resolveTherapistId(
   admin: AnalyticsAdminClient,
   user: { id: string; email?: string | null },
 ) {
-  const byId = await admin.from("therapists").select("id").eq("id", user.id).maybeSingle()
-  if (byId.data?.id) return byId.data.id as string
-  if (!user.email) return null
-  const byEmail = await admin.from("therapists").select("id").ilike("email", user.email.trim().toLowerCase()).maybeSingle()
-  return (byEmail.data?.id as string | undefined) || null
+  const tenant = await resolveTenantContext(admin, user)
+  return tenant?.therapistId || null
 }
 
 export async function writeProductAnalyticsEvent(

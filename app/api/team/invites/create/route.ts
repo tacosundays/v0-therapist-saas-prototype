@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { renderTherapistInviteEmail } from "@/components/emails/therapist-invite-email"
 import { normalizeProductId } from "@/lib/products"
 import { writeAuditLog } from "@/lib/audit-log"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 const resendApiUrl = "https://api.resend.com/emails"
 const defaultFromEmail = "ShrinkAid <onboarding@resend.dev>"
@@ -71,10 +72,15 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
+    const tenant = await resolveTenantContext(adminClient, user)
+    if (!tenant || !["owner", "admin"].includes(tenant.role)) {
+      return NextResponse.json({ error: "Only organization billing admins can invite clinicians" }, { status: 403 })
+    }
     const { data: owner, error: ownerError } = await adminClient
       .from("therapists")
       .select("id, email, full_name, plan, subscription_plan")
-      .ilike("email", normalizeEmail(user.email))
+      .eq("id", tenant.therapistId)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (ownerError) {
@@ -85,7 +91,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No therapist account found for your email" }, { status: 403 })
     }
 
-    const planId = normalizeProductId(owner.plan || owner.subscription_plan) || "free"
+    const { data: organization } = await adminClient
+      .from("organizations")
+      .select("plan, subscription_plan, legacy_practice_id")
+      .eq("id", tenant.organizationId)
+      .single()
+    const planId = normalizeProductId(organization?.plan || organization?.subscription_plan) || "free"
     if (planId !== "group-practice") {
       return NextResponse.json({ error: "Team invitations require the Group Practice plan" }, { status: 403 })
     }
@@ -104,6 +115,9 @@ export async function POST(request: Request) {
 
     if (!membership?.practice_id) {
       return NextResponse.json({ error: "Open the Team page before inviting therapists" }, { status: 400 })
+    }
+    if (membership.practice_id !== organization?.legacy_practice_id) {
+      return NextResponse.json({ error: "Practice does not belong to the active organization" }, { status: 403 })
     }
 
     const { data: practice, error: practiceError } = await adminClient

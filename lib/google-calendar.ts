@@ -1,5 +1,6 @@
 import crypto from "crypto"
 import { createClient } from "@supabase/supabase-js"
+import { resolveTenantContext } from "./tenant-context.ts"
 
 const calendarScopes = ["https://www.googleapis.com/auth/calendar.events.readonly"]
 
@@ -138,10 +139,15 @@ export async function resolveTherapistFromToken(request: Request) {
   }
 
   const adminClient = getAdminClient()
+  const tenant = await resolveTenantContext(adminClient, user)
+  if (!tenant) {
+    return { error: "No active clinician organization was found", status: 403 as const }
+  }
   const { data: therapist, error: therapistError } = await adminClient
     .from("therapists")
     .select("id, full_name, email")
-    .ilike("email", normalizeEmail(user.email))
+    .eq("id", tenant.therapistId)
+    .eq("organization_id", tenant.organizationId)
     .maybeSingle()
 
   if (therapistError) {
@@ -152,7 +158,7 @@ export async function resolveTherapistFromToken(request: Request) {
     return { error: "No therapist account found for your email", status: 403 as const }
   }
 
-  return { adminClient, therapist, user }
+  return { adminClient, therapist, tenant, user }
 }
 
 export function getGoogleAuthUrl(request: Request, state: string) {

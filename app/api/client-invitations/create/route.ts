@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { resolveTenantContext } from "@/lib/tenant-context"
 import { getPlanLimits } from "@/lib/plan-limits"
 import { normalizeProductId } from "@/lib/products"
 import { writeAuditLog } from "@/lib/audit-log"
@@ -68,12 +69,17 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
-    const normalizedTherapistEmail = normalizeEmail(user.email)
+    const tenant = await resolveTenantContext(adminClient, user)
+
+    if (!tenant) {
+      return NextResponse.json({ error: "No active clinician organization was found" }, { status: 403 })
+    }
 
     const { data: therapist, error: therapistError } = await adminClient
       .from("therapists")
       .select("id, email, plan, subscription_plan")
-      .ilike("email", normalizedTherapistEmail)
+      .eq("id", tenant.therapistId)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (therapistError) {
@@ -88,6 +94,7 @@ export async function POST(request: Request) {
       .from("clients")
       .select("id")
       .eq("therapist_id", therapist.id)
+      .eq("organization_id", tenant.organizationId)
       .eq("email", normalizedClientEmail)
       .maybeSingle()
 
@@ -100,6 +107,7 @@ export async function POST(request: Request) {
         .from("clients")
         .select("*", { count: "exact", head: true })
         .eq("therapist_id", therapist.id)
+        .eq("organization_id", tenant.organizationId)
 
       if (countError) {
         return NextResponse.json({ error: countError.message }, { status: 500 })
@@ -128,6 +136,7 @@ export async function POST(request: Request) {
 
     const clientPayload = {
       therapist_id: therapist.id,
+      organization_id: tenant.organizationId,
       full_name: clientName,
       email: normalizedClientEmail,
       status: "invited",
@@ -142,6 +151,7 @@ export async function POST(request: Request) {
           .update(clientPayload)
           .eq("id", existingClient.id)
           .eq("therapist_id", therapist.id)
+          .eq("organization_id", tenant.organizationId)
           .select("id")
           .single()
       : await adminClient
@@ -157,7 +167,7 @@ export async function POST(request: Request) {
     await writeAuditLog({
       therapistId: therapist.id,
       userId: user.id,
-      userEmail: normalizedTherapistEmail,
+      userEmail: normalizeEmail(user.email),
       actorRole: "therapist",
       action: existingClient ? "client.update" : "client.create",
       resourceType: "client",

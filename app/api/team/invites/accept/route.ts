@@ -1,6 +1,7 @@
 import { createHash } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -51,11 +52,16 @@ export async function POST(request: Request) {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
     const tokenHash = hashInviteToken(String(inviteToken))
+    const currentTenant = await resolveTenantContext(adminClient, user)
+    if (!currentTenant) {
+      return NextResponse.json({ error: "No active clinician organization was found" }, { status: 403 })
+    }
 
     const { data: therapist, error: therapistError } = await adminClient
       .from("therapists")
       .select("id, email")
-      .ilike("email", normalizedEmail)
+      .eq("id", currentTenant.therapistId)
+      .eq("organization_id", currentTenant.organizationId)
       .maybeSingle()
 
     if (therapistError) {
@@ -124,11 +130,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: memberError.message }, { status: 500 })
     }
 
+    const { error: tenantJoinError } = await adminClient.rpc("join_organization_for_practice", {
+      target_therapist_id: therapist.id,
+      target_practice_id: invite.practice_id,
+    })
+
+    if (tenantJoinError) {
+      return NextResponse.json({ error: tenantJoinError.message }, { status: 500 })
+    }
+
     await adminClient
       .from("therapists")
       .update({ plan: "group-practice" })
       .eq("id", therapist.id)
-      .ilike("email", normalizedEmail)
 
     const { error: updateInviteError } = await adminClient
       .from("therapist_invites")

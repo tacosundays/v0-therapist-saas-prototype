@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { normalizeProductId } from "@/lib/products"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -43,10 +44,15 @@ async function getAuthenticatedTherapist(request: Request) {
   }
 
   const adminClient = getAdminClient()
+  const tenant = await resolveTenantContext(adminClient, user)
+  if (!tenant) {
+    return { error: NextResponse.json({ error: "No active clinician organization was found" }, { status: 403 }) }
+  }
   const { data: therapist, error: therapistError } = await adminClient
     .from("therapists")
     .select("id, email, full_name, practice_name, plan, subscription_plan")
-    .ilike("email", normalizeEmail(user.email))
+    .eq("id", tenant.therapistId)
+    .eq("organization_id", tenant.organizationId)
     .maybeSingle()
 
   if (therapistError) {
@@ -57,10 +63,10 @@ async function getAuthenticatedTherapist(request: Request) {
     return { error: NextResponse.json({ error: "No therapist account found for your email" }, { status: 403 }) }
   }
 
-  return { adminClient, therapist }
+  return { adminClient, tenant, therapist }
 }
 
-async function ensurePractice(adminClient: any, therapist: any) {
+async function ensurePractice(adminClient: any, therapist: any, organizationId: string) {
   const { data: existingMembership, error: membershipError } = await adminClient
     .from("practice_members")
     .select("id, role, status, practice_id")
@@ -108,6 +114,12 @@ async function ensurePractice(adminClient: any, therapist: any) {
     .single()
 
   if (createMembershipError) throw createMembershipError
+  const { error: organizationLinkError } = await adminClient
+    .from("organizations")
+    .update({ legacy_practice_id: practice.id })
+    .eq("id", organizationId)
+    .eq("owner_therapist_id", therapist.id)
+  if (organizationLinkError) throw organizationLinkError
   return { practice, membership }
 }
 
@@ -116,8 +128,8 @@ export async function GET(request: Request) {
     const result = await getAuthenticatedTherapist(request)
     if (result.error) return result.error
 
-    const { adminClient, therapist } = result
-    const { practice, membership } = await ensurePractice(adminClient, therapist)
+    const { adminClient, tenant, therapist } = result
+    const { practice, membership } = await ensurePractice(adminClient, therapist, tenant.organizationId)
     const planId = normalizeProductId(therapist.plan || therapist.subscription_plan) || "free"
     const canManageTeam = membership.role === "owner" && planId === "group-practice"
 

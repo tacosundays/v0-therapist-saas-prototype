@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { writeAuditLog } from "@/lib/audit-log"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -47,10 +48,15 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
+    const tenant = await resolveTenantContext(adminClient, user)
+    if (!tenant || tenant.role !== "owner") {
+      return NextResponse.json({ error: "Only organization owners can remove clinicians" }, { status: 403 })
+    }
     const { data: owner, error: ownerError } = await adminClient
       .from("therapists")
       .select("id, email")
-      .ilike("email", normalizeEmail(user.email))
+      .eq("id", tenant.therapistId)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (ownerError) {
@@ -96,14 +102,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The practice owner cannot be removed" }, { status: 400 })
     }
 
-    const { error: removeError } = await adminClient
-      .from("practice_members")
-      .update({
-        status: "removed",
-        removed_at: new Date().toISOString(),
-      })
-      .eq("id", member.id)
-      .eq("practice_id", ownerMembership.practice_id)
+    const { error: removeError } = await adminClient.rpc("remove_clinician_from_organization", {
+      target_organization_id: tenant.organizationId,
+      target_practice_id: ownerMembership.practice_id,
+      target_therapist_id: member.therapist_id,
+    })
 
     if (removeError) {
       return NextResponse.json({ error: removeError.message }, { status: 500 })

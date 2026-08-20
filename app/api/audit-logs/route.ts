@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { writeAuditLog } from "@/lib/audit-log"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 const allowedActions = new Set([
   "login",
@@ -63,12 +64,11 @@ export async function POST(request: Request) {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
     const normalizedEmail = normalizeEmail(user.email) as string
+    const tenant = await resolveTenantContext(adminClient, user)
 
-    const { data: therapist } = await adminClient
-      .from("therapists")
-      .select("id, email")
-      .ilike("email", normalizedEmail)
-      .maybeSingle()
+    const therapist = tenant
+      ? { id: tenant.therapistId, email: normalizedEmail }
+      : null
 
     let client: { id: string; therapist_id: string; email: string | null; user_id: string | null } | null = null
 

@@ -166,6 +166,7 @@ export default function SignupPage() {
         .from("therapists")
         .insert({
           id: authData.user.id,
+          auth_user_id: authData.user.id,
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
           full_name: `${firstName} ${lastName}`,

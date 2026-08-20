@@ -4,6 +4,7 @@ import { z } from "zod"
 import { writeAuditLog } from "../../../lib/audit-log.ts"
 import { checkRateLimit } from "../../../lib/security/rate-limit.ts"
 import { genericError, getBearerToken, getRequestIp } from "../../../lib/security/request.ts"
+import { resolveTenantContext } from "../../../lib/tenant-context.ts"
 
 const worksheetSchema = z.object({
   title: z.string().describe("A clear, engaging title for the worksheet"),
@@ -56,15 +57,7 @@ type AuthClient = {
   }
 }
 
-type AdminClient = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      ilike: (column: string, value: string) => {
-        maybeSingle: () => Promise<SupabaseQueryResult<TherapistRecord>>
-      }
-    }
-  }
-}
+type AdminClient = any
 
 type GenerateWorksheetDeps = {
   createAuthClient: () => AuthClient
@@ -190,10 +183,13 @@ export async function handleGenerateWorksheetRequest(req: Request, deps = create
     }
 
     const adminClient = deps.createAdminClient()
+    const tenant = await resolveTenantContext(adminClient, authUser)
+    if (!tenant) return genericError(403)
     const { data: therapistRecord, error: therapistError } = await adminClient
       .from("therapists")
       .select("id, email, subscription_status")
-      .ilike("email", normalizeEmail(authUser.email))
+      .eq("id", tenant.therapistId)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (therapistError || !therapistRecord || !isActiveTherapist(therapistRecord)) {

@@ -81,6 +81,36 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const resolveBillingOwner = async (subscription: Stripe.Subscription) => {
+    const organizationId = subscription.metadata.organization_id
+    const therapistId = subscription.metadata.therapist_id || subscription.metadata.billing_therapist_id
+    if (organizationId) return { organizationId, therapistId: therapistId || null }
+    if (!therapistId) return { organizationId: null, therapistId: null }
+
+    const { data: therapist } = await supabaseAdmin
+      .from('therapists')
+      .select('organization_id')
+      .eq('id', therapistId)
+      .maybeSingle()
+    return { organizationId: therapist?.organization_id || null, therapistId }
+  }
+
+  const updateOrganizationSubscription = async (
+    organizationId: string,
+    update: ReturnType<typeof buildSubscriptionUpdate>,
+  ) => supabaseAdmin
+    .from('organizations')
+    .update({
+      subscription_status: update.subscription_status,
+      subscription_plan: update.subscription_plan,
+      stripe_subscription_id: update.stripe_subscription_id,
+      ...(update.stripe_customer_id ? { stripe_customer_id: update.stripe_customer_id } : {}),
+      current_period_end: update.current_period_end,
+      trial_ends_at: update.trial_ends_at,
+      plan: update.plan,
+    })
+    .eq('id', organizationId)
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -98,18 +128,18 @@ export async function POST(req: NextRequest) {
             session.subscription as string
           )
           
-          const therapistId = subscription.metadata.therapist_id
+          const { organizationId, therapistId } = await resolveBillingOwner(subscription)
           const productId = normalizeProductId(subscription.metadata.product_id)
 
           console.log('[v0] Webhook: Subscription details', {
             subscriptionId: subscription.id,
             status: subscription.status,
-            therapistId,
+            organizationId,
             productId,
             trialEnd: subscription.trial_end
           })
 
-          if (therapistId) {
+          if (organizationId) {
             console.log('[v0] Webhook: Date conversion', {
               raw_current_period_end: (subscription as StripeSubscriptionWithPeriod).current_period_end,
               raw_trial_end: subscription.trial_end,
@@ -119,19 +149,16 @@ export async function POST(req: NextRequest) {
 
             const updateData = buildSubscriptionUpdate(subscription, session.customer as string, productId)
 
-            console.log('[v0] Webhook: Updating therapist', { therapistId, updateData })
+            console.log('[v0] Webhook: Updating organization', { organizationId, updateData })
 
-            const { error } = await supabaseAdmin
-              .from('therapists')
-              .update(updateData)
-              .eq('id', therapistId)
+            const { error } = await updateOrganizationSubscription(organizationId, updateData)
 
             if (error) {
               console.error('[v0] Webhook: Failed to update therapist', error)
             } else {
-              console.log('[v0] Webhook: Therapist updated successfully')
+              console.log('[v0] Webhook: Organization updated successfully')
               await writeAuditLog({
-                therapistId,
+                therapistId: therapistId || undefined,
                 actorRole: 'system',
                 action: 'subscription.changed',
                 resourceType: 'stripe_subscription',
@@ -140,13 +167,14 @@ export async function POST(req: NextRequest) {
                   eventType: event.type,
                   stripeSubscriptionId: subscription.id,
                   stripeCustomerId: session.customer,
+                  organizationId,
                   status: subscription.status,
                   plan: productId,
                 },
               })
             }
           } else {
-            console.error('[v0] Webhook: No therapist_id in subscription metadata')
+            console.error('[v0] Webhook: No organization billing owner in subscription metadata')
           }
         }
         break
@@ -154,16 +182,13 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-        const therapistId = subscription.metadata.therapist_id
+        const { organizationId, therapistId } = await resolveBillingOwner(subscription)
 
-        if (therapistId) {
-          await supabaseAdmin
-            .from('therapists')
-            .update(buildSubscriptionUpdate(subscription))
-            .eq('id', therapistId)
+        if (organizationId) {
+          await updateOrganizationSubscription(organizationId, buildSubscriptionUpdate(subscription))
 
           await writeAuditLog({
-            therapistId,
+            therapistId: therapistId || undefined,
             actorRole: 'system',
             action: 'subscription.changed',
             resourceType: 'stripe_subscription',
@@ -173,6 +198,7 @@ export async function POST(req: NextRequest) {
               stripeSubscriptionId: subscription.id,
               status: subscription.status,
               plan: normalizeProductId(subscription.metadata.product_id),
+              organizationId,
             },
           })
         }
@@ -181,23 +207,22 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
-        const therapistId = subscription.metadata.therapist_id
+        const { organizationId, therapistId } = await resolveBillingOwner(subscription)
 
-        if (therapistId) {
+        if (organizationId) {
           await supabaseAdmin
-            .from('therapists')
+            .from('organizations')
             .update({
               subscription_status: 'canceled',
               subscription_plan: 'free',
               plan: 'free',
               stripe_subscription_id: null,
-              subscription_end_date: null,
               current_period_end: null,
             })
-            .eq('id', therapistId)
+            .eq('id', organizationId)
 
           await writeAuditLog({
-            therapistId,
+            therapistId: therapistId || undefined,
             actorRole: 'system',
             action: 'subscription.changed',
             resourceType: 'stripe_subscription',
@@ -207,6 +232,7 @@ export async function POST(req: NextRequest) {
               stripeSubscriptionId: subscription.id,
               status: 'canceled',
               plan: 'free',
+              organizationId,
             },
           })
         }
@@ -220,18 +246,18 @@ export async function POST(req: NextRequest) {
           const subscription = await stripe.subscriptions.retrieve(
             typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
           )
-          const therapistId = subscription.metadata.therapist_id
+          const { organizationId, therapistId } = await resolveBillingOwner(subscription)
 
-          if (therapistId) {
+          if (organizationId) {
             await supabaseAdmin
-              .from('therapists')
+              .from('organizations')
               .update({
                 subscription_status: 'past_due',
               })
-              .eq('id', therapistId)
+              .eq('id', organizationId)
 
             await writeAuditLog({
-              therapistId,
+              therapistId: therapistId || undefined,
               actorRole: 'system',
               action: 'subscription.changed',
               resourceType: 'stripe_invoice',
@@ -241,6 +267,7 @@ export async function POST(req: NextRequest) {
                 stripeInvoiceId: invoice.id,
                 stripeSubscriptionId: subscription.id,
                 status: 'past_due',
+                organizationId,
               },
             })
           }

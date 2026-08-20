@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 function normalizeEmail(email: string | null | undefined) {
   return email ? email.trim().toLowerCase() : null
@@ -47,11 +48,15 @@ async function getTherapistForRequest(request: Request) {
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
-  const normalizedEmail = normalizeEmail(user.email) as string
+  const tenant = await resolveTenantContext(adminClient, user)
+  if (!tenant) {
+    return { error: NextResponse.json({ error: "No active clinician organization was found" }, { status: 403 }) }
+  }
   const { data: therapist, error: therapistError } = await adminClient
     .from("therapists")
     .select("id, email")
-    .ilike("email", normalizedEmail)
+    .eq("id", tenant.therapistId)
+    .eq("organization_id", tenant.organizationId)
     .maybeSingle()
 
   if (therapistError) {

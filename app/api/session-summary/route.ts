@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createSessionSummaryFingerprint } from "@/lib/session-summary-cache"
+import { resolveTenantContext } from "@/lib/tenant-context"
 
 const defaultModel = "gpt-4o-mini"
 
@@ -13,10 +14,6 @@ interface SessionSummarySections {
   suggestedDiscussionTopics: string[]
   suggestedInterventions: Array<{ name: string; rationale: string }>
   homeworkRecommendation: { title: string; rationale: string } | null
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase()
 }
 
 function getBearerToken(request: Request) {
@@ -141,12 +138,17 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
-    const normalizedTherapistEmail = normalizeEmail(user.email)
+    const tenant = await resolveTenantContext(adminClient, user)
+
+    if (!tenant) {
+      return NextResponse.json({ error: "No active clinician organization was found" }, { status: 403 })
+    }
 
     const { data: therapist, error: therapistError } = await adminClient
       .from("therapists")
       .select("id, full_name, email")
-      .ilike("email", normalizedTherapistEmail)
+      .eq("id", tenant.therapistId)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (therapistError) {
@@ -162,6 +164,7 @@ export async function POST(request: Request) {
       .select("id, therapist_id, full_name, email, status, created_at, user_id, invite_sent_at, invite_accepted_at")
       .eq("id", clientId)
       .eq("therapist_id", therapist.id)
+      .eq("organization_id", tenant.organizationId)
       .maybeSingle()
 
     if (clientError) {

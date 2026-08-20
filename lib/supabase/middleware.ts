@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 import { AppRole, getRouteAccessDecision, RedirectDestination } from "./route-access.ts"
+import { resolveTenantContext } from "../tenant-context.ts"
 
 async function resolveRole(userId: string, email: string | null | undefined): Promise<AppRole> {
   const normalizedEmail = email?.trim().toLowerCase()
@@ -13,12 +14,8 @@ async function resolveRole(userId: string, email: string | null | undefined): Pr
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
-  const [{ data: therapist }, { data: clients }] = await Promise.all([
-    adminClient
-      .from("therapists")
-      .select("id")
-      .ilike("email", normalizedEmail)
-      .maybeSingle(),
+  const [tenant, { data: clients }] = await Promise.all([
+    resolveTenantContext(adminClient, { id: userId, email: normalizedEmail }),
     adminClient
       .from("clients")
       .select("id")
@@ -26,7 +23,7 @@ async function resolveRole(userId: string, email: string | null | undefined): Pr
       .limit(1),
   ])
 
-  if (therapist) return "therapist"
+  if (tenant) return "therapist"
   if (Array.isArray(clients) && clients.length > 0) return "client"
   return "unknown"
 }

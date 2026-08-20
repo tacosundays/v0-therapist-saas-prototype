@@ -34,7 +34,7 @@ import { getClient } from "@/lib/supabase/client"
 import { logClientAuditEvent } from "@/lib/audit-client"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { User } from "@supabase/supabase-js"
-import { demoPractice, useDemoMode } from "@/lib/demo-mode"
+import { demoPractice, isDemoModeEnabled, useDemoMode } from "@/lib/demo-mode"
 
 const navSections = [
   {
@@ -120,7 +120,7 @@ export function DashboardSidebar() {
   }, [mobileOpen])
 
   useEffect(() => {
-    if (isDemoMode) {
+    if (isDemoMode || isDemoModeEnabled()) {
       setUser(null)
       setTherapistProfile({
         full_name: demoPractice.therapist,

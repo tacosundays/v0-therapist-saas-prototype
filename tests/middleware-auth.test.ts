@@ -52,10 +52,12 @@ test("public demo entry establishes demo mode before entering the dashboard", ()
   const route = readFileSync("app/demo/route.ts", "utf8")
   const demoMode = readFileSync("lib/demo-mode.ts", "utf8")
   const header = readFileSync("components/landing/header.tsx", "utf8")
+  const sidebar = readFileSync("components/dashboard/sidebar.tsx", "utf8")
   assert.match(route, /\/dashboard\?demo=1/)
   assert.match(route, /shrinkaId\.demoMode/)
   assert.match(demoMode, /document\.cookie/)
   assert.match(header, /href="\/demo"/)
+  assert.match(sidebar, /isDemoMode \|\| isDemoModeEnabled\(\)/)
 })
 
 test("primary surfaces use the SessionSteps brand", () => {

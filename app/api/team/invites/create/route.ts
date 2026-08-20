@@ -42,7 +42,7 @@ function getRequestIp(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json()
+    const { email, locationId } = await request.json()
     const normalizedInviteEmail = typeof email === "string" ? normalizeEmail(email) : ""
 
     if (!normalizedInviteEmail) {
@@ -99,6 +99,17 @@ export async function POST(request: Request) {
     const planId = normalizeProductId(organization?.plan || organization?.subscription_plan) || "free"
     if (planId !== "group-practice") {
       return NextResponse.json({ error: "Team invitations require the Group Practice plan" }, { status: 403 })
+    }
+
+    let locationQuery = adminClient
+      .from("locations")
+      .select("id")
+      .eq("organization_id", tenant.organizationId)
+      .eq("status", "active")
+    locationQuery = locationId ? locationQuery.eq("id", locationId) : locationQuery.eq("is_primary", true)
+    const { data: inviteLocation, error: locationError } = await locationQuery.limit(1).maybeSingle()
+    if (locationError || !inviteLocation) {
+      return NextResponse.json({ error: "Select an active organization location" }, { status: 400 })
     }
 
     const { count: activeMemberCount, error: memberCountError } = await adminClient
@@ -165,6 +176,7 @@ export async function POST(request: Request) {
       .from("organization_invitations")
       .insert({
         organization_id: tenant.organizationId,
+        location_id: inviteLocation.id,
         invited_by_therapist_id: owner.id,
         email: normalizedInviteEmail,
         role: "clinician",

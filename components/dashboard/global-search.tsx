@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   BookOpen,
+  Building2,
   CalendarDays,
   CreditCard,
   FileText,
@@ -152,6 +153,16 @@ const pageResults: SearchResult[] = [
     href: "/dashboard/team",
     keywords: "team members seats practice",
     icon: Users,
+    tone: "slate",
+  },
+  {
+    id: "page-organization",
+    category: "Pages",
+    title: "Organization",
+    subtitle: "Locations, roles, ownership, and seats",
+    href: "/dashboard/organization",
+    keywords: "organization practice locations roles ownership seats",
+    icon: Building2,
     tone: "slate",
   },
   {

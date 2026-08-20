@@ -16,6 +16,7 @@ import {
   BarChart3, 
   MessageSquare,
   Settings,
+  Building2,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -59,6 +60,7 @@ const navSections = [
     label: "Practice",
     items: [
       { href: "/dashboard/team", label: "Team", icon: UserPlus },
+      { href: "/dashboard/organization", label: "Organization", icon: Building2 },
       { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
       { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
       { href: "/dashboard/security", label: "Security", icon: ShieldCheck },

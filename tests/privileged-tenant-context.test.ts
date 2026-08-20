@@ -11,6 +11,7 @@ const tenantScopedPaths = [
   "app/api/client-invitations/send/route.ts",
   "app/api/generate-worksheet/handler.ts",
   "app/api/mfa/recovery-codes/route.ts",
+  "app/api/organization/route.ts",
   "app/api/session-summary/route.ts",
   "app/api/team/invites/accept/route.ts",
   "app/api/team/invites/create/route.ts",

@@ -1,0 +1,129 @@
+"use client"
+
+import Link from "next/link"
+import { useMemo, useState } from "react"
+import { Activity, ArrowLeft, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardCheck, Eye, HeartPulse, Home, RotateCcw, Search, ShieldCheck, Sparkles, Users, X } from "lucide-react"
+
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
+import { demoHistory, isolatedDemoClients, isolatedDemoWorksheets, type DemoWorksheet } from "@/lib/isolated-demo-data"
+
+type View = "dashboard" | "clients" | "client" | "library" | "progress" | "prep"
+type DemoAssignment = { id: string; clientId: string; worksheetId: string; status: "Assigned" | "Completed" | "In progress" | "Overdue"; due: string; response?: string }
+
+const nav: { id: View; label: string; icon: typeof Home }[] = [
+  { id: "dashboard", label: "Dashboard", icon: Home },
+  { id: "clients", label: "Clients", icon: Users },
+  { id: "library", label: "Worksheets", icon: BookOpen },
+  { id: "progress", label: "Progress", icon: BarChart3 },
+]
+
+function worksheetTitle(id: string) {
+  return isolatedDemoWorksheets.find((worksheet) => worksheet.id === id)?.title ?? "Worksheet"
+}
+
+export default function TherapistDemoPage() {
+  const [view, setView] = useState<View>("dashboard")
+  const [selectedClientId, setSelectedClientId] = useState("maya")
+  const [assignments, setAssignments] = useState<DemoAssignment[]>(() => isolatedDemoClients.flatMap((client) => client.assignments.map((item) => ({ ...item, clientId: client.id }))))
+  const [modalWorksheet, setModalWorksheet] = useState<DemoWorksheet | null>(null)
+  const [assignClientId, setAssignClientId] = useState("maya")
+  const [notice, setNotice] = useState("")
+  const [clientPreview, setClientPreview] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const selectedClient = isolatedDemoClients.find((client) => client.id === selectedClientId) ?? isolatedDemoClients[0]
+  const selectedAssignments = assignments.filter((assignment) => assignment.clientId === selectedClient.id)
+  const filteredWorksheets = isolatedDemoWorksheets.filter((worksheet) => `${worksheet.title} ${worksheet.category} ${worksheet.description}`.toLowerCase().includes(search.toLowerCase()))
+  const completedCount = assignments.filter((assignment) => assignment.status === "Completed").length
+  const averageMood = useMemo(() => {
+    const values = isolatedDemoClients.flatMap((client) => client.mood)
+    return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)
+  }, [])
+
+  const chooseClient = (id: string, destination: View = "client") => {
+    setSelectedClientId(id)
+    setView(destination)
+  }
+  const assign = () => {
+    if (!modalWorksheet) return
+    setAssignments((current) => [...current, { id: `session-${current.length + 1}`, clientId: assignClientId, worksheetId: modalWorksheet.id, status: "Assigned", due: "Sep 11" }])
+    setNotice(`${modalWorksheet.title} assigned in this demo only.`)
+    setModalWorksheet(null)
+  }
+  const reset = () => {
+    setAssignments(isolatedDemoClients.flatMap((client) => client.assignments.map((item) => ({ ...item, clientId: client.id }))))
+    setView("dashboard")
+    setSelectedClientId("maya")
+    setClientPreview(false)
+    setNotice("Demo reset to its original fictional practice.")
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex items-center gap-5"><Link href="/demo" aria-label="Back to demo choices"><SessionStepsLogo className="h-auto w-[160px]" /></Link><span className="hidden rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700 md:inline">THERAPIST DEMO</span></div>
+          <div className="flex items-center gap-2">
+            <Link href="/demo/client" className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 md:inline-flex">Client demo</Link>
+            <button onClick={reset} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"><RotateCcw className="h-4 w-4" /><span className="hidden sm:inline">Reset demo</span></button>
+            <Link href="/signup" className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700">Create My Practice</Link>
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-2 bg-emerald-50 px-4 py-2 text-center text-xs font-medium text-emerald-900"><ShieldCheck className="h-4 w-4" />Fictional therapist demo · isolated from production · changes reset on refresh</div>
+      </header>
+
+      <div className="flex">
+        <aside className="sticky top-[104px] hidden h-[calc(100vh-104px)] w-60 shrink-0 border-r border-slate-200 bg-white p-4 lg:block">
+          <div className="mb-5 rounded-2xl bg-[#171b3f] p-4 text-white"><p className="text-xs text-violet-200">North Hills Counseling</p><p className="mt-1 font-semibold">Dr. Emily Carter</p><p className="mt-2 text-xs text-slate-300">Synthetic practice</p></div>
+          <nav className="space-y-1">{nav.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${view === item.id ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50"}`}><item.icon className="h-4 w-4" />{item.label}</button>)}</nav>
+          <div className="absolute bottom-5 left-4 right-4 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900"><strong>Safe sandbox</strong><br />No login, emails, live AI, or production records.</div>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white p-2 lg:hidden">{nav.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${view === item.id ? "bg-violet-50 text-violet-700" : "text-slate-600"}`}><item.icon className="h-4 w-4" />{item.label}</button>)}</nav>
+          {notice && <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 sm:mx-7"><span><Check className="mr-2 inline h-4 w-4" />{notice}</span><button aria-label="Dismiss" onClick={() => setNotice("")}><X className="h-4 w-4" /></button></div>}
+          <div className="p-4 sm:p-7">
+            {view === "dashboard" && <Dashboard onClient={chooseClient} completedCount={completedCount} />}
+            {view === "clients" && <Clients onClient={chooseClient} assignments={assignments} />}
+            {view === "client" && <ClientDetail client={selectedClient} assignments={selectedAssignments} onBack={() => setView("clients")} onPrep={() => setView("prep")} onPreview={() => setClientPreview(true)} />}
+            {view === "library" && <Library worksheets={filteredWorksheets} search={search} setSearch={setSearch} onWorksheet={(worksheet) => { setModalWorksheet(worksheet); setAssignClientId(selectedClient.id) }} />}
+            {view === "progress" && <Progress averageMood={averageMood} completedCount={completedCount} onClient={chooseClient} />}
+            {view === "prep" && <SessionPrep client={selectedClient} onBack={() => setView("client")} />}
+          </div>
+        </div>
+      </div>
+
+      <div className="fixed bottom-5 right-5 z-30 hidden items-center gap-3 rounded-2xl border border-violet-200 bg-white p-3 shadow-xl sm:flex"><div><p className="text-xs text-slate-500">Ready for your own workspace?</p><p className="text-sm font-bold">Start with your real practice</p></div><Link href="/signup" className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white">Create My Practice</Link></div>
+
+      {modalWorksheet && <WorksheetModal worksheet={modalWorksheet} clientId={assignClientId} setClientId={setAssignClientId} onClose={() => setModalWorksheet(null)} onAssign={assign} />}
+      {clientPreview && <ClientPreview client={selectedClient} assignments={selectedAssignments} onClose={() => setClientPreview(false)} />}
+    </main>
+  )
+}
+
+function PageTitle({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <div className="mb-7"><p className="text-xs font-bold uppercase tracking-widest text-violet-600">{eyebrow}</p><h1 className="mt-2 font-serif text-3xl font-semibold sm:text-4xl">{title}</h1><p className="mt-2 max-w-3xl text-slate-500">{copy}</p></div> }
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>{children}</div> }
+function Status({ value }: { value: string }) { const urgent = value === "Needs attention" || value === "Overdue"; return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${urgent ? "bg-rose-50 text-rose-700" : value === "Review requested" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{value}</span> }
+
+function Dashboard({ onClient, completedCount }: { onClient: (id: string, view?: View) => void; completedCount: number }) {
+  return <><PageTitle eyebrow="Thursday, September 4" title="Good morning, Emily" copy="Here is what changed across your fictional practice since your last visit." />
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[{ label: "Active clients", value: "8", icon: Users }, { label: "Sessions this week", value: "9", icon: CalendarDays }, { label: "Ready to review", value: String(completedCount), icon: ClipboardCheck }, { label: "Need attention", value: "4", icon: HeartPulse }].map((item) => <Card key={item.label}><item.icon className="h-5 w-5 text-violet-600" /><p className="mt-4 text-3xl font-bold">{item.value}</p><p className="text-sm text-slate-500">{item.label}</p></Card>)}</div>
+    <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_.65fr]"><Card><div className="mb-4 flex items-center justify-between"><div><h2 className="font-serif text-xl font-semibold">Needs attention</h2><p className="text-sm text-slate-500">Signals to review, not clinical conclusions.</p></div><Activity className="h-5 w-5 text-rose-500" /></div><div className="divide-y divide-slate-100">{isolatedDemoClients.filter((c) => c.status !== "On track" && c.status !== "New client").map((client) => <button key={client.id} onClick={() => onClient(client.id)} className="flex w-full items-center gap-3 py-4 text-left"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">{client.initials}</span><span className="min-w-0 flex-1"><span className="font-semibold">{client.name}</span><span className="block truncate text-sm text-slate-500">{client.reflections[0]}</span></span><Status value={client.status} /><ChevronRight className="h-4 w-4 text-slate-300" /></button>)}</div></Card>
+    <Card><h2 className="font-serif text-xl font-semibold">Upcoming sessions</h2><div className="mt-4 space-y-4">{isolatedDemoClients.slice(0, 4).map((client) => <button key={client.id} onClick={() => onClient(client.id, "prep")} className="flex w-full items-center gap-3 text-left"><CalendarDays className="h-4 w-4 text-violet-500" /><span className="flex-1"><span className="block text-sm font-semibold">{client.name}</span><span className="text-xs text-slate-500">{client.nextSession}</span></span><Sparkles className="h-4 w-4 text-violet-500" /></button>)}</div></Card></div></>
+}
+
+function Clients({ onClient, assignments }: { onClient: (id: string) => void; assignments: DemoAssignment[] }) { return <><PageTitle eyebrow="Practice" title="Clients" copy="Eight fictional cases at different stages of care, including a couple, a teen, and a new client." /><Card className="overflow-hidden p-0"><div className="divide-y divide-slate-100">{isolatedDemoClients.map((client) => <button key={client.id} onClick={() => onClient(client.id)} className="flex w-full items-center gap-4 p-4 text-left hover:bg-slate-50 sm:p-5"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-100 font-bold text-violet-700">{client.initials}</span><span className="min-w-0 flex-1"><span className="font-semibold">{client.name}</span><span className="block text-sm text-slate-500">{client.type} · {client.focus.join(" · ")}</span></span><span className="hidden text-sm text-slate-500 md:block">{assignments.filter((a) => a.clientId === client.id).length} assignments</span><Status value={client.status} /><ChevronRight className="h-4 w-4 text-slate-300" /></button>)}</div></Card></> }
+
+function ClientDetail({ client, assignments, onBack, onPrep, onPreview }: { client: typeof isolatedDemoClients[number]; assignments: DemoAssignment[]; onBack: () => void; onPrep: () => void; onPreview: () => void }) { return <><button onClick={onBack} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-500"><ArrowLeft className="h-4 w-4" />Clients</button><div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-4"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-lg font-bold text-violet-700">{client.initials}</span><div><h1 className="font-serif text-3xl font-semibold">{client.name}</h1><p className="text-sm text-slate-500">{client.pronouns} · {client.type} · Next: {client.nextSession}</p></div></div><div className="flex gap-2"><button onClick={onPreview} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold"><Eye className="h-4 w-4" />View as client</button><button onClick={onPrep} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white"><Sparkles className="h-4 w-4" />Session Prep</button></div></div>
+  <div className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]"><div className="space-y-6"><Card><h2 className="font-serif text-xl font-semibold">Assignments</h2><div className="mt-3 divide-y divide-slate-100">{assignments.length ? assignments.map((item) => <div key={item.id} className="flex items-center gap-3 py-4"><ClipboardCheck className="h-5 w-5 text-violet-500" /><span className="flex-1"><span className="block font-semibold">{worksheetTitle(item.worksheetId)}</span><span className="text-xs text-slate-500">Due {item.due}</span></span><Status value={item.status} /></div>) : <p className="py-5 text-sm text-slate-500">No work assigned yet. Choose one from Worksheets.</p>}</div></Card><Card><h2 className="font-serif text-xl font-semibold">Reflections</h2><div className="mt-4 space-y-3">{client.reflections.length ? client.reflections.map((reflection) => <blockquote key={reflection} className="rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">“{reflection}”</blockquote>) : <p className="text-sm text-slate-500">No reflections yet.</p>}</div></Card></div>
+  <div className="space-y-6"><Card><h2 className="font-serif text-xl font-semibold">Mood check-ins</h2>{client.mood.length ? <><div className="mt-5 flex h-28 items-end gap-2">{client.mood.map((value, index) => <div key={index} className="flex-1 rounded-t-md bg-violet-400" style={{ height: `${value * 10}%` }} title={`${value}/10`} />)}</div><p className="mt-2 text-xs text-slate-500">Five weekly check-ins · latest {client.mood.at(-1)}/10</p></> : <p className="mt-4 text-sm text-slate-500">No check-ins yet.</p>}</Card><Card><h2 className="font-serif text-xl font-semibold">Treatment goals</h2><ul className="mt-4 space-y-3">{client.goals.map((goal) => <li key={goal} className="flex gap-2 text-sm"><Check className="mt-0.5 h-4 w-4 text-emerald-500" />{goal}</li>)}</ul></Card><Card><h2 className="font-serif text-xl font-semibold">Recent history</h2><ul className="mt-4 space-y-3">{demoHistory.map((item) => <li key={item} className="text-sm text-slate-600">{item}</li>)}</ul></Card></div></div></> }
+
+function Library({ worksheets, search, setSearch, onWorksheet }: { worksheets: DemoWorksheet[]; search: string; setSearch: (value: string) => void; onWorksheet: (worksheet: DemoWorksheet) => void }) { return <><PageTitle eyebrow="Content library" title="Real worksheets, safe demo actions" copy="Preview and assign SessionSteps worksheet structures to any fictional client. Assignments live only in page memory." /><label className="mb-5 flex max-w-lg items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3"><Search className="h-4 w-4 text-slate-400" /><input aria-label="Search worksheets" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search worksheets or categories" className="w-full bg-transparent text-sm outline-none" /></label><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{worksheets.map((worksheet) => <Card key={worksheet.id}><span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">{worksheet.category}</span><h2 className="mt-4 font-serif text-xl font-semibold">{worksheet.title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500">{worksheet.description}</p><button onClick={() => onWorksheet(worksheet)} className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white">Preview & assign</button></Card>)}</div></> }
+
+function Progress({ averageMood, completedCount, onClient }: { averageMood: string; completedCount: number; onClient: (id: string) => void }) { return <><PageTitle eyebrow="Practice insights" title="Progress and check-ins" copy="Review patterns across several weeks of synthetic homework and mood activity." /><div className="grid gap-4 sm:grid-cols-3"><Card><p className="text-sm text-slate-500">Practice mood average</p><p className="mt-2 text-3xl font-bold">{averageMood}/10</p></Card><Card><p className="text-sm text-slate-500">Completed worksheets</p><p className="mt-2 text-3xl font-bold">{completedCount}</p></Card><Card><p className="text-sm text-slate-500">Check-ins recorded</p><p className="mt-2 text-3xl font-bold">35</p></Card></div><Card className="mt-6"><h2 className="font-serif text-xl font-semibold">Five-week mood patterns</h2><div className="mt-5 space-y-5">{isolatedDemoClients.filter((c) => c.mood.length).map((client) => <button key={client.id} onClick={() => onClient(client.id)} className="grid w-full grid-cols-[150px_1fr_45px] items-center gap-3 text-left"><span className="truncate text-sm font-semibold">{client.name}</span><span className="flex h-8 items-end gap-1">{client.mood.map((value, index) => <span key={index} className={`h-2 flex-1 rounded-full ${index === client.mood.length - 1 ? "bg-violet-600" : "bg-violet-200"}`} style={{ opacity: .35 + value / 15 }} />)}</span><span className="text-right text-sm font-bold">{client.mood.at(-1)}/10</span></button>)}</div></Card></> }
+
+function SessionPrep({ client, onBack }: { client: typeof isolatedDemoClients[number]; onBack: () => void }) { return <><button onClick={onBack} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-500"><ArrowLeft className="h-4 w-4" />{client.name}</button><PageTitle eyebrow="AI Session Prep example" title={`Prepare for ${client.name}`} copy="A pre-written synthetic example generated from this demo's fictional activity—no model or external service is called." /><div className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]"><Card><div className="flex items-center gap-2 text-violet-700"><Sparkles className="h-5 w-5" /><span className="text-xs font-bold uppercase tracking-widest">Demo summary</span></div><h2 className="mt-5 font-serif text-2xl font-semibold">At a glance</h2><p className="mt-3 leading-7 text-slate-600">{client.prep.overview}</p><h3 className="mt-6 font-semibold">Progress since last session</h3><p className="mt-2 text-sm leading-6 text-slate-600">{client.prep.progress}</p><h3 className="mt-6 font-semibold">Suggested discussion questions</h3><ul className="mt-3 space-y-3">{client.prep.questions.map((question) => <li key={question} className="flex gap-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-950"><ChevronRight className="h-4 w-4 shrink-0" />{question}</li>)}</ul><p className="mt-5 text-xs text-slate-400">AI-assisted preparation supports, but does not replace, therapist judgment. Verify all context directly with the client.</p></Card><div className="space-y-6"><Card><h2 className="font-serif text-xl font-semibold">Themes</h2><div className="mt-4 flex flex-wrap gap-2">{client.prep.themes.map((theme) => <span key={theme} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold">{theme}</span>)}</div></Card><Card><h2 className="font-serif text-xl font-semibold">Sources included</h2><ul className="mt-4 space-y-3 text-sm text-slate-600"><li>{client.mood.length} mood check-ins</li><li>{client.reflections.length} reflections</li><li>{client.assignments.length} assignments</li><li>1 fictional progress note</li></ul></Card></div></div></> }
+
+function WorksheetModal({ worksheet, clientId, setClientId, onClose, onAssign }: { worksheet: DemoWorksheet; clientId: string; setClientId: (id: string) => void; onClose: () => void; onAssign: () => void }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-label={`Assign ${worksheet.title}`}><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"><div className="flex items-start justify-between gap-4"><div><span className="text-xs font-bold uppercase tracking-widest text-violet-600">{worksheet.category} worksheet</span><h2 className="mt-2 font-serif text-3xl font-semibold">{worksheet.title}</h2><p className="mt-2 text-sm text-slate-500">{worksheet.description}</p></div><button aria-label="Close" onClick={onClose}><X className="h-5 w-5" /></button></div><div className="mt-6 rounded-2xl bg-slate-50 p-5"><p className="text-xs font-bold uppercase tracking-widest text-slate-400">Client experience</p><ol className="mt-4 space-y-4">{worksheet.questions.map((question, index) => <li key={question}><p className="text-sm font-semibold">{index + 1}. {question}</p><div className="mt-2 h-10 rounded-lg border border-slate-200 bg-white" /></li>)}</ol></div><label className="mt-6 block text-sm font-bold">Assign to fictional client<select value={clientId} onChange={(event) => setClientId(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 font-normal">{isolatedDemoClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label><div className="mt-6 flex gap-3"><button onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-bold">Cancel</button><button onClick={onAssign} className="flex-1 rounded-xl bg-violet-600 px-4 py-3 font-bold text-white">Assign in demo</button></div></div></div> }
+
+function ClientPreview({ client, assignments, onClose }: { client: typeof isolatedDemoClients[number]; assignments: DemoAssignment[]; onClose: () => void }) { return <div className="fixed inset-0 z-50 overflow-y-auto bg-[#f5f3ff] p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Client portal preview"><div className="mx-auto max-w-3xl"><div className="mb-6 flex items-center justify-between"><SessionStepsLogo className="h-auto w-[160px]" /><button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold shadow"><X className="h-4 w-4" />Exit client view</button></div><div className="mb-5 rounded-xl bg-violet-700 px-4 py-3 text-center text-sm font-semibold text-white">Fictional client portal preview · nothing is submitted or saved</div><Card><p className="text-sm text-slate-500">Welcome back</p><h1 className="mt-1 font-serif text-3xl font-semibold">{client.name}</h1><p className="mt-2 text-slate-600">Your therapist shared these next steps for the time between sessions.</p></Card><div className="mt-5 grid gap-5 md:grid-cols-2"><Card><h2 className="font-serif text-xl font-semibold">Your worksheets</h2><div className="mt-4 space-y-3">{assignments.length ? assignments.map((item) => <div key={item.id} className="rounded-xl border border-slate-200 p-4"><p className="font-semibold">{worksheetTitle(item.worksheetId)}</p><p className="mt-1 text-xs text-slate-500">{item.status} · due {item.due}</p></div>) : <p className="text-sm text-slate-500">Nothing assigned yet.</p>}</div></Card><Card><h2 className="font-serif text-xl font-semibold">How are you feeling?</h2><p className="mt-2 text-sm text-slate-500">Choose a number from 1 to 10.</p><div className="mt-5 grid grid-cols-5 gap-2">{[1,2,3,4,5,6,7,8,9,10].map((number) => <button key={number} onClick={() => undefined} className="rounded-lg border border-slate-200 bg-white py-2 text-sm font-bold hover:border-violet-500">{number}</button>)}</div><button onClick={() => undefined} className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-3 font-bold text-white">Save demo check-in</button></Card></div></div></div> }

@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Activity, ArrowLeft, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardCheck, Eye, HeartPulse, Home, RotateCcw, Search, ShieldCheck, Sparkles, Users, X } from "lucide-react"
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardCheck, Compass, Eye, HeartPulse, Home, RotateCcw, Search, ShieldCheck, Sparkles, Users, X } from "lucide-react"
 
 import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import { demoHistory, isolatedDemoClients, isolatedDemoWorksheets, type DemoWorksheet } from "@/lib/isolated-demo-data"
 
 type View = "dashboard" | "clients" | "client" | "library" | "progress" | "prep"
+type TourStage = "welcome" | "client" | "worksheet" | "prep" | "complete" | "dismissed"
 type DemoAssignment = { id: string; clientId: string; worksheetId: string; status: "Assigned" | "Completed" | "In progress" | "Overdue"; due: string; response?: string }
 
 const nav: { id: View; label: string; icon: typeof Home }[] = [
@@ -30,6 +31,7 @@ export default function TherapistDemoPage() {
   const [notice, setNotice] = useState("")
   const [clientPreview, setClientPreview] = useState(false)
   const [search, setSearch] = useState("")
+  const [tourStage, setTourStage] = useState<TourStage>("welcome")
 
   const selectedClient = isolatedDemoClients.find((client) => client.id === selectedClientId) ?? isolatedDemoClients[0]
   const selectedAssignments = assignments.filter((assignment) => assignment.clientId === selectedClient.id)
@@ -49,12 +51,14 @@ export default function TherapistDemoPage() {
     setAssignments((current) => [...current, { id: `session-${current.length + 1}`, clientId: assignClientId, worksheetId: modalWorksheet.id, status: "Assigned", due: "Sep 11" }])
     setNotice(`${modalWorksheet.title} assigned in this demo only.`)
     setModalWorksheet(null)
+    if (tourStage === "worksheet") setTourStage("prep")
   }
   const reset = () => {
     setAssignments(isolatedDemoClients.flatMap((client) => client.assignments.map((item) => ({ ...item, clientId: client.id }))))
     setView("dashboard")
     setSelectedClientId("maya")
     setClientPreview(false)
+    setTourStage("welcome")
     setNotice("Demo reset to its original fictional practice.")
   }
 
@@ -65,6 +69,7 @@ export default function TherapistDemoPage() {
           <div className="flex items-center gap-5"><Link href="/demo" aria-label="Back to demo choices"><SessionStepsLogo className="h-auto w-[160px]" /></Link><span className="hidden rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700 md:inline">THERAPIST DEMO</span></div>
           <div className="flex items-center gap-2">
             <Link href="/demo/client" className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 md:inline-flex">Client demo</Link>
+            <button onClick={() => setTourStage("welcome")} className="hidden items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 sm:inline-flex"><Compass className="h-4 w-4" />Tour</button>
             <button onClick={reset} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"><RotateCcw className="h-4 w-4" /><span className="hidden sm:inline">Reset demo</span></button>
             <Link href="/signup" className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700">Create My Practice</Link>
           </div>
@@ -97,8 +102,25 @@ export default function TherapistDemoPage() {
 
       {modalWorksheet && <WorksheetModal worksheet={modalWorksheet} clientId={assignClientId} setClientId={setAssignClientId} onClose={() => setModalWorksheet(null)} onAssign={assign} />}
       {clientPreview && <ClientPreview client={selectedClient} assignments={selectedAssignments} onClose={() => setClientPreview(false)} />}
+      {tourStage === "welcome" && <TourWelcome onStart={() => setTourStage("client")} onSkip={() => setTourStage("dismissed")} />}
+      {tourStage !== "welcome" && tourStage !== "dismissed" && <TourGuide stage={tourStage} onClose={() => setTourStage("dismissed")} onClient={() => { chooseClient("maya"); setTourStage("worksheet") }} onWorksheet={() => setView("library")} onPrep={() => { setSelectedClientId(assignClientId); setView("prep"); setTourStage("complete") }} />}
     </main>
   )
+}
+
+function TourWelcome({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
+  return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#111638]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Welcome to the therapist demo"><div className="w-full max-w-lg rounded-[2rem] bg-white p-7 shadow-2xl sm:p-9"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700"><Compass className="h-6 w-6" /></div><p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Guided therapist demo</p><h2 className="mt-2 font-serif text-3xl font-semibold">See the core workflow in about two minutes.</h2><p className="mt-4 leading-7 text-slate-600">Follow one fictional client from a needs-attention signal to a worksheet assignment and an AI Session Prep example.</p><ol className="mt-6 space-y-3">{["Review a client who needs attention", "Preview and assign a real worksheet", "Prepare for the next session"].map((label, index) => <li key={label} className="flex items-center gap-3 text-sm font-semibold text-slate-700"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">{index + 1}</span>{label}</li>)}</ol><button onClick={onStart} className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3.5 font-bold text-white hover:bg-violet-700">Start guided tour <ArrowRight className="h-4 w-4" /></button><button onClick={onSkip} className="mt-2 w-full rounded-xl px-5 py-3 text-sm font-semibold text-slate-500 hover:bg-slate-50">Explore on my own</button></div></div>
+}
+
+function TourGuide({ stage, onClose, onClient, onWorksheet, onPrep }: { stage: Exclude<TourStage, "welcome" | "dismissed">; onClose: () => void; onClient: () => void; onWorksheet: () => void; onPrep: () => void }) {
+  const steps = [
+    { id: "client", label: "Review a client", title: "Start with a signal that needs attention", copy: "Open Maya Thompson to see recent mood, reflections, goals, and assigned work together.", action: "Open Maya's profile", run: onClient },
+    { id: "worksheet", label: "Assign a worksheet", title: "Give Maya a focused next step", copy: "Open Worksheets, choose an evidence-informed template, and assign it inside this safe demo.", action: "Browse worksheets", run: onWorksheet },
+    { id: "prep", label: "Prepare for session", title: "Turn activity into session context", copy: "See how SessionSteps organizes fictional check-ins and homework into a concise preparation view.", action: "Open Session Prep", run: onPrep },
+  ] as const
+  const currentIndex = stage === "complete" ? 3 : steps.findIndex((step) => step.id === stage)
+  const current = stage === "complete" ? null : steps[currentIndex]
+  return <aside className="fixed bottom-4 left-4 right-4 z-50 rounded-2xl border border-violet-200 bg-white p-4 shadow-2xl sm:left-auto sm:right-5 sm:w-[390px] sm:p-5" aria-label="Guided demo checklist"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">{stage === "complete" ? "Tour complete" : `Step ${currentIndex + 1} of 3`}</p><h2 className="mt-1 font-serif text-xl font-semibold">{stage === "complete" ? "You’ve seen the core workflow" : current?.title}</h2></div><button aria-label="Close guided tour" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>{stage === "complete" ? <><p className="mt-3 text-sm leading-6 text-slate-600">Keep exploring another fictional client, preview the client experience, or create your own practice.</p><div className="mt-4 grid grid-cols-2 gap-2"><button onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold">Keep exploring</button><Link href="/signup" className="rounded-xl bg-violet-600 px-3 py-2.5 text-center text-sm font-bold text-white">Create My Practice</Link></div></> : <><p className="mt-3 text-sm leading-6 text-slate-600">{current?.copy}</p><div className="mt-4 flex gap-1.5">{steps.map((step, index) => <span key={step.id} className={`h-1.5 flex-1 rounded-full ${index <= currentIndex ? "bg-violet-600" : "bg-slate-200"}`} />)}</div><button onClick={current?.run} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white">{current?.action}<ArrowRight className="h-4 w-4" /></button><p className="mt-3 text-center text-xs text-slate-400">You can still explore anything while the guide is open.</p></>}</aside>
 }
 
 function PageTitle({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <div className="mb-7"><p className="text-xs font-bold uppercase tracking-widest text-violet-600">{eyebrow}</p><h1 className="mt-2 font-serif text-3xl font-semibold sm:text-4xl">{title}</h1><p className="mt-2 max-w-3xl text-slate-500">{copy}</p></div> }

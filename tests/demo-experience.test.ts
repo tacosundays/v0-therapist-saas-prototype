@@ -60,6 +60,20 @@ test("isolated therapist demo includes the full workflow and synthetic history",
   assert.match(data, /reflections:/)
 })
 
+test("therapist demo guides first-time visitors without blocking exploration", () => {
+  const entry = read("app/demo/therapist/page.tsx")
+
+  assert.match(entry, /See the core workflow in about two minutes/)
+  assert.match(entry, /Start guided tour/)
+  assert.match(entry, /Explore on my own/)
+  assert.match(entry, /Step.*of 3/)
+  assert.match(entry, /Open Maya's profile/)
+  assert.match(entry, /Browse worksheets/)
+  assert.match(entry, /Open Session Prep/)
+  assert.match(entry, /You’ve seen the core workflow/)
+  assert.match(entry, /Create My Practice/)
+})
+
 test("client demo is fictional and does not access persistent or production data", () => {
   const clientDemo = read("app/demo/client/page.tsx")
 

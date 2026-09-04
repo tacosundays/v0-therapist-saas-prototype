@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
 import { useState } from "react"
-import { BrandMark } from "@/components/brand-mark"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -20,8 +20,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2">
-            <BrandMark className="h-10 w-10" />
-            <span className="text-xl font-bold tracking-tight text-slate-950">SessionSteps</span>
+            <SessionStepsLogo />
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { BrandMark } from "@/components/brand-mark"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 
 export function Footer() {
   return (
@@ -8,8 +8,7 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-            <BrandMark className="h-10 w-10" />
-              <span className="font-semibold text-lg text-foreground">SessionSteps</span>
+              <SessionStepsLogo />
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
               Helping therapists assign homework, collect reflections, and review client progress between sessions.

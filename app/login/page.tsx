@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Brain, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import { getClient, getSupabaseBrowserConfigStatus } from "@/lib/supabase/client"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
@@ -484,12 +485,7 @@ export default function LoginPage() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <Brain className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl text-foreground">SessionSteps</span>
-          </div>
+          <SessionStepsLogo className="mb-8" />
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Verify your login</h1>
           <p className="text-muted-foreground mb-6">Enter the code from your authenticator app to continue.</p>
@@ -590,12 +586,7 @@ export default function LoginPage() {
             Back to home
           </Link>
 
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <Brain className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl text-foreground">SessionSteps</span>
-          </div>
+          <SessionStepsLogo className="mb-8" />
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Welcome back</h1>
           <p className="text-muted-foreground mb-8">Sign in to your account to continue</p>

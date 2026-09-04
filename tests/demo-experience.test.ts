@@ -88,6 +88,23 @@ test("landing and demo surfaces share one canonical logo component", () => {
   }
 })
 
+test("every branded application surface uses the canonical SessionSteps logo", () => {
+  for (const path of [
+    "app/signup/page.tsx",
+    "app/login/page.tsx",
+    "app/forgot-password/page.tsx",
+    "app/pricing/page.tsx",
+    "app/onboarding/page.tsx",
+    "app/portal/layout.tsx",
+    "app/client-portal/layout.tsx",
+    "components/dashboard/sidebar.tsx",
+  ]) {
+    const source = read(path)
+    assert.match(source, /SessionStepsLogo|SessionStepsMark/, path)
+    assert.doesNotMatch(source, /<Brain[^>]+(?:primary-foreground|text-white)/, path)
+  }
+})
+
 test("client demo is fictional and does not access persistent or production data", () => {
   const clientDemo = read("app/demo/client/page.tsx")
 

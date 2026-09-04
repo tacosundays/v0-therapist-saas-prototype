@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import { Progress } from "@/components/ui/progress"
 import { getTherapistId } from "@/lib/auth/check-user-role"
 import { getClient } from "@/lib/supabase/client"
@@ -242,8 +243,7 @@ export default function OnboardingPage() {
       <header className="border-b border-border/70 bg-background/80 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary"><Brain className="h-5 w-5 text-primary-foreground" /></span>
-            <span className="text-lg font-semibold">SessionSteps</span>
+            <SessionStepsLogo />
           </Link>
           <Button variant="ghost" onClick={skip} disabled={isSaving}>Skip for now</Button>
         </div>

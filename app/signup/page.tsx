@@ -6,7 +6,8 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Brain, Eye, EyeOff, ArrowLeft, Check, Loader2, Mail } from "lucide-react"
+import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail } from "lucide-react"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import { getClient } from "@/lib/supabase/client"
 import { hashInviteToken, normalizeInviteEmail } from "@/lib/invitations"
 
@@ -327,12 +328,7 @@ export default function SignupPage() {
             Back to home
           </Link>
 
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <Brain className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl text-foreground">SessionSteps</span>
-          </div>
+          <SessionStepsLogo className="mb-8" />
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Create your account</h1>
           <p className="text-muted-foreground mb-8">

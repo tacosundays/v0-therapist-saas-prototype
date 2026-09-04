@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { 
   Check, 
-  Brain, 
   ArrowLeft,
   HelpCircle,
   Sparkles
 } from "lucide-react"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import {
   Accordion,
   AccordionContent,
@@ -73,10 +73,7 @@ export default function PricingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                <Brain className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="font-semibold text-lg text-foreground">SessionSteps</span>
+              <SessionStepsLogo />
             </Link>
             <Button variant="ghost" asChild>
               <Link href="/">

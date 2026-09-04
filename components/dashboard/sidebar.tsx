@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
-  Brain, 
   LayoutDashboard, 
   Inbox,
   CalendarDays,
@@ -28,6 +27,7 @@ import {
   Menu,
   X,
 } from "lucide-react"
+import { SessionStepsLogo, SessionStepsMark } from "@/components/brand/sessionsteps-logo"
 import { cn } from "@/lib/utils"
 import { useState, useEffect, useRef } from "react"
 import { getClient } from "@/lib/supabase/client"
@@ -251,11 +251,8 @@ export function DashboardSidebar() {
           >
             <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
               <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary shadow-[0_12px_28px_rgba(109,94,245,0.24)]">
-                  <Brain className="h-6 w-6 text-white" />
-                </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-lg font-bold tracking-tight text-slate-950">SessionSteps</span>
+                  <SessionStepsLogo />
                   <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Therapist workspace</span>
                 </span>
               </Link>
@@ -317,12 +314,10 @@ export function DashboardSidebar() {
       {/* Logo */}
       <div className="border-b border-slate-200/70 px-5 py-4">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary shadow-[0_12px_28px_rgba(109,94,245,0.24)]">
-            <Brain className="h-6 w-6 text-white" />
-          </div>
+          {collapsed && <SessionStepsMark className="h-10 w-10" />}
           {!collapsed && (
             <div>
-              <span className="block text-lg font-bold tracking-tight text-slate-950">SessionSteps</span>
+              <SessionStepsLogo />
               <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                 {isDemoMode ? "Demo Workspace" : "Homework"}
               </span>

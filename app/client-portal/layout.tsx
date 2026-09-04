@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { getClient } from "@/lib/supabase/client"
-import { Loader2, Brain, LogOut, AlertCircle } from "lucide-react"
+import { Loader2, LogOut, AlertCircle } from "lucide-react"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import { Button } from "@/components/ui/button"
 import { checkUserRole } from "@/lib/auth/check-user-role"
 import { logClientAuditEvent } from "@/lib/audit-client"
@@ -133,11 +134,8 @@ export default function ClientPortalLayout({
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#6D5EF5] shadow-[0_14px_30px_rgba(109,94,245,0.24)]">
-                <Brain className="h-5 w-5 text-white" />
-              </div>
               <div>
-                <span className="block font-bold tracking-tight text-slate-950">SessionSteps</span>
+                <SessionStepsLogo />
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Client Portal</span>
               </div>
             </div>

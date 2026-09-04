@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
-import { Brain, LogOut, Loader2 } from "lucide-react"
+import { LogOut, Loader2 } from "lucide-react"
+import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
 import { Button } from "@/components/ui/button"
 import { getClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
@@ -77,10 +78,7 @@ export default function PortalLayout({
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/portal" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                <Brain className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="font-semibold text-lg text-foreground">SessionSteps</span>
+              <SessionStepsLogo />
             </Link>
 
             <div className="flex items-center gap-4">

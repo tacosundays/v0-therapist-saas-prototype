@@ -48,23 +48,16 @@ test("API routes remain protected by their route handlers", () => {
   assert.deepEqual(getRouteAccessDecision("/api/calendar/events", null, false), { action: "allow" })
 })
 
-test("public demo entry establishes demo mode before entering the dashboard", () => {
+test("public demo entry remains separate from protected product routes", () => {
   const chooser = readFileSync("app/demo/page.tsx", "utf8")
-  const demoMode = readFileSync("lib/demo-mode.ts", "utf8")
   const header = readFileSync("components/landing/header.tsx", "utf8")
-  const sidebar = readFileSync("components/dashboard/sidebar.tsx", "utf8")
   const middleware = readFileSync("lib/supabase/middleware.ts", "utf8")
-  const clientLayout = readFileSync("app/client-portal/layout.tsx", "utf8")
-  const clientPage = readFileSync("app/client-portal/page.tsx", "utf8")
-  assert.match(chooser, /\/dashboard\?demo=therapist/)
-  assert.match(chooser, /\/client-portal\?demo=client/)
+  assert.match(chooser, /\/demo\/therapist/)
+  assert.match(chooser, /\/demo\/client/)
+  assert.doesNotMatch(chooser, /\/dashboard\?demo=/)
   assert.match(middleware, /startsWith\("\/client-portal"\)/)
   assert.match(middleware, /sessionsteps\.demoMode/)
-  assert.match(demoMode, /document\.cookie/)
   assert.match(header, /href="\/demo"/)
-  assert.match(sidebar, /isDemoMode \|\| isDemoModeEnabled\(\)/)
-  assert.match(clientLayout, /params\.get\("demo"\) === "client"/)
-  assert.match(clientPage, /demoAssignments/)
 })
 
 test("primary surfaces use the SessionSteps brand", () => {
@@ -78,4 +71,14 @@ test("primary surfaces use the SessionSteps brand", () => {
   assert.match(mark, /SessionSteps logo/)
   assert.match(hero, /Clinical continuity for behavioral health/)
   assert.match(hero, /longitudinal outcomes/)
+})
+
+test("public demo routes bypass Supabase initialization", () => {
+  const middleware = readFileSync("lib/supabase/middleware.ts", "utf8")
+  const publicDemoReturn = middleware.indexOf("if (isPublicDemoRoute) return response")
+  const supabaseInitialization = middleware.indexOf("const supabase = createServerClient")
+
+  assert.ok(publicDemoReturn > -1)
+  assert.ok(supabaseInitialization > publicDemoReturn)
+  assert.match(middleware, /pathname === "\/demo".*startsWith\("\/demo\/"\)/)
 })

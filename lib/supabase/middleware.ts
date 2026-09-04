@@ -37,11 +37,16 @@ function redirectTo(request: NextRequest, destination: RedirectDestination) {
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
+  const isPublicDemoRoute = request.nextUrl.pathname === "/demo" || request.nextUrl.pathname.startsWith("/demo/")
   const isDemoProtectedRoute = request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/client-portal")
   const isDemoRequest = ["1", "therapist", "client"].includes(request.nextUrl.searchParams.get("demo") || "")
   const hasDemoCookie = request.cookies.get("sessionsteps.demoMode")?.value === "true"
 
-  // The demo workspace uses static, synthetic data and never queries protected
+  // Public demos are entirely synthetic. Return before constructing a Supabase
+  // client so they work without auth or production environment configuration.
+  if (isPublicDemoRoute) return response
+
+  // The legacy demo workspace uses static, synthetic data and never queries protected
   // therapist records. Keep the public "View demo" flow ahead of auth routing.
   if (isDemoProtectedRoute && (isDemoRequest || hasDemoCookie)) {
     if (isDemoRequest) {

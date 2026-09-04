@@ -74,6 +74,20 @@ test("therapist demo guides first-time visitors without blocking exploration", (
   assert.match(entry, /Create My Practice/)
 })
 
+test("landing and demo surfaces share one canonical logo component", () => {
+  const logo = read("components/brand/sessionsteps-logo.tsx")
+  const header = read("components/landing/header.tsx")
+  const footer = read("components/landing/footer.tsx")
+  const chooser = read("app/demo/page.tsx")
+  const therapist = read("app/demo/therapist/page.tsx")
+  const client = read("app/demo/client/page.tsx")
+
+  assert.match(logo, /BrandMark/)
+  for (const source of [header, footer, chooser, therapist, client]) {
+    assert.match(source, /SessionStepsLogo/)
+  }
+})
+
 test("client demo is fictional and does not access persistent or production data", () => {
   const clientDemo = read("app/demo/client/page.tsx")
 

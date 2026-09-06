@@ -24,7 +24,7 @@ export function SessionStepsLogo({
   showTagline = false,
 }: SessionStepsLogoProps) {
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
+    <span className={cn("flex items-center gap-2", className)}>
       <SessionStepsMark className={cn("h-10 w-10", markClassName)} title="SessionSteps logo" />
       <span className="min-w-0">
         <span className={cn("block text-xl font-bold tracking-tight text-slate-950", wordmarkClassName)}>

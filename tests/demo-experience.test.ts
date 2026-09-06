@@ -105,6 +105,12 @@ test("every branded application surface uses the canonical SessionSteps logo", (
   }
 })
 
+test("canonical logo stays on its own line beside auth back links", () => {
+  const logo = read("components/brand/sessionsteps-logo.tsx")
+  assert.match(logo, /cn\("flex items-center gap-2"/)
+  assert.doesNotMatch(logo, /inline-flex items-center gap-2/)
+})
+
 test("client demo is fictional and does not access persistent or production data", () => {
   const clientDemo = read("app/demo/client/page.tsx")
 

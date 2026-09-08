@@ -1,6 +1,7 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   ArrowRight,
@@ -17,12 +18,36 @@ import {
 import Link from "next/link"
 
 const featureStrip = [
-  { label: "Online Worksheets", icon: ClipboardList },
-  { label: "Client Portal", icon: Users },
-  { label: "Mood Tracking", icon: HeartPulse },
-  { label: "Session Prep", icon: CalendarClock },
-  { label: "Reflections", icon: MessageSquare },
-  { label: "Group Practice", icon: ShieldCheck },
+  {
+    label: "Online Worksheets",
+    icon: ClipboardList,
+    description: "Assign evidence-informed worksheets in seconds and review completed work before the next session.",
+  },
+  {
+    label: "Client Portal",
+    icon: Users,
+    description: "Give clients one calm, private place for homework, check-ins, reflections, and upcoming sessions.",
+  },
+  {
+    label: "Mood Tracking",
+    icon: HeartPulse,
+    description: "See changes in mood and stress over time, so important patterns do not get lost between visits.",
+  },
+  {
+    label: "Session Prep",
+    icon: CalendarClock,
+    description: "Walk into each session with recent homework, mood trends, and reflections already brought together.",
+  },
+  {
+    label: "Reflections",
+    icon: MessageSquare,
+    description: "Invite brief between-session reflections that help clients notice wins, barriers, and emerging themes.",
+  },
+  {
+    label: "Group Practice",
+    icon: ShieldCheck,
+    description: "Support up to five therapist seats while each clinician keeps their own client work organized and private.",
+  },
 ]
 
 export function Hero() {
@@ -112,6 +137,9 @@ function HeroBackground() {
 }
 
 function FeatureStrip() {
+  const [activeFeature, setActiveFeature] = useState(0)
+  const selectedFeature = featureStrip[activeFeature]
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -119,18 +147,63 @@ function FeatureStrip() {
       transition={{ duration: 0.6, delay: 0.35 }}
       className="mt-14 rounded-3xl border border-white/80 bg-white/75 p-3 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl"
     >
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        {featureStrip.map((feature) => (
-          <div
-            key={feature.label}
-            className="flex items-center gap-2 rounded-2xl px-3 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-[#635BFF]/5 hover:text-[#635BFF]"
+      <div className="overflow-hidden px-2 pb-3 pt-1 sm:px-3">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedFeature.label}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.18 }}
+            id={`feature-preview-${activeFeature}`}
+            role="status"
+            aria-live="polite"
+            className="flex flex-col gap-3 rounded-2xl border border-[#635BFF]/10 bg-gradient-to-r from-[#635BFF]/[0.07] to-[#18B7A0]/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#635BFF]/10 text-[#635BFF]">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#635BFF]">
+                {selectedFeature.label}
+              </p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                {selectedFeature.description}
+              </p>
+            </div>
+            <Link
+              href="/demo"
+              className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[#635BFF] transition-colors hover:text-[#574CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#635BFF] focus-visible:ring-offset-2"
+            >
+              See it in the demo
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {featureStrip.map((feature, index) => {
+          const isActive = index === activeFeature
+
+          return (
+          <button
+            type="button"
+            key={feature.label}
+            onMouseEnter={() => setActiveFeature(index)}
+            onFocus={() => setActiveFeature(index)}
+            onClick={() => setActiveFeature(index)}
+            aria-pressed={isActive}
+            aria-controls={`feature-preview-${activeFeature}`}
+            className={`flex items-center gap-2 rounded-2xl px-3 py-3 text-left text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#635BFF] focus-visible:ring-offset-2 ${
+              isActive
+                ? "bg-[#635BFF]/10 text-[#635BFF]"
+                : "text-slate-700 hover:bg-[#635BFF]/5 hover:text-[#635BFF]"
+            }`}
+          >
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#635BFF] ${isActive ? "bg-white shadow-sm" : "bg-[#635BFF]/10"}`}>
               <feature.icon className="h-4 w-4" />
             </div>
             <span>{feature.label}</span>
-          </div>
-        ))}
+          </button>
+          )
+        })}
       </div>
     </motion.div>
   )

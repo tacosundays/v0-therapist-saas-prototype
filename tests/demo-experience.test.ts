@@ -24,11 +24,12 @@ test("landing feature rail previews each capability accessibly", () => {
   assert.match(hero, /Support up to five therapist seats/)
 })
 
-test("landing hero uses the original illustrated step background", () => {
+test("landing hero uses the clean original gradient background", () => {
   const hero = read("components/landing/hero.tsx")
 
-  assert.match(hero, /id="hero-step-line"/)
-  assert.match(hero, /linear-gradient\(180deg,#FFFFFF_0%,#F8FAFC_68%,#EEF2FF_100%\)/)
+  assert.match(hero, /circle_at_18%_18%/)
+  assert.match(hero, /linear-gradient\(180deg,#FFFFFF_0%,#F8FAFC_72%,#EEF2FF_100%\)/)
+  assert.doesNotMatch(hero, /hero-step-line/)
   assert.doesNotMatch(hero, /sessionsteps-path-hero\.jpg/)
 })
 

@@ -12,6 +12,18 @@ test("landing demo links open the public demo chooser", () => {
   assert.match(hero, /href="\/demo"/)
 })
 
+test("landing feature rail previews each capability accessibly", () => {
+  const hero = read("components/landing/hero.tsx")
+
+  assert.match(hero, /const \[activeFeature, setActiveFeature\] = useState\(0\)/)
+  assert.match(hero, /onMouseEnter=\{\(\) => setActiveFeature\(index\)\}/)
+  assert.match(hero, /onFocus=\{\(\) => setActiveFeature\(index\)\}/)
+  assert.match(hero, /onClick=\{\(\) => setActiveFeature\(index\)\}/)
+  assert.match(hero, /aria-pressed=\{isActive\}/)
+  assert.match(hero, /See it in the demo/)
+  assert.match(hero, /Support up to five therapist seats/)
+})
+
 test("demo chooser provides therapist and client experiences", () => {
   const chooser = read("app/demo/page.tsx")
 

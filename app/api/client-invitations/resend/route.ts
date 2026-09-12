@@ -2,10 +2,8 @@ import { createHash, randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { renderClientInviteEmail } from "@/components/emails/client-invite-email"
+import { isPauboxConfigured, sendPauboxEmail } from "@/lib/email/paubox"
 import { resolveTenantContext } from "@/lib/tenant-context"
-
-const resendApiUrl = "https://api.resend.com/emails"
-const defaultFromEmail = "SessionSteps <onboarding@resend.dev>"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -40,13 +38,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing client id" }, { status: 400 })
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (!resendApiKey) {
-      return NextResponse.json({ error: "RESEND_API_KEY is not configured" }, { status: 500 })
+    if (!isPauboxConfigured()) {
+      return NextResponse.json({ error: "PAUBOX_API_KEY is not configured" }, { status: 500 })
     }
 
     if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
@@ -135,27 +132,18 @@ export async function POST(request: Request) {
       inviteLink,
     })
 
-    const resendResponse = await fetch(resendApiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL || defaultFromEmail,
-        to: [client.email],
+    let delivery
+    try {
+      delivery = await sendPauboxEmail({
+        to: client.email,
         subject: email.subject,
         html: email.html,
         text: email.text,
-      }),
-    })
-
-    const resendResult = await resendResponse.json().catch(() => null)
-
-    if (!resendResponse.ok) {
+      })
+    } catch (error) {
       return NextResponse.json(
         {
-          error: resendResult?.message || resendResult?.error || "Email delivery failed",
+          error: error instanceof Error ? error.message : "Email delivery failed",
           inviteLink,
         },
         { status: 502 },
@@ -177,7 +165,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: sentUpdateError.message, inviteLink }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, inviteLink, id: resendResult?.id || null })
+    return NextResponse.json({ success: true, inviteLink, id: delivery.id })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to resend invitation" },

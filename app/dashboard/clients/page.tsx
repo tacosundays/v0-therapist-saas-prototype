@@ -272,7 +272,12 @@ export default function ClientsPage() {
         if (result?.inviteLink) {
           await navigator.clipboard.writeText(result.inviteLink)
           setCopiedClientId(client.id)
-          setClientActionMessage("Email delivery failed. Invite link copied so you can send it manually.")
+          const deliveryError = typeof result?.error === "string"
+            ? result.error
+            : "The email provider rejected the request."
+          setClientActionMessage(
+            `Email delivery failed: ${deliveryError} Invite link copied so you can send it manually.`,
+          )
           setTimeout(() => setCopiedClientId(null), 2000)
           await fetchData()
           return

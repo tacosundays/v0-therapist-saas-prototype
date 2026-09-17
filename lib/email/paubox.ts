@@ -1,7 +1,7 @@
 import "server-only"
 
 const PAUBOX_API_BASE_URL = "https://api.paubox.net/v1"
-const DEFAULT_SENDING_DOMAIN = "sessionsteps.com"
+const DEFAULT_ENDPOINT_USERNAME = "sessionsteps"
 const DEFAULT_FROM_EMAIL = "SessionSteps <notifications@sessionsteps.com>"
 
 type EmailMessage = {
@@ -44,12 +44,12 @@ export async function sendPauboxEmail(message: EmailMessage) {
   const apiKey = process.env.PAUBOX_API_KEY
   if (!apiKey) throw new Error("PAUBOX_API_KEY is not configured")
 
-  const sendingDomain = process.env.PAUBOX_SENDING_DOMAIN || DEFAULT_SENDING_DOMAIN
+  const endpointUsername = process.env.PAUBOX_ENDPOINT_USERNAME || DEFAULT_ENDPOINT_USERNAME
   const from = process.env.PAUBOX_FROM_EMAIL || DEFAULT_FROM_EMAIL
   const recipients = Array.isArray(message.to) ? message.to : [message.to]
 
   const response = await fetch(
-    `${PAUBOX_API_BASE_URL}/${encodeURIComponent(sendingDomain)}/messages`,
+    `${PAUBOX_API_BASE_URL}/${encodeURIComponent(endpointUsername)}/messages`,
     {
       method: "POST",
       headers: {

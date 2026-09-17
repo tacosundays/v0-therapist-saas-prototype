@@ -25,6 +25,14 @@ test("Paubox requests use the verified domain endpoint and multipart content sha
   assert.match(sender, /"text\/plain": message\.text/)
   assert.match(sender, /"text\/html": message\.html/)
   assert.match(sender, /sourceTrackingId/)
+  assert.match(sender, /Paubox rejected email delivery/)
+  assert.match(sender, /result\?\.errors/)
+})
+
+test("client resend failures expose the provider rejection while retaining the manual link", () => {
+  const clientsPage = read("app/dashboard/clients/page.tsx")
+  assert.match(clientsPage, /Email delivery failed: \$\{deliveryError\}/)
+  assert.match(clientsPage, /Invite link copied so you can send it manually/)
 })
 
 test("all transactional invitation routes share the Paubox sender", () => {

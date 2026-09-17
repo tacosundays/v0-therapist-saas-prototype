@@ -16,8 +16,24 @@ type PauboxResponse = {
   data?: {
     sourceTrackingId?: string
   }
-  error?: string
+  error?: string | { message?: string; detail?: string }
+  errors?: Array<{ title?: string; message?: string; detail?: string }>
   message?: string
+}
+
+function getPauboxErrorMessage(result: PauboxResponse | null, status: number) {
+  if (typeof result?.message === "string") return result.message
+  if (typeof result?.error === "string") return result.error
+  if (result?.error && typeof result.error === "object") {
+    return result.error.message || result.error.detail || `Paubox rejected email delivery (${status})`
+  }
+
+  const details = result?.errors
+    ?.map((error) => error.detail || error.message || error.title)
+    .filter(Boolean)
+    .join("; ")
+
+  return details || `Paubox rejected email delivery (${status})`
 }
 
 export function isPauboxConfigured() {
@@ -60,7 +76,7 @@ export async function sendPauboxEmail(message: EmailMessage) {
 
   const result = await response.json().catch(() => null) as PauboxResponse | null
   if (!response.ok) {
-    throw new Error(result?.message || result?.error || "Email delivery failed")
+    throw new Error(getPauboxErrorMessage(result, response.status))
   }
 
   return {

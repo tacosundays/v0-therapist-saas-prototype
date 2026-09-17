@@ -6,6 +6,7 @@ import { isPauboxConfigured, sendPauboxEmail } from "@/lib/email/paubox"
 import { normalizeProductId } from "@/lib/products"
 import { writeAuditLog } from "@/lib/audit-log"
 import { resolveTenantContext } from "@/lib/tenant-context"
+import { getInviteOrigin } from "@/lib/invitations"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
 
     const inviteToken = createInviteToken()
     const tokenHash = hashInviteToken(inviteToken)
-    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+    const origin = getInviteOrigin(request)
     const inviteLink = buildTherapistInviteLink(origin, normalizedInviteEmail, inviteToken)
 
     const { data: invite, error: inviteError } = await adminClient

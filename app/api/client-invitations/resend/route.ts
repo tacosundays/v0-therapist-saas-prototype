@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { renderClientInviteEmail } from "@/components/emails/client-invite-email"
 import { isPauboxConfigured, sendPauboxEmail } from "@/lib/email/paubox"
 import { resolveTenantContext } from "@/lib/tenant-context"
+import { getInviteOrigin } from "@/lib/invitations"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
 
     const inviteToken = createInviteToken()
     const inviteTokenHash = hashInviteToken(inviteToken)
-    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+    const origin = getInviteOrigin(request)
     const inviteLink = buildClientInviteLink(origin, client.email, inviteToken)
 
     const { error: tokenUpdateError } = await adminClient

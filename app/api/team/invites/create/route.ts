@@ -2,12 +2,10 @@ import { createHash, randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { renderTherapistInviteEmail } from "@/components/emails/therapist-invite-email"
+import { isPauboxConfigured, sendPauboxEmail } from "@/lib/email/paubox"
 import { normalizeProductId } from "@/lib/products"
 import { writeAuditLog } from "@/lib/audit-log"
 import { resolveTenantContext } from "@/lib/tenant-context"
-
-const resendApiUrl = "https://api.resend.com/emails"
-const defaultFromEmail = "SessionSteps <onboarding@resend.dev>"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -49,7 +47,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Therapist email is required" }, { status: 400 })
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -189,7 +186,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: inviteError.message }, { status: 500 })
     }
 
-    if (!resendApiKey) {
+    if (!isPauboxConfigured()) {
       await writeAuditLog({
         therapistId: owner.id,
         userId: user.id,
@@ -202,7 +199,7 @@ export async function POST(request: Request) {
           invitedEmail: normalizedInviteEmail,
           organizationId: tenant.organizationId,
           emailSent: false,
-          reason: "RESEND_API_KEY not configured",
+          reason: "PAUBOX_API_KEY not configured",
         },
         ipAddress: getRequestIp(request),
         userAgent: request.headers.get("user-agent"),
@@ -223,24 +220,15 @@ export async function POST(request: Request) {
       inviteLink,
     })
 
-    const resendResponse = await fetch(resendApiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL || defaultFromEmail,
-        to: [normalizedInviteEmail],
+    try {
+      await sendPauboxEmail({
+        to: normalizedInviteEmail,
         subject: emailContent.subject,
         html: emailContent.html,
         text: emailContent.text,
-      }),
-    })
-
-    const resendResult = await resendResponse.json().catch(() => null)
-
-    if (!resendResponse.ok) {
+      })
+    } catch (error) {
+      const deliveryError = error instanceof Error ? error.message : "Email delivery failed"
       await writeAuditLog({
         therapistId: owner.id,
         userId: user.id,
@@ -253,7 +241,7 @@ export async function POST(request: Request) {
           invitedEmail: normalizedInviteEmail,
           organizationId: tenant.organizationId,
           emailSent: false,
-          resendError: resendResult?.message || resendResult?.error || "Email delivery failed",
+          pauboxError: deliveryError,
         },
         ipAddress: getRequestIp(request),
         userAgent: request.headers.get("user-agent"),
@@ -264,7 +252,7 @@ export async function POST(request: Request) {
         emailSent: false,
         inviteLink,
         invite,
-        message: resendResult?.message || resendResult?.error || "Invite created. Email delivery failed. Copy invite link manually.",
+        message: deliveryError || "Invite created. Email delivery failed. Copy invite link manually.",
       })
     }
 

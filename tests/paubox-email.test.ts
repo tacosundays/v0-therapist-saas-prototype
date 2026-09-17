@@ -18,9 +18,12 @@ test("Paubox credentials remain server-only and are never sent in message bodies
   assert.doesNotMatch(sender, /JSON\.stringify\([\s\S]*apiKey/)
 })
 
-test("Paubox requests use the verified domain endpoint and multipart content shape", () => {
+test("Paubox requests use the account endpoint username and multipart content shape", () => {
   assert.match(sender, /https:\/\/api\.paubox\.net\/v1/)
-  assert.match(sender, /encodeURIComponent\(sendingDomain\)/)
+  assert.match(sender, /DEFAULT_ENDPOINT_USERNAME = "sessionsteps"/)
+  assert.match(sender, /process\.env\.PAUBOX_ENDPOINT_USERNAME/)
+  assert.match(sender, /encodeURIComponent\(endpointUsername\)/)
+  assert.doesNotMatch(sender, /encodeURIComponent\(sendingDomain\)/)
   assert.match(sender, /recipients/)
   assert.match(sender, /"text\/plain": message\.text/)
   assert.match(sender, /"text\/html": message\.html/)

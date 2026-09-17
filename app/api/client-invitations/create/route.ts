@@ -5,6 +5,7 @@ import { resolveTenantContext } from "@/lib/tenant-context"
 import { getPlanLimits } from "@/lib/plan-limits"
 import { normalizeProductId } from "@/lib/products"
 import { writeAuditLog } from "@/lib/audit-log"
+import { getInviteOrigin } from "@/lib/invitations"
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -181,7 +182,7 @@ export async function POST(request: Request) {
       userAgent: request.headers.get("user-agent"),
     })
 
-    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+    const origin = getInviteOrigin(request)
     const inviteLink = buildClientInviteLink(origin, normalizedClientEmail, inviteToken)
 
     return NextResponse.json({

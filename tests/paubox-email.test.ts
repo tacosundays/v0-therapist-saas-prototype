@@ -4,6 +4,7 @@ import test from "node:test"
 
 const read = (path: string) => readFileSync(path, "utf8")
 const sender = read("lib/email/paubox.ts")
+const invitations = read("lib/invitations.ts")
 const emailRoutes = [
   "app/api/client-invitations/send/route.ts",
   "app/api/client-invitations/resend/route.ts",
@@ -50,4 +51,19 @@ test("team invitations retain a manual-link fallback when email delivery fails",
   assert.match(teamInviteRoute, /emailSent: false/)
   assert.match(teamInviteRoute, /inviteLink/)
   assert.match(teamInviteRoute, /pauboxError/)
+})
+
+test("production invitation links use the canonical SessionSteps domain", () => {
+  assert.match(invitations, /PRODUCTION_APP_ORIGIN = "https:\/\/sessionsteps\.com"/)
+  assert.match(invitations, /process\.env\.NODE_ENV === "production"/)
+  assert.match(invitations, /process\.env\.INVITE_BASE_URL/)
+
+  for (const route of [
+    read("app/api/client-invitations/create/route.ts"),
+    read("app/api/client-invitations/resend/route.ts"),
+    read("app/api/team/invites/create/route.ts"),
+  ]) {
+    assert.match(route, /getInviteOrigin\(request\)/)
+    assert.doesNotMatch(route, /request\.headers\.get\("origin"\) \|\| process\.env\.NEXT_PUBLIC_APP_URL/)
+  }
 })

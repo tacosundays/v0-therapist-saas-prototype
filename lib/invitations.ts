@@ -2,6 +2,17 @@ export function normalizeInviteEmail(email: string) {
   return email.trim().toLowerCase()
 }
 
+const PRODUCTION_APP_ORIGIN = "https://sessionsteps.com"
+
+export function getInviteOrigin(request: Request) {
+  const configuredOrigin = process.env.INVITE_BASE_URL?.trim()
+  if (configuredOrigin) return new URL(configuredOrigin).origin
+
+  if (process.env.NODE_ENV === "production") return PRODUCTION_APP_ORIGIN
+
+  return request.headers.get("origin") || new URL(request.url).origin
+}
+
 function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, "0"))

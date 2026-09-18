@@ -4,6 +4,8 @@ interface TherapistInviteEmailProps {
   inviteLink: string
 }
 
+const EMAIL_LOGO_URL = "https://sessionsteps.com/sessionsteps-email-logo.png"
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -44,8 +46,17 @@ export function renderTherapistInviteEmail({ inviterName, practiceName, inviteLi
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e6e8f0;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:28px 32px 16px;">
-                <div style="font-size:22px;font-weight:700;color:#172033;">SessionSteps</div>
-                <div style="font-size:13px;color:#647085;margin-top:4px;">Group Practice team invitation</div>
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="padding-right:12px;vertical-align:middle;">
+                      <img src="${EMAIL_LOGO_URL}" width="48" height="48" alt="SessionSteps" style="display:block;width:48px;height:48px;border:0;border-radius:14px;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:22px;font-weight:700;color:#172033;">SessionSteps</div>
+                      <div style="font-size:13px;color:#647085;margin-top:4px;">Group Practice team invitation</div>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>

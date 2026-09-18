@@ -5,6 +5,8 @@ import test from "node:test"
 const read = (path: string) => readFileSync(path, "utf8")
 const sender = read("lib/email/paubox.ts")
 const invitations = read("lib/invitations.ts")
+const clientTemplate = read("components/emails/client-invite-email.ts")
+const therapistTemplate = read("components/emails/therapist-invite-email.ts")
 const emailRoutes = [
   "app/api/client-invitations/send/route.ts",
   "app/api/client-invitations/resend/route.ts",
@@ -43,6 +45,13 @@ test("all transactional invitation routes share the Paubox sender", () => {
   for (const route of emailRoutes) {
     assert.match(route, /sendPauboxEmail/)
     assert.doesNotMatch(route, /api\.resend\.com|RESEND_API_KEY|RESEND_FROM_EMAIL/)
+  }
+})
+
+test("invitation emails use the hosted SessionSteps logo", () => {
+  for (const template of [clientTemplate, therapistTemplate]) {
+    assert.match(template, /https:\/\/sessionsteps\.com\/sessionsteps-email-logo\.png/)
+    assert.match(template, /alt="SessionSteps"/)
   }
 })
 

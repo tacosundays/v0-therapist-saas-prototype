@@ -530,7 +530,7 @@ export default function SignupPage() {
           </h2>
           <ul className="space-y-4">
             {[
-              "200+ evidence-based worksheets and exercises",
+              "Structured evidence-informed worksheets and exercises",
               "AI-powered homework recommendations",
               "Real-time client progress tracking",
               "Clean, distraction-free client portal",

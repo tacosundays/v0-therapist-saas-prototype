@@ -23,7 +23,7 @@ export const PRODUCTS: Product[] = [
     priceEnvVar: "STRIPE_SOLO_PRICE_ID",
     features: [
       "Up to 25 active clients",
-      "Full content library (200+ exercises)",
+      "Structured worksheet and exercise library",
       "Client portal access",
       "Progress tracking",
       "Email support",

@@ -2,19 +2,9 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createSessionSummaryFingerprint } from "@/lib/session-summary-cache"
 import { resolveTenantContext } from "@/lib/tenant-context"
+import { normalizeSessionSummary, type SessionSummarySections } from "@/lib/session-summary-normalization"
 
 const defaultModel = "gpt-4o-mini"
-
-interface SessionSummarySections {
-  clientOverview: string
-  progressSinceLastSession: string
-  moodTrends: string
-  reflectionThemes: string
-  homeworkProgress: string
-  suggestedDiscussionTopics: string[]
-  suggestedInterventions: Array<{ name: string; rationale: string }>
-  homeworkRecommendation: { title: string; rationale: string } | null
-}
 
 function getBearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || ""
@@ -46,48 +36,6 @@ function buildSummaryText(summary: SessionSummarySections) {
     `Suggested Interventions\n${summary.suggestedInterventions.map((item) => `- ${item.name}: ${item.rationale}`).join("\n")}`,
     `Homework Recommendation\n${summary.homeworkRecommendation ? `${summary.homeworkRecommendation.title}: ${summary.homeworkRecommendation.rationale}` : "No recommendation available."}`,
   ].join("\n\n")
-}
-
-function normalizeSummary(rawSummary: unknown): SessionSummarySections {
-  const value = rawSummary && typeof rawSummary === "object" ? rawSummary as Partial<SessionSummarySections> : {}
-  const fallback = "No relevant data was available in the provided client record."
-
-  return {
-    clientOverview: typeof value.clientOverview === "string" && value.clientOverview.trim() ? value.clientOverview.trim() : fallback,
-    progressSinceLastSession: typeof value.progressSinceLastSession === "string" && value.progressSinceLastSession.trim()
-      ? value.progressSinceLastSession.trim()
-      : fallback,
-    moodTrends: typeof value.moodTrends === "string" && value.moodTrends.trim() ? value.moodTrends.trim() : fallback,
-    reflectionThemes: typeof value.reflectionThemes === "string" && value.reflectionThemes.trim() ? value.reflectionThemes.trim() : fallback,
-    homeworkProgress: typeof value.homeworkProgress === "string" && value.homeworkProgress.trim() ? value.homeworkProgress.trim() : fallback,
-    suggestedDiscussionTopics: Array.isArray(value.suggestedDiscussionTopics)
-      ? value.suggestedDiscussionTopics
-          .filter((topic): topic is string => typeof topic === "string" && topic.trim().length > 0)
-          .map((topic) => topic.trim())
-          .slice(0, 6)
-      : [],
-    suggestedInterventions: Array.isArray(value.suggestedInterventions)
-      ? value.suggestedInterventions
-          .filter((item): item is { name: string; rationale: string } => (
-            Boolean(item)
-            && typeof item === "object"
-            && typeof (item as { name?: unknown }).name === "string"
-            && typeof (item as { rationale?: unknown }).rationale === "string"
-          ))
-          .map((item) => ({ name: item.name.trim(), rationale: item.rationale.trim() }))
-          .filter((item) => item.name && item.rationale)
-          .slice(0, 5)
-      : [],
-    homeworkRecommendation: value.homeworkRecommendation
-      && typeof value.homeworkRecommendation === "object"
-      && typeof value.homeworkRecommendation.title === "string"
-      && typeof value.homeworkRecommendation.rationale === "string"
-      ? {
-          title: value.homeworkRecommendation.title.trim(),
-          rationale: value.homeworkRecommendation.rationale.trim(),
-        }
-      : null,
-  }
 }
 
 async function fetchOptionalData<T>(
@@ -400,7 +348,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `OpenAI returned invalid JSON: ${getErrorMessage(error)}` }, { status: 502 })
     }
 
-    const summary = normalizeSummary(parsedSummary)
+    const summary = normalizeSessionSummary(parsedSummary, sourceCounts)
     const summaryText = buildSummaryText(summary)
 
     const { data: savedSummary, error: saveError } = await adminClient

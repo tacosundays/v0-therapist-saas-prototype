@@ -46,6 +46,7 @@ interface ContentItem {
   created_at: string
   isCustom?: boolean
   isInteractive?: boolean
+  isPremade?: boolean
 }
 
 const categories = [
@@ -160,10 +161,18 @@ export default function LibraryPage() {
             description: item.description,
             content: null,
             created_at: item.created_at,
-            isCustom: true,
+            isCustom: item.source_type !== "premade",
             isInteractive: true,
+            isPremade: item.source_type === "premade",
           }))
           customContent = [...templateItems, ...customContent]
+
+          const interactiveTitles = new Set(templateItems.map((item) => item.title.toLowerCase()))
+          builtInContent?.splice(
+            0,
+            builtInContent.length,
+            ...builtInContent.filter((item) => !interactiveTitles.has(item.title.toLowerCase())),
+          )
         }
       }
 

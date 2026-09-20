@@ -181,7 +181,8 @@ export function ViewWorksheetModal({
   }
 
   const handleAssign = () => {
-    onAssign()
+    onOpenChange(false)
+    window.setTimeout(onAssign, 200)
   }
 
   const categoryColors: Record<string, string> = {

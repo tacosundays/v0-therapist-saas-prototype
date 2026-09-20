@@ -87,23 +87,11 @@ export default function LibraryPage() {
   const [isCreateWorksheetOpen, setIsCreateWorksheetOpen] = useState(false)
   const [isAssignWorksheetOpen, setIsAssignWorksheetOpen] = useState(false)
   const [isViewWorksheetOpen, setIsViewWorksheetOpen] = useState(false)
-  const [assignAfterPreviewCloses, setAssignAfterPreviewCloses] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchContent()
   }, [])
-
-  useEffect(() => {
-    if (isViewWorksheetOpen || !assignAfterPreviewCloses) return
-
-    const frame = requestAnimationFrame(() => {
-      setAssignAfterPreviewCloses(false)
-      setIsAssignWorksheetOpen(true)
-    })
-
-    return () => cancelAnimationFrame(frame)
-  }, [assignAfterPreviewCloses, isViewWorksheetOpen])
 
   const fetchContent = async () => {
     setIsLoading(true)
@@ -434,8 +422,7 @@ export default function LibraryPage() {
         onOpenChange={setIsViewWorksheetOpen}
         worksheetId={selectedTemplateId}
         onAssign={() => {
-          setAssignAfterPreviewCloses(true)
-          setIsViewWorksheetOpen(false)
+          setIsAssignWorksheetOpen(true)
         }}
         onDeleted={fetchContent}
       />

@@ -60,19 +60,7 @@ export function AssignWorksheetModal({
   const [isFetching, setIsFetching] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (open) {
-      fetchData()
-      if (preselectedClientId) {
-        setSelectedClient(preselectedClientId)
-      }
-      if (preselectedTemplateId) {
-        setSelectedTemplate(preselectedTemplateId)
-      }
-    }
-  }, [open, preselectedClientId, preselectedTemplateId])
-
-  const fetchData = async () => {
+  async function fetchData() {
     setIsFetching(true)
     try {
       const supabase = getClient() as any
@@ -111,6 +99,18 @@ export function AssignWorksheetModal({
       setIsFetching(false)
     }
   }
+
+  useEffect(() => {
+    if (open) {
+      fetchData()
+      if (preselectedClientId) {
+        setSelectedClient(preselectedClientId)
+      }
+      if (preselectedTemplateId) {
+        setSelectedTemplate(preselectedTemplateId)
+      }
+    }
+  }, [open, preselectedClientId, preselectedTemplateId])
 
   const handleSubmit = async () => {
     if (!selectedClient || !selectedTemplate) {

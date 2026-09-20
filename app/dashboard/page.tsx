@@ -155,9 +155,9 @@ function formatTime(value: Date | null) {
   return value?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) || "All day"
 }
 
-function formatActivityTime(value: string) {
+function formatActivityTime(value: string, referenceTime: number) {
   const date = new Date(value)
-  const diff = Date.now() - date.getTime()
+  const diff = referenceTime - date.getTime()
   const hours = Math.floor(diff / (60 * 60 * 1000))
   if (hours < 1) return "Just now"
   if (hours < 24) return `${hours}h ago`
@@ -187,6 +187,7 @@ export default function DashboardPage() {
   const [addClientOpen, setAddClientOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
+  const [referenceTime, setReferenceTime] = useState(0)
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true)
@@ -201,6 +202,7 @@ export default function DashboardPage() {
       setMoods(demoMoodCheckIns)
       setSummaries([])
       setCalendar(demoCalendarPayload)
+      setReferenceTime(Date.now())
       setIsLoading(false)
       return
     }
@@ -269,6 +271,7 @@ export default function DashboardPage() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The dashboard could not be loaded.")
     } finally {
+      setReferenceTime(Date.now())
       setIsLoading(false)
     }
   }, [isDemoMode])
@@ -283,11 +286,11 @@ export default function DashboardPage() {
 
   const nextSession = todaySessions.find((session) => {
     const start = calendarDate(session)
-    return session.matchedClient && start && start.getTime() >= Date.now()
+    return session.matchedClient && start && start.getTime() >= referenceTime
   }) || todaySessions.find((session) => session.matchedClient) || null
 
   const attentionClients = useMemo<AttentionClient[]>(() => {
-    const now = new Date()
+    const now = new Date(referenceTime)
     return clients.map((client) => {
       const clientAssignments = assignments.filter((item) => item.client_id === client.id)
       const overdueHomeworkCount = clientAssignments.filter((item) => (
@@ -325,10 +328,10 @@ export default function DashboardPage() {
 
       return { client, ...result, lastActivityAt }
     }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 5)
-  }, [assignments, calendar, clients, moods, reflections, worksheetAssignments])
+  }, [assignments, calendar, clients, moods, referenceTime, reflections, worksheetAssignments])
 
   const overdueCount = assignments.filter((item) => (
-    !isCompleted(item) && item.due_date && new Date(item.due_date).getTime() < Date.now()
+    !isCompleted(item) && item.due_date && new Date(item.due_date).getTime() < referenceTime
   )).length
   const moodAlertCount = attentionClients.filter((item) => item.significantMoodAlert).length
   const activeClients = clients.filter((client) => client.status !== "inactive").length
@@ -337,13 +340,13 @@ export default function DashboardPage() {
     + worksheetAssignments.filter((item) => item.status === "completed" || Boolean(item.completed_at)).length
   const homeworkCompletion = totalHomework ? Math.round((completedHomework / totalHomework) * 100) : 0
   const engagedClients = clients.filter((client) => {
-    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000
+    const cutoff = referenceTime - 14 * 24 * 60 * 60 * 1000
     return reflections.some((item) => item.client_id === client.id && new Date(item.created_at).getTime() >= cutoff)
       || moods.some((item) => item.client_id === client.id && new Date(item.created_at).getTime() >= cutoff)
       || assignments.some((item) => item.client_id === client.id && item.completed_at && new Date(item.completed_at).getTime() >= cutoff)
   }).length
   const engagementScore = clients.length ? Math.round((engagedClients / clients.length) * 100) : 0
-  const todayStart = new Date()
+  const todayStart = new Date(referenceTime)
   todayStart.setHours(0, 0, 0, 0)
   const preparedToday = summaries.filter((summary) => new Date(summary.created_at).getTime() >= todayStart.getTime()).length
 
@@ -403,7 +406,8 @@ export default function DashboardPage() {
     ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 8)
   }, [assignments, clients, moods, reflections, worksheetAssignments])
 
-  const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"
+  const currentHour = new Date(referenceTime).getHours()
+  const greeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening"
   const firstName = user?.user_metadata?.first_name
     || user?.user_metadata?.full_name?.split(" ")[0]
     || (isDemoMode ? "Emily" : "there")
@@ -412,7 +416,7 @@ export default function DashboardPage() {
     : "/dashboard/calendar"
   const nextSessionDate = nextSession ? calendarDate(nextSession) : null
   const minutesUntilNextSession = nextSessionDate
-    ? Math.max(0, Math.round((nextSessionDate.getTime() - Date.now()) / (60 * 1000)))
+    ? Math.max(0, Math.round((nextSessionDate.getTime() - referenceTime) / (60 * 1000)))
     : null
   const dynamicGreeting = minutesUntilNextSession !== null && minutesUntilNextSession <= 180
     ? `Your next session begins ${minutesUntilNextSession === 0 ? "now" : `in ${minutesUntilNextSession} minute${minutesUntilNextSession === 1 ? "" : "s"}`}.`
@@ -528,7 +532,7 @@ export default function DashboardPage() {
                         <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700">Score {item.score}</span>
                       </div>
                       <p className="mt-1 text-xs font-medium text-muted-foreground">
-                        Last activity: {item.lastActivityAt ? formatActivityTime(item.lastActivityAt) : "No activity yet"}
+                        Last activity: {item.lastActivityAt ? formatActivityTime(item.lastActivityAt, referenceTime) : "No activity yet"}
                       </p>
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.reasons.slice(0, 3).join(" · ")}</p>
                     </div>
@@ -595,7 +599,7 @@ export default function DashboardPage() {
                     <Link key={item.id} href={`/dashboard/clients/${item.clientId}/session-prep`} className="flex gap-3 rounded-2xl border border-transparent p-3 transition-colors hover:border-border hover:bg-muted/30">
                       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.tone}`}><Icon className="h-5 w-5" /></span>
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-semibold text-foreground">{item.clientName}</span><span className="shrink-0 text-xs text-muted-foreground">{formatActivityTime(item.at)}</span></span>
+                        <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-semibold text-foreground">{item.clientName}</span><span className="shrink-0 text-xs text-muted-foreground">{formatActivityTime(item.at, referenceTime)}</span></span>
                         <span className="mt-0.5 block text-xs font-medium text-muted-foreground">{item.label}</span>
                         <span className="mt-1 block truncate text-xs text-muted-foreground">{item.detail}</span>
                       </span>

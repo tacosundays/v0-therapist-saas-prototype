@@ -18,6 +18,7 @@ interface SubscriptionData {
 
 export function SubscriptionBanner() {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
+  const [subscriptionCheckedAt, setSubscriptionCheckedAt] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function SubscriptionBanner() {
       try {
         const data = await getSubscriptionStatus()
         setSubscriptionData(data)
+        setSubscriptionCheckedAt(Date.now())
       } catch (error) {
         console.error("Error fetching subscription:", error)
       } finally {
@@ -49,7 +51,7 @@ export function SubscriptionBanner() {
   // Trial banner
   if (subscription?.isInTrial && subscription.trialEndDate) {
     const daysLeft = Math.ceil(
-      (new Date(subscription.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (new Date(subscription.trialEndDate).getTime() - subscriptionCheckedAt) / (1000 * 60 * 60 * 24)
     )
 
     if (daysLeft <= 0) {

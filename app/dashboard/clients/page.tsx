@@ -101,6 +101,7 @@ export default function ClientsPage() {
   const [clientReflections, setClientReflections] = useState<ClientReflection[]>([])
   const [resendingClientId, setResendingClientId] = useState<string | null>(null)
   const [clientActionMessage, setClientActionMessage] = useState<string | null>(null)
+  const [referenceTime, setReferenceTime] = useState(0)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
@@ -200,6 +201,7 @@ export default function ClientsPage() {
       console.error("Exception fetching data:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
     } finally {
+      setReferenceTime(Date.now())
       setIsLoading(false)
     }
   }, [isDemoMode])
@@ -312,7 +314,7 @@ export default function ClientsPage() {
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : null
     
     // Check for overdue assignments
-    const now = new Date()
+    const now = new Date(referenceTime)
     const overdue = clientAssignments.filter(a => {
       if (a.completed || !a.due_date) return false
       return new Date(a.due_date) < now
@@ -328,7 +330,7 @@ export default function ClientsPage() {
 
   const getDaysSince = (date: string | null) => {
     if (!date) return null
-    return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
+    return Math.floor((referenceTime - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
   }
 
   const formatRelativeDate = (date: string | null) => {

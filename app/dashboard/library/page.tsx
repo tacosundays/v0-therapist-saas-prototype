@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -89,11 +89,7 @@ export default function LibraryPage() {
   const [isViewWorksheetOpen, setIsViewWorksheetOpen] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchContent()
-  }, [])
-
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     
@@ -114,6 +110,7 @@ export default function LibraryPage() {
 
       // Fetch custom worksheets if user is logged in
       let customContent: ContentItem[] = []
+      let availableBuiltInContent = builtInContent || []
       if (user) {
         const { therapistId, userEmail } = await getTherapistId()
 
@@ -168,21 +165,23 @@ export default function LibraryPage() {
           customContent = [...templateItems, ...customContent]
 
           const interactiveTitles = new Set(templateItems.map((item) => item.title.toLowerCase()))
-          builtInContent?.splice(
-            0,
-            builtInContent.length,
-            ...builtInContent.filter((item) => !interactiveTitles.has(item.title.toLowerCase())),
+          availableBuiltInContent = availableBuiltInContent.filter(
+            (item) => !interactiveTitles.has(item.title.toLowerCase()),
           )
         }
       }
 
-      setContentItems([...customContent, ...(builtInContent || [])])
+      setContentItems([...customContent, ...availableBuiltInContent])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load content")
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchContent()
+  }, [fetchContent])
 
   const handleAssignClick = (item: ContentItem, e?: React.MouseEvent) => {
     e?.stopPropagation()

@@ -96,13 +96,7 @@ export function ViewWorksheetModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  useEffect(() => {
-    if (open && worksheetId) {
-      fetchWorksheet()
-    }
-  }, [open, worksheetId])
-
-  const fetchWorksheet = async () => {
+  async function fetchWorksheet() {
     if (!worksheetId) return
 
     setIsLoading(true)
@@ -144,6 +138,12 @@ export function ViewWorksheetModal({
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (open && worksheetId) {
+      fetchWorksheet()
+    }
+  }, [open, worksheetId])
 
   const handleDelete = async () => {
     if (!worksheetId) return

@@ -75,10 +75,6 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasUnsavedChanges = useRef(false)
 
-  useEffect(() => {
-    fetchWorksheetData()
-  }, [assignmentId])
-
   // Auto-save function
   const saveProgress = useCallback(async (answersToSave: Record<string, string | string[] | number>) => {
     if (Object.keys(answersToSave).length === 0) return
@@ -259,6 +255,10 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchWorksheetData()
+  }, [assignmentId])
 
   const updateAnswer = (questionId: string, value: string | string[] | number) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))

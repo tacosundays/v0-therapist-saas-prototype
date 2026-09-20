@@ -39,14 +39,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const [planId, setPlanId] = useState<string | null>(null)
   const [isCheckingLimits, setIsCheckingLimits] = useState(true)
 
-  // Check plan limits when modal opens
-  useEffect(() => {
-    if (open) {
-      checkPlanLimits()
-    }
-  }, [open])
-
-  const checkPlanLimits = async () => {
+  async function checkPlanLimits() {
     setIsCheckingLimits(true)
     try {
       const supabase = getClient() as any
@@ -95,6 +88,13 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
       setIsCheckingLimits(false)
     }
   }
+
+  // Check plan limits when modal opens
+  useEffect(() => {
+    if (open) {
+      checkPlanLimits()
+    }
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

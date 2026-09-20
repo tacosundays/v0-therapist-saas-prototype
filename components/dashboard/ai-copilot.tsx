@@ -371,13 +371,6 @@ export function AiCopilot() {
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({})
   const [hasLoadedBrief, setHasLoadedBrief] = useState(false)
 
-  useEffect(() => {
-    if (open && !hasLoadedBrief && messages.length === 0) {
-      setHasLoadedBrief(true)
-      askCopilot("Daily Brief", { silentUserMessage: true })
-    }
-  }, [open, hasLoadedBrief, messages.length])
-
   const askCopilot = async (
     nextQuestion?: string,
     options?: { silentUserMessage?: boolean },
@@ -460,6 +453,13 @@ export function AiCopilot() {
       setLoadingPrompt(null)
     }
   }
+
+  useEffect(() => {
+    if (open && !hasLoadedBrief && messages.length === 0) {
+      setHasLoadedBrief(true)
+      askCopilot("Daily Brief", { silentUserMessage: true })
+    }
+  }, [open, hasLoadedBrief, messages.length])
 
   const copySummary = async (message: ChatMessage) => {
     if (!message.result) return

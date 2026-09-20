@@ -22,7 +22,7 @@ const activityEvents = ["mousemove", "click", "keydown", "touchstart"] as const
 
 export function SessionTimeout() {
   const [isWarningOpen, setIsWarningOpen] = useState(false)
-  const lastActivityAt = useRef(Date.now())
+  const lastActivityAt = useRef(0)
   const isSigningOut = useRef(false)
 
   const signOut = useCallback(async () => {
@@ -42,6 +42,8 @@ export function SessionTimeout() {
   }, [])
 
   useEffect(() => {
+    lastActivityAt.current = Date.now()
+
     activityEvents.forEach((eventName) => {
       window.addEventListener(eventName, resetTimer, { passive: true })
     })

@@ -57,23 +57,7 @@ export function AssignHomeworkModal({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  // Fetch clients when modal opens
-  useEffect(() => {
-    if (open) {
-      fetchClients()
-      if (preselectedClientId) {
-        setSelectedClientId(preselectedClientId)
-      }
-      if (prefilledTitle) {
-        setTitle(prefilledTitle)
-      }
-      if (prefilledDescription) {
-        setDescription(prefilledDescription)
-      }
-    }
-  }, [open, preselectedClientId, prefilledTitle, prefilledDescription])
-
-  const fetchClients = async () => {
+  async function fetchClients() {
     setIsLoadingClients(true)
     try {
       const supabase = getClient() as any
@@ -107,6 +91,22 @@ export function AssignHomeworkModal({
       setIsLoadingClients(false)
     }
   }
+
+  // Fetch clients when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchClients()
+      if (preselectedClientId) {
+        setSelectedClientId(preselectedClientId)
+      }
+      if (prefilledTitle) {
+        setTitle(prefilledTitle)
+      }
+      if (prefilledDescription) {
+        setDescription(prefilledDescription)
+      }
+    }
+  }, [open, preselectedClientId, prefilledTitle, prefilledDescription])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

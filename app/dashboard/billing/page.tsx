@@ -174,7 +174,7 @@ export default function BillingPage() {
       }
       
       if (result.url) {
-        window.location.href = result.url
+        window.location.assign(result.url)
       }
     } catch (error) {
       console.error("Checkout error:", error)

@@ -64,13 +64,7 @@ export function ViewResponsesModal({ open, onOpenChange, assignmentId }: ViewRes
   const [responses, setResponses] = useState<Response[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (open && assignmentId) {
-      fetchData()
-    }
-  }, [open, assignmentId])
-
-  const fetchData = async () => {
+  async function fetchData() {
     if (!assignmentId) return
 
     setIsLoading(true)
@@ -121,6 +115,12 @@ export function ViewResponsesModal({ open, onOpenChange, assignmentId }: ViewRes
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (open && assignmentId) {
+      fetchData()
+    }
+  }, [open, assignmentId])
 
   const getResponseForQuestion = (questionId: string) => {
     return responses.find(r => r.question_id === questionId)

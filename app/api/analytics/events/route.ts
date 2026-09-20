@@ -34,6 +34,12 @@ export async function POST(request: Request) {
     properties: sanitizeAnalyticsProperties(body.properties),
   }, sessionId)
 
-  if (error) return NextResponse.json({ error: "Event could not be recorded" }, { status: 500 })
+  if (error) {
+    console.warn("[product-analytics] Event write failed", {
+      code: "code" in error && typeof error.code === "string" ? error.code : "unknown",
+      message: typeof error.message === "string" ? error.message : "Unknown analytics storage error",
+    })
+    return NextResponse.json({ recorded: false }, { status: 202 })
+  }
   return NextResponse.json({ recorded: true }, { status: 202 })
 }

@@ -49,3 +49,10 @@ test("analytics migration is server-only and explicitly constrains event payload
   assert.match(migration, /octet_length\(properties::text\) <= 1024/)
   assert.doesNotMatch(migration, /reflection_text|session_prep_notes|mood_checkins/)
 })
+
+test("client analytics storage failures remain best-effort and non-blocking", () => {
+  const route = readFileSync(new URL("../app/api/analytics/events/route.ts", import.meta.url), "utf8")
+  assert.match(route, /Event write failed/)
+  assert.match(route, /recorded: false[\s\S]*status: 202/)
+  assert.doesNotMatch(route, /Event could not be recorded[\s\S]*status: 500/)
+})

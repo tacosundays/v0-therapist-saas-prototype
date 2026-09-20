@@ -2,13 +2,16 @@
   "name": "my-project",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --pretty false",
-    "test:security": "node --test --experimental-strip-types tests/*.test.ts"
+    "test:security": "node --test --experimental-strip-types tests/*.test.ts",
+    "check:whitespace": "git diff --check",
+    "validate": "npm run lint && npm run typecheck && npm run test:security && npm run check:whitespace && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

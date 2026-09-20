@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { parseCopilotRequest } from "@/lib/ai-copilot-request"
+import { checkRateLimit } from "@/lib/security/rate-limit"
+import { getBearerToken, getRequestIp } from "@/lib/security/request"
 import { resolveTenantContext } from "@/lib/tenant-context"
 
 const defaultModel = "gpt-4o-mini"
 const disclaimer = "AI suggestions are for therapist review and do not replace clinical judgment."
+const ipLimit = 30
+const ipWindowMs = 60_000
+const userLimit = 30
+const userWindowMs = 10 * 60_000
 
 type CopilotSection = {
   summary: string
@@ -62,11 +69,6 @@ type DatedClientRecord = {
   mood_rating?: number | null
   anxiety_rating?: number | null
   stress_rating?: number | null
-}
-
-function getBearerToken(request: Request) {
-  const authorization = request.headers.get("authorization") || ""
-  return authorization.startsWith("Bearer ") ? authorization.slice(7) : null
 }
 
 function getErrorMessage(error: unknown) {
@@ -304,11 +306,18 @@ function buildDailyBrief(
 
 export async function POST(request: Request) {
   try {
-    const { question, history } = await request.json()
-
-    if (!question || typeof question !== "string" || !question.trim()) {
-      return NextResponse.json({ error: "Missing question" }, { status: 400 })
+    const ipAddress = getRequestIp(request)
+    const ipLimitResult = checkRateLimit(`ai-copilot:ip:${ipAddress}`, ipLimit, ipWindowMs)
+    if (!ipLimitResult.allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
     }
+
+    const rawBody = await request.text()
+    const input = parseCopilotRequest(rawBody)
+    if (!input) {
+      return NextResponse.json({ error: "Invalid AI Copilot request" }, { status: 400 })
+    }
+    const { question, history } = input
 
     const openAiApiKey = process.env.OPENAI_API_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -336,6 +345,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You must be logged in to use AI Copilot" }, { status: 401 })
     }
 
+    const userLimitResult = checkRateLimit(`ai-copilot:user:${user.id}:ip:${ipAddress}`, userLimit, userWindowMs)
+    if (!userLimitResult.allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+    }
+
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
     const tenant = await resolveTenantContext(adminClient, user)
 
@@ -351,7 +365,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (therapistError) {
-      return NextResponse.json({ error: therapistError.message }, { status: 500 })
+      console.error("[v0] AI Copilot: therapist lookup failed", therapistError)
+      return NextResponse.json({ error: "AI Copilot could not load the therapist workspace" }, { status: 500 })
     }
 
     if (!therapist) {
@@ -476,7 +491,7 @@ export async function POST(request: Request) {
         name: therapist.full_name,
       },
       question: question.trim(),
-      currentSessionHistory: Array.isArray(history) ? history.slice(-8) : [],
+      currentSessionHistory: history,
       sourceCounts,
       dailyBrief,
       clients,
@@ -534,8 +549,12 @@ export async function POST(request: Request) {
     const openAiResult = await openAiResponse.json().catch(() => null)
 
     if (!openAiResponse.ok) {
+      console.error("[v0] AI Copilot: provider request failed", {
+        status: openAiResponse.status,
+        error: openAiResult?.error?.message || "Unknown provider error",
+      })
       return NextResponse.json(
-        { error: openAiResult?.error?.message || "OpenAI AI Copilot request failed" },
+        { error: "AI Copilot could not complete the request" },
         { status: 502 },
       )
     }
@@ -550,7 +569,8 @@ export async function POST(request: Request) {
     try {
       parsedResponse = JSON.parse(content)
     } catch (error) {
-      return NextResponse.json({ error: `OpenAI returned invalid JSON: ${getErrorMessage(error)}` }, { status: 502 })
+      console.error("[v0] AI Copilot: provider returned invalid JSON", getErrorMessage(error))
+      return NextResponse.json({ error: "AI Copilot returned an invalid response" }, { status: 502 })
     }
 
     const copilotResponse = normalizeCopilotResponse(parsedResponse, primaryClient)
@@ -569,7 +589,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[v0] AI Copilot: failed", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to run AI Copilot" },
+      { error: "Failed to run AI Copilot" },
       { status: 500 },
     )
   }

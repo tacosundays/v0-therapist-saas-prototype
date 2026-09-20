@@ -25,3 +25,4 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:security
       - run: pnpm check:whitespace
+      - run: pnpm build

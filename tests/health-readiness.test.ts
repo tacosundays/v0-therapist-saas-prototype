@@ -58,4 +58,9 @@ test("production readiness requires the canonical SessionSteps origin", () => {
       billing: true,
     },
   })
+
+  assert.equal(
+    getProductionReadiness(previewOrigin, "https://sessionsteps.com").checks.application,
+    true,
+  )
 })

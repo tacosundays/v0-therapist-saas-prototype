@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getProductionReadiness } from "@/lib/health-readiness"
 
 export const dynamic = "force-dynamic"
 
-export function GET() {
-  const readiness = getProductionReadiness(process.env)
+export function GET(request: NextRequest) {
+  const readiness = getProductionReadiness(process.env, request.nextUrl.origin)
 
   return NextResponse.json(
     {

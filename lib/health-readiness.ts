@@ -2,9 +2,11 @@ function hasValues(environment: NodeJS.ProcessEnv, names: string[]) {
   return names.every((name) => Boolean(environment[name]?.trim()))
 }
 
-export function getProductionReadiness(environment: NodeJS.ProcessEnv) {
+export function getProductionReadiness(environment: NodeJS.ProcessEnv, requestOrigin?: string) {
   const appUrl = environment.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "")
-  const canonicalOrigin = appUrl === "https://sessionsteps.com"
+  const observedOrigin = requestOrigin?.trim().replace(/\/$/, "")
+  const canonicalOrigin =
+    appUrl === "https://sessionsteps.com" || observedOrigin === "https://sessionsteps.com"
   const checks = {
     application: canonicalOrigin,
     database: hasValues(environment, [

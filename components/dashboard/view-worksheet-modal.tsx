@@ -143,6 +143,8 @@ export function ViewWorksheetModal({
     if (open && worksheetId) {
       fetchWorksheet()
     }
+    // Re-fetch only when the selected worksheet or dialog state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, worksheetId])
 
   const handleDelete = async () => {

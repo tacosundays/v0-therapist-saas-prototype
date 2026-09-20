@@ -101,7 +101,7 @@ function logStripeCheckoutEnv(stage: string, productId: string, priceId: string)
   })
 }
 
-export async function startSubscriptionCheckout(productId: string, userData: UserData) {
+export async function startSubscriptionCheckout(productId: string, _userData: UserData) {
   try {
     const normalizedProductId = normalizeProductId(productId)
     const product = normalizedProductId ? getProductById(normalizedProductId) : null
@@ -192,7 +192,7 @@ export async function startSubscriptionCheckout(productId: string, userData: Use
   }
 }
 
-export async function getSubscriptionStatus(userData?: UserData) {
+export async function getSubscriptionStatus(_userData?: UserData) {
   const context = await getBillingContext()
   if (!context) {
     return { status: 'unauthenticated', subscription: null }
@@ -228,7 +228,7 @@ export async function getSubscriptionStatus(userData?: UserData) {
   }
 }
 
-export async function createCustomerPortalSession(userData: UserData) {
+export async function createCustomerPortalSession(_userData: UserData) {
   const context = await getBillingContext(true)
   if (!context) {
     throw new Error('You must be logged in')
@@ -254,7 +254,7 @@ export async function createCustomerPortalSession(userData: UserData) {
 
 // Verify and activate subscription after successful checkout
 // This is a fallback in case the webhook is delayed or not configured
-export async function verifyAndActivateSubscription(sessionId: string, userData: UserData) {
+export async function verifyAndActivateSubscription(sessionId: string, _userData: UserData) {
   if (!sessionId) {
     return { success: false, error: 'Missing required data' }
   }

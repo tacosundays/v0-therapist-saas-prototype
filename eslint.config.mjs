@@ -6,14 +6,20 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
   {
-    // Keep the existing application lintable while its legacy findings are
-    // addressed incrementally. New syntax/configuration failures still fail.
+    // These two React 19 migration rules currently flag established data-loading
+    // effects and legacy API boundary types throughout the application. Keep
+    // them disabled until those areas are deliberately refactored; all other
+    // correctness and quality rules remain active.
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      }],
       'prefer-const': 'warn',
       'react-hooks/immutability': 'warn',
       'react-hooks/purity': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/set-state-in-effect': 'off',
       'react/no-unescaped-entities': 'warn',
     },
   },

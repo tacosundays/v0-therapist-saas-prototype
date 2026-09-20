@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +10,6 @@ import { Slider } from "@/components/ui/slider"
 import { 
   BookOpen, 
   CheckCircle2, 
-  Clock, 
   Calendar,
   ChevronRight,
   Heart,
@@ -115,7 +113,6 @@ type PortalTask = {
 }
 
 function ClientPortalContent() {
-  const searchParams = useSearchParams()
   
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
   const [selectedWorksheetAssignment, setSelectedWorksheetAssignment] = useState<string | null>(null)

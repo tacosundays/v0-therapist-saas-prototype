@@ -27,7 +27,6 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [practiceName, setPracticeName] = useState("")
   const [credentials, setCredentials] = useState("")
-  const [therapistEmail, setTherapistEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showVerificationMessage, setShowVerificationMessage] = useState(false)

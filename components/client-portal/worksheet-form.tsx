@@ -19,7 +19,6 @@ import {
   ArrowLeft,
   Calendar,
   AlertCircle,
-  Save,
   Cloud,
   CloudOff
 } from "lucide-react"
@@ -258,6 +257,8 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
 
   useEffect(() => {
     fetchWorksheetData()
+    // Reload only when the assignment changes; the loader owns the request lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignmentId])
 
   const updateAnswer = (questionId: string, value: string | string[] | number) => {

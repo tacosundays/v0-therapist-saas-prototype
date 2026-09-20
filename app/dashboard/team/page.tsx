@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Copy,
   Loader2,
-  Mail,
   MoreHorizontal,
   Trash2,
   UserPlus,

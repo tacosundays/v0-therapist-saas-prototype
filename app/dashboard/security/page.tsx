@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import { motion } from "framer-motion"
 import {
   AlertCircle,
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
-  Clock,
   Copy,
   Download,
   Globe2,
@@ -521,6 +521,8 @@ export default function SecurityPage() {
     }
 
     loadAuditLogs()
+    // This effect intentionally performs the one-time security-page bootstrap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const verifiedTotpFactor = mfaFactors.find((factor) => factor.factor_type === "totp" && factor.status === "verified")
@@ -1099,7 +1101,7 @@ export default function SecurityPage() {
             {mfaEnrollment && (
               <>
                 <div className="flex justify-center rounded-xl border border-border bg-white p-4">
-                  <img src={qrCodeSrc} alt="Authenticator QR code" className="h-48 w-48" />
+                  <Image src={qrCodeSrc} alt="Authenticator QR code" width={192} height={192} unoptimized className="h-48 w-48" />
                 </div>
                 <div className="rounded-xl bg-muted/40 p-3">
                   <p className="mb-1 text-xs font-medium text-muted-foreground">Manual setup key</p>

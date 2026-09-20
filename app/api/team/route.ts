@@ -3,10 +3,6 @@ import { createClient } from "@supabase/supabase-js"
 import { normalizeProductId } from "@/lib/products"
 import { resolveTenantContext } from "@/lib/tenant-context"
 
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase()
-}
-
 function getBearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || ""
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : null

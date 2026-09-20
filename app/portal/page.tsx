@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   BookOpen, 
   CheckCircle2, 
-  Clock, 
   Calendar,
   ChevronRight,
   Heart,

@@ -46,11 +46,6 @@ type TherapistRecord = {
   status?: string | null
 }
 
-type SupabaseQueryResult<T> = {
-  data: T | null
-  error: { message?: string } | null
-}
-
 type AuthClient = {
   auth: {
     getUser: (token: string) => Promise<{ data: { user: AuthUser | null }; error: { message?: string } | null }>
@@ -65,10 +60,6 @@ type GenerateWorksheetDeps = {
   generateWorksheet: (input: z.infer<typeof requestSchema>) => Promise<unknown>
   audit: typeof writeAuditLog
   rateLimit: typeof checkRateLimit
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase()
 }
 
 function isActiveTherapist(therapist: TherapistRecord) {

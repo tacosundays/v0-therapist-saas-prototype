@@ -66,12 +66,6 @@ interface HomeworkTypePoint {
   color: string
 }
 
-interface EngagementPoint {
-  day: string
-  assignments: number
-  completions: number
-}
-
 const chartColors = [
   "hsl(var(--chart-1))",
   "hsl(var(--chart-2))",

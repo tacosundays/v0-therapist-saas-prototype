@@ -388,9 +388,18 @@ export default function CouplesPage() {
     }
   }
 
-  const selectedCheckIns = selectedCouple ? checkIns.filter((checkIn) => checkIn.couple_id === selectedCouple.id) : []
-  const selectedAssignments = selectedCouple ? assignments.filter((assignment) => assignment.couple_id === selectedCouple.id) : []
-  const selectedNotes = selectedCouple ? notes.filter((note) => note.couple_id === selectedCouple.id) : []
+  const selectedCheckIns = useMemo(
+    () => selectedCouple ? checkIns.filter((checkIn) => checkIn.couple_id === selectedCouple.id) : [],
+    [checkIns, selectedCouple],
+  )
+  const selectedAssignments = useMemo(
+    () => selectedCouple ? assignments.filter((assignment) => assignment.couple_id === selectedCouple.id) : [],
+    [assignments, selectedCouple],
+  )
+  const selectedNotes = useMemo(
+    () => selectedCouple ? notes.filter((note) => note.couple_id === selectedCouple.id) : [],
+    [notes, selectedCouple],
+  )
   const latestWeek = selectedCheckIns[0]?.check_in_week || null
   const latestPartnerOne = selectedCouple && latestWeek
     ? selectedCheckIns.find((checkIn) => checkIn.check_in_week === latestWeek && checkIn.client_id === selectedCouple.partner_1_client_id)

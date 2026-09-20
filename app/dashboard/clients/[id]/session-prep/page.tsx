@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
-import { motion } from "framer-motion"
 import {
   AlertTriangle,
   ArrowLeft,
@@ -631,14 +630,6 @@ export default function SessionPrepPage() {
   const moodLast30Days = moodCheckIns.filter((checkIn) => (
     now.getTime() - new Date(checkIn.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
   ))
-  const moodLast7Days = moodCheckIns.filter((checkIn) => (
-    now.getTime() - new Date(checkIn.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000
-  ))
-  const averageMood = (items: MoodCheckIn[]) => (
-    items.length > 0 ? Number((items.reduce((sum, item) => sum + item.mood_rating, 0) / items.length).toFixed(1)) : null
-  )
-  const averageMood30 = averageMood(moodLast30Days)
-  const averageMood7 = averageMood(moodLast7Days)
   const mostRecentMood = moodCheckIns[0] || null
   const oldestRecentMood = moodCheckIns.length > 1 ? moodCheckIns[Math.min(moodCheckIns.length - 1, 6)] : null
   const moodTrend = mostRecentMood && oldestRecentMood
@@ -665,15 +656,6 @@ export default function SessionPrepPage() {
     + worksheetAssignments.filter((assignment) => assignment.status === "in_progress" || assignment.started_at).length
   const assignedAssignments = Math.max(totalAssignments - completedAssignments - startedAssignments, 0)
   const completionRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0
-  const lastCompletedAssignment = [
-    ...assignments
-      .filter((assignment) => (assignment.completed || assignment.status === "completed") && assignment.completed_at)
-      .map((assignment) => ({ title: assignment.title, completedAt: assignment.completed_at! })),
-    ...worksheetAssignments
-      .filter((assignment) => assignment.status === "completed" && assignment.completed_at)
-      .map((assignment) => ({ title: assignment.worksheet_templates?.title || "Worksheet", completedAt: assignment.completed_at! })),
-  ].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())[0]
-
   const timeline = useMemo(() => {
     const items: TimelineItem[] = []
 
@@ -2076,23 +2058,6 @@ function StatusBadge({ status, tone }: { status: string; tone: string }) {
       : "bg-slate-100 text-slate-600"
 
   return <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status}</span>
-}
-
-function MoodBars({ items }: { items: MoodCheckIn[] }) {
-  if (items.length === 0) return null
-
-  return (
-    <div className="flex h-16 items-end gap-1.5 rounded-2xl bg-slate-50 p-3">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="min-w-0 flex-1 rounded-t-lg bg-primary/70"
-          style={{ height: `${Math.max(12, item.mood_rating * 10)}%` }}
-          title={`${item.mood_rating}/10`}
-        />
-      ))}
-    </div>
-  )
 }
 
 function MoodTrendPanel({ items, trend }: { items: MoodCheckIn[]; trend: string }) {

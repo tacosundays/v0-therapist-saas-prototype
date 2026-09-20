@@ -266,7 +266,7 @@ export function CreateWorksheetModal({ open, onOpenChange, onWorksheetCreated }:
             {questions.length === 0 ? (
               <Card className="rounded-xl border-dashed">
                 <CardContent className="py-8 text-center text-muted-foreground">
-                  <p>No questions yet. Click "Add Question" to start building your worksheet.</p>
+                  <p>No questions yet. Click &quot;Add Question&quot; to start building your worksheet.</p>
                 </CardContent>
               </Card>
             ) : (

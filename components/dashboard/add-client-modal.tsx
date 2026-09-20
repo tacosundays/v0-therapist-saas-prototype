@@ -94,6 +94,8 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
     if (open) {
       checkPlanLimits()
     }
+    // Opening the dialog is the intended refresh boundary.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {

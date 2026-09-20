@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -655,7 +656,7 @@ export default function ClientsPage() {
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       {(client as any).avatar ? (
-                        <img src={(client as any).avatar} alt="" className="h-10 w-10 shrink-0 rounded-full ring-1 ring-primary/15" />
+                        <Image src={(client as any).avatar} alt="" width={40} height={40} unoptimized className="h-10 w-10 shrink-0 rounded-full ring-1 ring-primary/15" />
                       ) : (
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/15">
                           <span className="text-sm font-bold text-primary">{getInitials(client.full_name)}</span>

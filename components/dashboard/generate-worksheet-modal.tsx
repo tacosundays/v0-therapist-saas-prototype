@@ -69,7 +69,7 @@ export function GenerateWorksheetModal({
   const [clientIssue, setClientIssue] = useState("")
   const [category, setCategory] = useState("cbt")
   const [worksheet, setWorksheet] = useState<GeneratedWorksheet | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   

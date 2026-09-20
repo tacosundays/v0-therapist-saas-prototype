@@ -3,10 +3,6 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { resolveTenantContext } from "@/lib/tenant-context"
 
-function normalizeEmail(email: string | null | undefined) {
-  return email ? email.trim().toLowerCase() : null
-}
-
 function normalizeRecoveryCode(code: string) {
   return code.trim().toUpperCase().replace(/\s+/g, "").replace(/-/g, "")
 }

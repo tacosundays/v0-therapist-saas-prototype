@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -120,6 +120,8 @@ export function ViewResponsesModal({ open, onOpenChange, assignmentId }: ViewRes
     if (open && assignmentId) {
       fetchData()
     }
+    // Re-fetch only when the selected assignment or dialog state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, assignmentId])
 
   const getResponseForQuestion = (questionId: string) => {

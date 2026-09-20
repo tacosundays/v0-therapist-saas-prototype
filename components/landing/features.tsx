@@ -127,7 +127,7 @@ export function Features() {
             Built for the homework workflow therapists actually use
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
-            Assignments, reflections, mood check-ins, session prep, and team support stay connected around each therapist's own clients.
+            Assignments, reflections, mood check-ins, session prep, and team support stay connected around each therapist&apos;s own clients.
           </p>
         </motion.div>
 

@@ -7,7 +7,6 @@ import {
   DatabaseBackup,
   FileArchive,
   FileText,
-  KeyRound,
   LifeBuoy,
   LockKeyhole,
   ServerCog,

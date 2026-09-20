@@ -15,7 +15,7 @@ export async function resolveTenantContext(
   admin: AdminClient,
   user: { id: string; email?: string | null },
 ): Promise<TenantContext | null> {
-  let therapistQuery = admin
+  const therapistQuery = admin
     .from("therapists")
     .select("id, organization_id, auth_user_id")
     .eq("auth_user_id", user.id)

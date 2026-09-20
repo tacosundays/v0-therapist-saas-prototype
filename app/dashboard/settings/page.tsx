@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -146,7 +147,6 @@ export default function SettingsPage() {
         setEmail(record?.email || userEmail || "")
         setCredentials(record?.credentials || "")
         setProfilePhotoUrl(getPhotoUrl(record))
-        await loadCalendarConnection()
       } catch (err) {
         console.error("[v0] Settings: failed to load therapist", err)
         setError(err instanceof Error ? err.message : "Failed to load settings")
@@ -172,13 +172,13 @@ export default function SettingsPage() {
     }
   }, [])
 
-  const getAuthHeader = async () => {
+  const getAuthHeader = useCallback(async () => {
     const supabase = getClient()
     const { data: { session } } = await supabase.auth.getSession()
     return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : null
-  }
+  }, [])
 
-  const loadCalendarConnection = async () => {
+  const loadCalendarConnection = useCallback(async () => {
     setIsCalendarLoading(true)
     setCalendarError(null)
 
@@ -202,7 +202,11 @@ export default function SettingsPage() {
     } finally {
       setIsCalendarLoading(false)
     }
-  }
+  }, [getAuthHeader])
+
+  useEffect(() => {
+    void loadCalendarConnection()
+  }, [loadCalendarConnection])
 
   const connectGoogleCalendar = async () => {
     setIsCalendarManaging(true)
@@ -492,7 +496,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-3xl bg-primary/10 ring-1 ring-primary/15">
                     {profilePhotoUrl ? (
-                      <img src={profilePhotoUrl} alt="Profile" className="w-full h-full object-cover" />
+                      <Image src={profilePhotoUrl} alt="Profile" width={64} height={64} unoptimized className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-xl font-bold text-primary">{initials}</span>
                     )}

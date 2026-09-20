@@ -7,7 +7,7 @@ type SessionStepsMarkProps = {
 }
 
 export function SessionStepsMark({ className, title }: SessionStepsMarkProps) {
-  return <BrandMark className={cn("shrink-0", className)} />
+  return <BrandMark className={cn("shrink-0", className)} aria-label={title} />
 }
 
 type SessionStepsLogoProps = {

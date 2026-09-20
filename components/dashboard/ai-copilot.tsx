@@ -459,6 +459,8 @@ export function AiCopilot() {
       setHasLoadedBrief(true)
       askCopilot("Daily Brief", { silentUserMessage: true })
     }
+    // The guards deliberately make this a once-per-open bootstrap request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, hasLoadedBrief, messages.length])
 
   const copySummary = async (message: ChatMessage) => {

@@ -6,7 +6,8 @@
 - Confirm signed BAAs are retained for every vendor that may handle protected health information.
 - Verify production secrets, Stripe live-mode products/webhook, Paubox sender domain, Supabase redirect URLs, and the canonical `NEXT_PUBLIC_APP_URL`.
 - Run the Supabase preflight, migrations, cross-tenant RLS rehearsal, and postflight against the production project; retain the results.
-- Exercise backup restoration in a non-production environment and record recovery time and recovery point.
+- Exercise backup restoration in a non-production environment and record recovery time and recovery point using `docs/backup-recovery-runbook.md`.
+- Inventory Supabase Storage and run the direct object-copy recovery drill whenever irreplaceable uploads are retained.
 - Configure uptime monitoring for `/api/health`, error alerting, database alerts, and an on-call recipient.
 - Complete end-to-end acceptance tests with fresh therapist and client accounts on desktop and mobile.
 - Confirm support ownership, response targets, refund/cancellation process, and incident escalation contacts.
@@ -31,5 +32,5 @@
 ## Recurring operations
 
 - Monthly: review access, inactive accounts, audit events, dependency advisories, email reputation, and payment failures.
-- Quarterly: restore a backup, review vendors and BAAs, test incident response, and run tenant-isolation tests.
+- Quarterly: restore a backup using `docs/backup-recovery-runbook.md`, review vendors and BAAs, test incident response, and run tenant-isolation tests.
 - Annually: obtain legal and security review and update public policies.

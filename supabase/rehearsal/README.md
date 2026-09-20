@@ -18,6 +18,10 @@ Order:
 7. Compare therapist, client, practice, membership, and Stripe counts to the
    preflight output.
 
+For a quarterly backup restore exercise, follow
+`docs/backup-recovery-runbook.md` and run `004_restore_verification.sql` against
+the restored non-production project before connecting an application preview.
+
 Rollback criteria:
 
 - Roll back immediately if a therapist has zero or multiple active tenants,

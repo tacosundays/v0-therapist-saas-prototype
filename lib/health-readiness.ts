@@ -1,26 +1,33 @@
-const requiredProductionVariables = [
-  "NEXT_PUBLIC_APP_URL",
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "OPENAI_API_KEY",
-  "PAUBOX_API_KEY",
-  "PAUBOX_ENDPOINT_USERNAME",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_SOLO_PRICE_ID",
-  "STRIPE_GROUP_PRICE_ID",
-  "STRIPE_GROWING_PRICE_ID",
-] as const
+function hasValues(environment: NodeJS.ProcessEnv, names: string[]) {
+  return names.every((name) => Boolean(environment[name]?.trim()))
+}
 
 export function getProductionReadiness(environment: NodeJS.ProcessEnv) {
-  const configured = requiredProductionVariables.every((name) => Boolean(environment[name]?.trim()))
   const appUrl = environment.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "")
   const canonicalOrigin = appUrl === "https://sessionsteps.com"
+  const checks = {
+    application: canonicalOrigin,
+    database: hasValues(environment, [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ]),
+    ai: hasValues(environment, ["OPENAI_API_KEY"]),
+    email: hasValues(environment, ["PAUBOX_API_KEY", "PAUBOX_ENDPOINT_USERNAME"]),
+    billing: hasValues(environment, [
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_SOLO_PRICE_ID",
+      "STRIPE_GROUP_PRICE_ID",
+      "STRIPE_GROWING_PRICE_ID",
+    ]),
+  }
+  const configured = Object.values(checks).every(Boolean)
 
   return {
-    ready: configured && canonicalOrigin,
+    ready: configured,
     configured,
     canonicalOrigin,
+    checks,
   }
 }

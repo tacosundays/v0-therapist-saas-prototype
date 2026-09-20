@@ -25,6 +25,13 @@ test("production readiness requires the complete launch configuration", () => {
     ready: true,
     configured: true,
     canonicalOrigin: true,
+    checks: {
+      application: true,
+      database: true,
+      ai: true,
+      email: true,
+      billing: true,
+    },
   })
 
   const missingPaubox = completeEnvironment()
@@ -38,7 +45,14 @@ test("production readiness requires the canonical SessionSteps origin", () => {
 
   assert.deepEqual(getProductionReadiness(previewOrigin), {
     ready: false,
-    configured: true,
+    configured: false,
     canonicalOrigin: false,
+    checks: {
+      application: false,
+      database: true,
+      ai: true,
+      email: true,
+      billing: true,
+    },
   })
 })

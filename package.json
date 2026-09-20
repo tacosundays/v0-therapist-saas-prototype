@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --pretty false",
     "test:security": "node --test --experimental-strip-types tests/*.test.ts",
+    "monitor:production": "node scripts/check-production.mjs",
     "check:whitespace": "git diff --check",
     "validate": "npm run lint && npm run typecheck && npm run test:security && npm run check:whitespace && npm run build"
   },

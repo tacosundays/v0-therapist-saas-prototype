@@ -1,0 +1,100 @@
+name: Production monitor
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check production
+        id: production
+        continue-on-error: true
+        run: node scripts/check-production.mjs 2>&1 | tee production-monitor-report.txt
+
+      - name: Open or update incident
+        if: steps.production.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const title = '[Production monitor] SessionSteps availability failure'
+            const report = fs.readFileSync('production-monitor-report.txt', 'utf8').slice(-6000)
+            const body = [
+              'The automated SessionSteps production monitor detected a failure.',
+              '',
+              '```text',
+              report,
+              '```',
+              '',
+              `Workflow: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n')
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            })
+            const existing = issues.find(issue => issue.title === title && !issue.pull_request)
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              })
+            }
+
+      - name: Close recovered incident
+        if: steps.production.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '[Production monitor] SessionSteps availability failure'
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            })
+            const existing = issues.find(issue => issue.title === title && !issue.pull_request)
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Production recovered. All automated checks passed in workflow run ${context.runId}.`,
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                state: 'closed',
+              })
+            }
+
+      - name: Fail workflow when production is unhealthy
+        if: steps.production.outcome == 'failure'
+        run: exit 1

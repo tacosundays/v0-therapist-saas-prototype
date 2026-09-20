@@ -182,8 +182,8 @@ export function AssignWorksheetModal({
     }
   }
 
-  const handleClose = () => {
-    if (!isLoading) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !isLoading) {
       setSelectedClient(preselectedClientId || "")
       setSelectedTemplate(preselectedTemplateId || "")
       setDueDate("")
@@ -193,7 +193,7 @@ export function AssignWorksheetModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md rounded-2xl">
         <DialogHeader>
           <DialogTitle>Assign Online Worksheet</DialogTitle>
@@ -273,7 +273,7 @@ export function AssignWorksheetModal({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={handleClose}
+            onClick={() => handleOpenChange(false)}
             disabled={isLoading}
             className="rounded-xl"
           >

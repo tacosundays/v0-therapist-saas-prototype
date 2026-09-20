@@ -181,7 +181,6 @@ export function ViewWorksheetModal({
   }
 
   const handleAssign = () => {
-    onOpenChange(false)
     onAssign()
   }
 

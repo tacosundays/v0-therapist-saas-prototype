@@ -13,7 +13,7 @@ export function getProductionReadiness(environment: NodeJS.ProcessEnv) {
       "SUPABASE_SERVICE_ROLE_KEY",
     ]),
     ai: hasValues(environment, ["OPENAI_API_KEY"]),
-    email: hasValues(environment, ["PAUBOX_API_KEY", "PAUBOX_ENDPOINT_USERNAME"]),
+    email: hasValues(environment, ["PAUBOX_API_KEY"]),
     billing: hasValues(environment, [
       "STRIPE_SECRET_KEY",
       "STRIPE_WEBHOOK_SECRET",

@@ -11,7 +11,6 @@ function completeEnvironment(): NodeJS.ProcessEnv {
     SUPABASE_SERVICE_ROLE_KEY: "service-role",
     OPENAI_API_KEY: "openai",
     PAUBOX_API_KEY: "paubox",
-    PAUBOX_ENDPOINT_USERNAME: "endpoint",
     STRIPE_SECRET_KEY: "stripe",
     STRIPE_WEBHOOK_SECRET: "webhook",
     STRIPE_SOLO_PRICE_ID: "solo",
@@ -37,6 +36,10 @@ test("production readiness requires the complete launch configuration", () => {
   const missingPaubox = completeEnvironment()
   delete missingPaubox.PAUBOX_API_KEY
   assert.equal(getProductionReadiness(missingPaubox).ready, false)
+
+  const defaultPauboxEndpoint = completeEnvironment()
+  delete defaultPauboxEndpoint.PAUBOX_ENDPOINT_USERNAME
+  assert.equal(getProductionReadiness(defaultPauboxEndpoint).checks.email, true)
 })
 
 test("production readiness requires the canonical SessionSteps origin", () => {

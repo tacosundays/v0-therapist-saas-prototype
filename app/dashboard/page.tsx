@@ -436,12 +436,12 @@ export default function DashboardPage() {
   if (isLoading) return <DashboardSkeleton />
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-4 pb-6 sm:space-y-6 sm:pb-10">
       <section className="overflow-hidden rounded-[2rem] border border-border/70 bg-card shadow-sm">
-        <div className="grid gap-8 bg-[radial-gradient(circle_at_top_right,rgba(109,94,245,0.18),transparent_28rem)] p-6 sm:p-8 xl:grid-cols-[1fr_auto] xl:items-center">
+        <div className="grid gap-5 bg-[radial-gradient(circle_at_top_right,rgba(109,94,245,0.18),transparent_28rem)] p-5 sm:gap-8 sm:p-8 xl:grid-cols-[1fr_auto] xl:items-center">
           <div>
             <p className="text-sm font-semibold text-primary">{greeting}, {firstName}</p>
-            <h1 className="mt-2 max-w-2xl text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="mt-2 max-w-2xl text-2xl font-bold tracking-tight text-foreground sm:text-4xl">
               {dynamicGreeting}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
@@ -455,7 +455,7 @@ export default function DashboardPage() {
             </Link>
           </Button>
         </div>
-        <div className="grid border-t border-border/70 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 border-t border-border/70 xl:grid-cols-4">
           <HeroMetric icon={CalendarDays} label="Sessions today" value={todaySessions.length} />
           <HeroMetric icon={AlertTriangle} label="Need attention" value={attentionClients.length} tone="text-amber-600" />
           <HeroMetric icon={Clock3} label="Overdue assignments" value={overdueCount} tone="text-rose-600" />
@@ -463,7 +463,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Practice key performance indicators">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Practice key performance indicators">
         <KpiCard icon={Users} label="Active Clients" value={String(activeClients)} detail="Current caseload" compact />
         <KpiCard icon={ClipboardCheck} label="Homework Completion" value={`${homeworkCompletion}%`} detail={`${completedHomework} of ${totalHomework || 0} completed`} compact />
         <KpiCard icon={TrendingUp} label="Engagement Score" value={`${engagementScore}%`} detail="Active in the last 14 days" compact />
@@ -509,7 +509,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="grid gap-4 sm:gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="overflow-hidden">
           <CardHeader className="flex flex-col items-start gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -582,7 +582,7 @@ export default function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_0.75fr]">
+      <section className="grid gap-4 sm:gap-6 xl:grid-cols-[1fr_0.75fr]">
         <Card>
           <CardHeader>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Live feed</p>
@@ -634,9 +634,9 @@ export default function DashboardPage() {
 
 function HeroMetric({ icon: Icon, label, value, tone = "text-primary" }: { icon: LucideIcon; label: string; value: number; tone?: string }) {
   return (
-    <div className="flex items-center gap-3 border-border/70 p-4 sm:p-5 sm:[&:nth-child(even)]:border-l xl:border-l">
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl bg-muted ${tone}`}><Icon className="h-5 w-5" /></span>
-      <span><span className="block text-2xl font-bold text-foreground">{value}</span><span className="block text-xs font-medium text-muted-foreground">{label}</span></span>
+    <div className="flex min-w-0 items-center gap-2 border-border/70 p-3 [&:nth-child(even)]:border-l sm:gap-3 sm:p-5 xl:border-l">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted sm:h-10 sm:w-10 ${tone}`}><Icon className="h-5 w-5" /></span>
+      <span className="min-w-0"><span className="block text-xl font-bold text-foreground sm:text-2xl">{value}</span><span className="block text-[11px] font-medium leading-tight text-muted-foreground sm:text-xs">{label}</span></span>
     </div>
   )
 }
@@ -644,9 +644,9 @@ function HeroMetric({ icon: Icon, label, value, tone = "text-primary" }: { icon:
 function KpiCard({ icon: Icon, label, value, detail, compact = false }: { icon: LucideIcon; label: string; value: string; detail: string; compact?: boolean }) {
   return (
     <Card className="border-border/70">
-      <CardContent className={compact ? "p-4" : "p-5"}>
-        <div className="flex items-start justify-between"><p className="text-sm font-medium text-muted-foreground">{label}</p><Icon className="h-4 w-4 text-primary" /></div>
-        <p className={`${compact ? "mt-2 text-2xl" : "mt-4 text-3xl"} font-bold tracking-tight text-foreground`}>{value}</p>
+      <CardContent className={compact ? "p-3 sm:p-4" : "p-5"}>
+        <div className="flex items-start justify-between"><p className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</p><Icon className="h-4 w-4 text-primary" /></div>
+        <p className={`${compact ? "mt-2 text-xl sm:text-2xl" : "mt-4 text-3xl"} font-bold tracking-tight text-foreground`}>{value}</p>
         <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>
@@ -669,7 +669,7 @@ function QuickAction({ icon: Icon, label, description, onClick }: { icon: Lucide
 
 function EmptyState({ icon: Icon, title, description, compact = false }: { icon: LucideIcon; title: string; description: string; compact?: boolean }) {
   return (
-    <div className={`flex flex-col items-center justify-center px-5 text-center ${compact ? "py-8" : "py-12"}`}>
+    <div className={`flex flex-col items-center justify-center px-5 text-center ${compact ? "py-6 sm:py-8" : "py-8 sm:py-12"}`}>
       <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground"><Icon className="h-5 w-5" /></span>
       <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
       <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{description}</p>

@@ -231,7 +231,7 @@ export function DashboardSidebar() {
         aria-expanded={mobileOpen}
         aria-controls="mobile-dashboard-navigation"
         onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur md:hidden"
+        className="absolute left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>

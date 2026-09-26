@@ -476,7 +476,7 @@ export function AiCopilot() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open AI Copilot"
-        className="fixed bottom-4 right-4 z-30 h-12 w-12 rounded-full bg-[#6D5EF5] p-0 text-white shadow-[0_20px_48px_rgba(109,94,245,0.34)] transition-all hover:-translate-y-0.5 hover:bg-[#5B4DEA] hover:shadow-[0_24px_58px_rgba(109,94,245,0.42)] sm:bottom-6 sm:right-6 sm:h-14 sm:w-auto sm:px-5"
+        className="fixed bottom-4 right-4 z-30 hidden h-12 w-12 rounded-full bg-[#6D5EF5] p-0 text-white shadow-[0_20px_48px_rgba(109,94,245,0.34)] transition-all hover:-translate-y-0.5 hover:bg-[#5B4DEA] hover:shadow-[0_24px_58px_rgba(109,94,245,0.42)] sm:bottom-6 sm:right-6 sm:flex sm:h-14 sm:w-auto sm:px-5"
       >
         <Sparkles className="h-5 w-5 sm:mr-2" />
         <span className="hidden sm:inline">AI Copilot</span>

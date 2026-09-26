@@ -217,7 +217,7 @@ export default function BillingPage() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="saas-page-header">
+        <div className="saas-page-header pl-14 md:pl-0">
           <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
           <div className="mt-3 h-8 w-40 animate-pulse rounded bg-slate-200" />
           <div className="mt-3 h-4 w-64 animate-pulse rounded bg-slate-100" />
@@ -240,9 +240,9 @@ export default function BillingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="saas-page-header">
+      <div className="saas-page-header pl-14 md:pl-0">
         <p className="saas-eyebrow mb-2">Subscription</p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-950">Billing</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Billing</h1>
         <p className="mt-2 text-sm text-slate-500">Manage your plan, usage, and Stripe billing portal.</p>
       </div>
 
@@ -502,8 +502,8 @@ interface PlanCardProps {
 
 function UsageMeter({ label, used, limitLabel, limit }: { label: string; used: number; limitLabel: string; limit: number | null }) {
   const percent = limit === null ? 25 : Math.min((used / limit) * 100, 100)
-  const isNearLimit = limit !== null && used >= limit * 0.8
-  const isAtLimit = limit !== null && used >= limit
+  const isNearLimit = limit !== null && used >= limit * 0.8 && used < limit
+  const isOverLimit = limit !== null && used > limit
 
   return (
     <div>
@@ -513,7 +513,7 @@ function UsageMeter({ label, used, limitLabel, limit }: { label: string; used: n
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all ${isAtLimit ? "bg-destructive" : isNearLimit ? "bg-amber-500" : "bg-primary"}`}
+          className={`h-full rounded-full transition-all ${isOverLimit ? "bg-destructive" : isNearLimit ? "bg-amber-500" : "bg-primary"}`}
           style={{ width: `${percent}%` }}
         />
       </div>

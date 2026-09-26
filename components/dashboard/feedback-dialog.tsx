@@ -75,7 +75,7 @@ export function FeedbackDialog() {
       <DialogTrigger asChild>
         <Button
           aria-label="Send feedback"
-          className="fixed bottom-4 left-4 z-30 h-12 w-12 rounded-full p-0 shadow-lg sm:bottom-5 sm:left-auto sm:right-24 sm:h-10 sm:w-auto sm:px-4"
+          className="fixed bottom-4 left-4 z-30 hidden h-12 w-12 rounded-full p-0 shadow-lg sm:bottom-5 sm:left-auto sm:right-24 sm:flex sm:h-10 sm:w-auto sm:px-4"
           variant="secondary"
         >
           <MessageSquarePlus className="h-4 w-4 sm:mr-2" />

@@ -124,7 +124,7 @@ function TourGuide({ stage, onClose, onClient, onWorksheet, onPrep }: { stage: E
 }
 
 function PageTitle({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <div className="mb-7"><p className="text-xs font-bold uppercase tracking-widest text-violet-600">{eyebrow}</p><h1 className="mt-2 font-serif text-3xl font-semibold sm:text-4xl">{title}</h1><p className="mt-2 max-w-3xl text-slate-500">{copy}</p></div> }
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>{children}</div> }
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <div className={`min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>{children}</div> }
 function Status({ value }: { value: string }) { const urgent = value === "Needs attention" || value === "Overdue"; return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${urgent ? "bg-rose-50 text-rose-700" : value === "Review requested" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{value}</span> }
 
 function Dashboard({ onClient, completedCount }: { onClient: (id: string, view?: View) => void; completedCount: number }) {

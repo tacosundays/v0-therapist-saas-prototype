@@ -95,6 +95,12 @@ test("therapist demo guides first-time visitors without blocking exploration", (
   assert.match(entry, /Create My Practice/)
 })
 
+test("therapist demo cards can shrink to phone width", () => {
+  const entry = read("app/demo/therapist/page.tsx")
+
+  assert.match(entry, /min-w-0 rounded-2xl border border-slate-200/)
+})
+
 test("landing and demo surfaces share one canonical logo component", () => {
   const logo = read("components/brand/sessionsteps-logo.tsx")
   const header = read("components/landing/header.tsx")

@@ -83,24 +83,6 @@ export async function getCheckoutAvailability() {
   )
 }
 
-function getStripeSecretKeyPrefix() {
-  const secretKey = process.env.STRIPE_SECRET_KEY
-  if (!secretKey) return null
-
-  return secretKey.slice(0, 8)
-}
-
-function logStripeCheckoutEnv(stage: string, productId: string, priceId: string) {
-  console.error(`[v0] Stripe checkout ${stage}`, {
-    stripeSecretKeyPrefix: getStripeSecretKeyPrefix(),
-    stripeSoloPriceId: process.env.STRIPE_SOLO_PRICE_ID || null,
-    stripeGrowingPriceId: process.env.STRIPE_GROWING_PRICE_ID || null,
-    stripeGroupPriceId: process.env.STRIPE_GROUP_PRICE_ID || null,
-    selectedPlanId: productId,
-    selectedPriceId: priceId,
-  })
-}
-
 export async function startSubscriptionCheckout(productId: string, _userData: UserData) {
   try {
     const normalizedProductId = normalizeProductId(productId)
@@ -152,8 +134,6 @@ export async function startSubscriptionCheckout(productId: string, _userData: Us
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    logStripeCheckoutEnv('before checkout session create', product.id, priceId)
-
     // Create redirect-based checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -178,12 +158,6 @@ export async function startSubscriptionCheckout(productId: string, _userData: Us
     if (!session.url) {
       return { error: 'Failed to create checkout session' }
     }
-
-    console.error('[v0] Stripe checkout session created', {
-      checkoutSessionId: session.id,
-      productId: product.id,
-      priceId,
-    })
 
     return { url: session.url }
   } catch (error) {
@@ -267,14 +241,6 @@ export async function verifyAndActivateSubscription(sessionId: string, _userData
       expand: ['subscription', 'subscription.default_payment_method']
     })
 
-    console.log('[v0] Checkout session:', {
-      id: session.id,
-      payment_status: session.payment_status,
-      status: session.status,
-      subscription: session.subscription,
-      customer: session.customer
-    })
-
     // For subscriptions, check session status instead of payment_status
     // payment_status can be 'no_payment_required' for trials
     if (session.status !== 'complete') {
@@ -298,16 +264,7 @@ export async function verifyAndActivateSubscription(sessionId: string, _userData
 
     const supabase = context.admin
 
-    console.log('[v0] Date conversion:', {
-      raw_current_period_end: (subscription as StripeSubscriptionWithPeriod).current_period_end,
-      raw_trial_end: subscription.trial_end,
-      converted_subscription_end_date: getSubscriptionPeriodEnd(subscription),
-      converted_trial_end_date: getTrialEnd(subscription),
-    })
-
     const updateData = billingUpdateData(subscription, session.customer as string, productId)
-
-    console.log('[v0] Updating organization billing with:', updateData)
 
     const { error: updateError } = await supabase
       .from('organizations')
@@ -323,14 +280,13 @@ export async function verifyAndActivateSubscription(sessionId: string, _userData
       .eq('id', organizationId)
 
     if (updateError) {
-      console.error('[v0] Failed to update subscription:', updateError)
+      console.error('Failed to update Stripe subscription:', updateError)
       return { success: false, error: `Failed to activate subscription: ${updateError.message}` }
     }
 
-    console.log('[v0] Subscription activated successfully')
     return { success: true }
   } catch (error) {
-    console.error('[v0] Verify subscription error:', error)
+    console.error('Stripe subscription verification error:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Verification failed' }
   }
 }

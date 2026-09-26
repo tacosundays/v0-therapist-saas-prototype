@@ -33,3 +33,10 @@ test("organization billing migration backfills current subscriptions", () => {
   assert.match(migration, /organizations_stripe_customer_id_unique/)
   assert.match(migration, /organizations_stripe_subscription_id_unique/)
 })
+
+test("billing code does not log Stripe secrets or price configuration", () => {
+  assert.doesNotMatch(actions, /getStripeSecretKeyPrefix|logStripeCheckoutEnv|stripeSecretKeyPrefix/)
+  assert.doesNotMatch(actions, /stripeSoloPriceId|stripeGrowingPriceId|stripeGroupPriceId/)
+  assert.doesNotMatch(actions, /\[v0\]/)
+  assert.doesNotMatch(webhook, /\[v0\]/)
+})

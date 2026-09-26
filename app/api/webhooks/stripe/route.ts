@@ -116,13 +116,6 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         
-        console.log('[v0] Webhook: checkout.session.completed', {
-          sessionId: session.id,
-          customerId: session.customer,
-          subscriptionId: session.subscription,
-          mode: session.mode
-        })
-        
         if (session.mode === 'subscription' && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             session.subscription as string
@@ -131,32 +124,14 @@ export async function POST(req: NextRequest) {
           const { organizationId, therapistId } = await resolveBillingOwner(subscription)
           const productId = normalizeProductId(subscription.metadata.product_id)
 
-          console.log('[v0] Webhook: Subscription details', {
-            subscriptionId: subscription.id,
-            status: subscription.status,
-            organizationId,
-            productId,
-            trialEnd: subscription.trial_end
-          })
-
           if (organizationId) {
-            console.log('[v0] Webhook: Date conversion', {
-              raw_current_period_end: (subscription as StripeSubscriptionWithPeriod).current_period_end,
-              raw_trial_end: subscription.trial_end,
-              converted_subscription_end_date: getCurrentPeriodEnd(subscription),
-              converted_trial_end_date: convertUnixToISO(subscription.trial_end),
-            })
-
             const updateData = buildSubscriptionUpdate(subscription, session.customer as string, productId)
-
-            console.log('[v0] Webhook: Updating organization', { organizationId, updateData })
 
             const { error } = await updateOrganizationSubscription(organizationId, updateData)
 
             if (error) {
-              console.error('[v0] Webhook: Failed to update therapist', error)
+              console.error('Stripe webhook failed to update organization:', error)
             } else {
-              console.log('[v0] Webhook: Organization updated successfully')
               await writeAuditLog({
                 therapistId: therapistId || undefined,
                 actorRole: 'system',
@@ -174,7 +149,7 @@ export async function POST(req: NextRequest) {
               })
             }
           } else {
-            console.error('[v0] Webhook: No organization billing owner in subscription metadata')
+            console.error('Stripe webhook could not resolve an organization billing owner')
           }
         }
         break

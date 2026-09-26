@@ -5,6 +5,7 @@ import { getProductById, getStripePriceId, normalizeProductId, PRODUCTS } from '
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { resolveTenantContext } from '@/lib/tenant-context'
+import { getAppBaseUrl } from '@/lib/app-url'
 import type Stripe from 'stripe'
 
 // Create admin client for server-side operations (doesn't rely on cookies)
@@ -133,7 +134,7 @@ export async function startSubscriptionCheckout(productId: string, _userData: Us
         .eq('id', tenant.organizationId)
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = getAppBaseUrl()
     // Create redirect-based checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -220,7 +221,7 @@ export async function createCustomerPortalSession(_userData: UserData) {
 
   const session = await stripe.billingPortal.sessions.create({
     customer: organization.stripe_customer_id,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/billing`,
+    return_url: `${getAppBaseUrl()}/dashboard/billing`,
   })
 
   return session.url

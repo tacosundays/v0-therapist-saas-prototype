@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { SessionStepsLogo, SessionStepsMark } from "@/components/brand/sessionsteps-logo"
 import { cn } from "@/lib/utils"
+import { formatSubscriptionPlanLabel } from "@/lib/subscription-display"
 import { useState, useEffect, useRef } from "react"
 import { getClient } from "@/lib/supabase/client"
 import { logClientAuditEvent } from "@/lib/audit-client"
@@ -82,20 +83,6 @@ type TherapistProfile = {
   plan?: string | null
   subscription_plan?: string | null
   subscription_status?: string | null
-}
-
-function formatPlanLabel(plan: string | null) {
-  if (!plan) return null
-
-  const normalized = plan.toLowerCase()
-  if (normalized.includes("solo")) return "Solo"
-  if (normalized.includes("growing")) return "Growing"
-  if (normalized.includes("group")) return "Group Practice"
-
-  return plan
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ")
 }
 
 export function DashboardSidebar() {
@@ -210,7 +197,10 @@ export function DashboardSidebar() {
     : user?.email?.split('@')[0] || 'User')
   const accountEmail = therapistProfile?.email || user?.email || ""
   const planValue = therapistProfile?.plan || therapistProfile?.subscription_plan || null
-  const planLabel = formatPlanLabel(planValue)
+  const planLabel = formatSubscriptionPlanLabel(
+    planValue,
+    therapistProfile?.subscription_status,
+  )
   const roleValue = (therapistProfile as any)?.practice_role || (therapistProfile as any)?.role || user?.user_metadata?.practice_role || user?.user_metadata?.role
   const statusLabel = typeof roleValue === "string" && roleValue.toLowerCase() === "owner"
     ? "Owner"

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -74,6 +75,7 @@ const typeIcons: Record<string, typeof FileText> = {
 }
 
 export default function LibraryPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [contentItems, setContentItems] = useState<ContentItem[]>([])
@@ -88,6 +90,8 @@ export default function LibraryPage() {
   const [isAssignWorksheetOpen, setIsAssignWorksheetOpen] = useState(false)
   const [isViewWorksheetOpen, setIsViewWorksheetOpen] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [onboardingClientId, setOnboardingClientId] = useState<string | null>(null)
+  const [isOnboardingFlow, setIsOnboardingFlow] = useState(false)
 
   const fetchContent = useCallback(async () => {
     setIsLoading(true)
@@ -183,6 +187,20 @@ export default function LibraryPage() {
     fetchContent()
   }, [fetchContent])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setIsOnboardingFlow(params.get("onboarding") === "1")
+    setOnboardingClientId(params.get("clientId"))
+  }, [])
+
+  const handleAssignmentCreated = useCallback(() => {
+    if (isOnboardingFlow) {
+      router.replace("/onboarding")
+      return
+    }
+    void fetchContent()
+  }, [fetchContent, isOnboardingFlow, router])
+
   const handleAssignClick = (item: ContentItem, e?: React.MouseEvent) => {
     e?.stopPropagation()
     if (item.isInteractive) {
@@ -211,6 +229,15 @@ export default function LibraryPage() {
 
   return (
     <div className="space-y-8">
+      {isOnboardingFlow && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-foreground">Choose a worksheet for your new client</p>
+            <p className="text-sm text-muted-foreground">Select any worksheet below. Your client is already selected.</p>
+          </div>
+          <Button variant="outline" onClick={() => router.replace("/onboarding")}>Back to setup</Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -388,7 +415,8 @@ export default function LibraryPage() {
       <AssignHomeworkModal
         open={isAssignModalOpen}
         onOpenChange={setIsAssignModalOpen}
-        onAssignmentCreated={fetchContent}
+        onAssignmentCreated={handleAssignmentCreated}
+        preselectedClientId={onboardingClientId || undefined}
         prefilledTitle={selectedContent?.title}
         prefilledDescription={selectedContent?.description || undefined}
       />
@@ -411,7 +439,8 @@ export default function LibraryPage() {
       <AssignWorksheetModal
         open={isAssignWorksheetOpen}
         onOpenChange={setIsAssignWorksheetOpen}
-        onAssigned={fetchContent}
+        onAssigned={handleAssignmentCreated}
+        preselectedClientId={onboardingClientId || undefined}
         preselectedTemplateId={selectedTemplateId || undefined}
       />
 

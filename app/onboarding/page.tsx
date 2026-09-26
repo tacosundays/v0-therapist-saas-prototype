@@ -20,7 +20,6 @@ import {
   UserRound,
 } from "lucide-react"
 import { AddClientModal } from "@/components/dashboard/add-client-modal"
-import { AssignHomeworkModal } from "@/components/dashboard/assign-homework-modal"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -74,7 +73,6 @@ export default function OnboardingPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [addClientOpen, setAddClientOpen] = useState(false)
-  const [assignOpen, setAssignOpen] = useState(false)
 
   const loadWorkspace = useCallback(async () => {
     setError(null)
@@ -103,12 +101,19 @@ export default function OnboardingPage() {
       const clientIds = nextClients.map((client) => client.id)
       let nextAssignmentCount = 0
       if (clientIds.length) {
-        const { count, error: assignmentError } = await supabase
-          .from("assignments")
-          .select("id", { count: "exact", head: true })
-          .eq("therapist_id", therapistId)
-        if (assignmentError) throw assignmentError
-        nextAssignmentCount = count || 0
+        const [homeworkResult, worksheetResult] = await Promise.all([
+          supabase
+            .from("assignments")
+            .select("id", { count: "exact", head: true })
+            .eq("therapist_id", therapistId),
+          supabase
+            .from("worksheet_assignments")
+            .select("id", { count: "exact", head: true })
+            .eq("therapist_id", therapistId),
+        ])
+        if (homeworkResult.error) throw homeworkResult.error
+        if (worksheetResult.error) throw worksheetResult.error
+        nextAssignmentCount = (homeworkResult.count || 0) + (worksheetResult.count || 0)
       }
 
       setTherapist(nextTherapist)
@@ -255,7 +260,8 @@ export default function OnboardingPage() {
             <div className="mb-2 flex justify-between text-xs font-medium text-muted-foreground"><span>SETUP PROGRESS</span><span>{progress}%</span></div>
             <Progress value={progress} className="h-2" />
           </div>
-          <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
+          <p className="text-sm font-semibold text-primary sm:hidden">{steps[step]?.short}</p>
+          <ol className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-4 lg:grid-cols-1">
             {steps.map((item, index) => {
               const Icon = item.icon
               return (
@@ -292,7 +298,7 @@ export default function OnboardingPage() {
                   </div>
                 )}
                 {step === 2 && <ActionStep complete={stepComplete.client} title={stepComplete.client ? `${clients.length} client${clients.length === 1 ? "" : "s"} ready` : "Start with one client"} body="Add a client through the same secure flow you’ll use every day. Their portal invitation is created automatically." tip="Tip: The Clients page is your home for assignments, activity, and Session Prep." actionLabel={stepComplete.client ? "Add another client" : "Add client"} onAction={() => setAddClientOpen(true)} />}
-                {step === 3 && <ActionStep complete={stepComplete.assignment} title={stepComplete.assignment ? "First assignment created" : "Give your client a useful next step"} body="Assign a simple homework prompt now, or visit the Content Library to choose a worksheet or generate one with AI." tip="Tip: “Generate with AI” lives in the Content Library and saves the result for reuse." actionLabel="Assign homework" onAction={() => setAssignOpen(true)} secondary={{ label: "Open Content Library", href: "/dashboard/library?onboarding=1" }} disabled={!stepComplete.client} />}
+                {step === 3 && <ActionStep complete={stepComplete.assignment} title={stepComplete.assignment ? "First worksheet assigned" : "Choose a worksheet for your client"} body="Browse the complete SessionSteps library and assign an interactive worksheet to your new client." tip="Your client will be selected automatically when the library opens." actionLabel="Choose from Content Library" href={firstClient ? `/dashboard/library?onboarding=1&clientId=${firstClient.id}` : undefined} disabled={!firstClient} />}
                 {step === 4 && <ActionStep complete={stepComplete.invite} title={stepComplete.invite ? "Invitation is ready" : "Connect your client portal"} body={firstClient ? `${firstClient.full_name} can use the secure invitation created when you added them. You can resend or copy it from Clients.` : "Add a client first, then SessionSteps will create their secure portal invitation."} tip="Tip: Invitation status appears beside each client in the Clients list." actionLabel="View invitation" href={firstClient ? `/dashboard/clients?onboarding=invite#client-${firstClient.id}` : undefined} disabled={!firstClient} />}
                 {step === 5 && <ActionStep complete={false} title="Walk into the session prepared" body="AI Session Prep combines recent homework, reflections, mood trends, and therapist notes into a concise briefing grounded in client activity." tip="Tip: “Prepare for Session” appears on every client card and opens the same page." actionLabel="Preview Session Prep" href={firstClient ? `/dashboard/clients/${firstClient.id}/session-prep?onboarding=1` : undefined} disabled={!firstClient} />}
                 {step === 6 && (
@@ -322,7 +328,6 @@ export default function OnboardingPage() {
       </main>
 
       <AddClientModal open={addClientOpen} onOpenChange={setAddClientOpen} onClientAdded={() => void loadWorkspace()} />
-      <AssignHomeworkModal open={assignOpen} onOpenChange={setAssignOpen} onAssignmentCreated={() => void loadWorkspace()} preselectedClientId={firstClient?.id} />
     </div>
   )
 }

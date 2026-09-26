@@ -242,7 +242,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
               onChange={(e) => setName(e.target.value)}
               className="h-11 rounded-xl"
               required
-              disabled={isLoading}
+              disabled={isLoading || Boolean(inviteLink)}
             />
           </div>
           
@@ -256,7 +256,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
               onChange={(e) => setEmail(e.target.value)}
               className="h-11 rounded-xl"
               required
-              disabled={isLoading}
+              disabled={isLoading || Boolean(inviteLink)}
             />
             <p className="text-xs text-muted-foreground">
               The client must sign up with this email address.
@@ -315,7 +315,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
             >
               {inviteLink ? "Done" : "Cancel"}
             </Button>
-            <Button
+            {!inviteLink && <Button
               type="submit"
               disabled={isLoading || !name.trim() || !email.trim()}
               className="rounded-xl"
@@ -328,7 +328,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
               ) : (
                 "Create Invite"
               )}
-            </Button>
+            </Button>}
           </DialogFooter>
         </form>
             </>

@@ -12,6 +12,16 @@ function cleanMetadataValue(value: unknown, maxLength = 120) {
   return cleaned ? cleaned.slice(0, maxLength) : null
 }
 
+function logDatabaseError(stage: string, error: { code?: string; message?: string; details?: string; hint?: string }) {
+  console.error("[provision-therapist]", {
+    stage,
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+  })
+}
+
 export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -42,7 +52,10 @@ export async function POST(request: Request) {
     .select("id")
     .eq("auth_user_id", user.id)
     .maybeSingle()
-  if (identityError) return NextResponse.json({ error: "Account setup failed." }, { status: 500 })
+  if (identityError) {
+    logDatabaseError("identity_lookup", identityError)
+    return NextResponse.json({ error: "Account setup failed." }, { status: 500 })
+  }
   if (identityMatch) return NextResponse.json({ therapistId: identityMatch.id })
 
   const { data: emailMatches, error: emailError } = await admin
@@ -50,7 +63,10 @@ export async function POST(request: Request) {
     .select("id, auth_user_id")
     .ilike("email", email)
     .limit(2)
-  if (emailError) return NextResponse.json({ error: "Account setup failed." }, { status: 500 })
+  if (emailError) {
+    logDatabaseError("email_lookup", emailError)
+    return NextResponse.json({ error: "Account setup failed." }, { status: 500 })
+  }
 
   if (emailMatches?.length === 1 && !emailMatches[0].auth_user_id) {
     const { data: linked, error: linkError } = await admin
@@ -60,7 +76,10 @@ export async function POST(request: Request) {
       .is("auth_user_id", null)
       .select("id")
       .single()
-    if (linkError) return NextResponse.json({ error: "Account setup failed." }, { status: 500 })
+    if (linkError) {
+      logDatabaseError("identity_link", linkError)
+      return NextResponse.json({ error: "Account setup failed." }, { status: 500 })
+    }
     return NextResponse.json({ therapistId: linked.id })
   }
   if (emailMatches?.length) {
@@ -92,6 +111,7 @@ export async function POST(request: Request) {
     .single()
 
   if (createError) {
+    logDatabaseError("profile_insert", createError)
     const { data: recovered } = await admin
       .from("therapists")
       .select("id")

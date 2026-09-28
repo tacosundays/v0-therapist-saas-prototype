@@ -148,7 +148,8 @@ export async function startSubscriptionCheckout(productId: string, _userData: Us
       .single()
 
     if (organizationError || !organization) {
-      return { error: `Failed to load organization billing: ${organizationError?.message || 'not found'}` }
+      console.error('Failed to load organization billing:', organizationError)
+      return { error: 'Organization billing could not be loaded. Please try again.' }
     }
 
     const savedCustomerId = organization.stripe_customer_id
@@ -195,7 +196,7 @@ export async function startSubscriptionCheckout(productId: string, _userData: Us
     return { url: session.url }
   } catch (error) {
     console.error('Stripe checkout error:', error)
-    return { error: error instanceof Error ? error.message : 'Failed to start checkout' }
+    return { error: 'Checkout could not be started. Please try again.' }
   }
 }
 
@@ -314,12 +315,12 @@ export async function verifyAndActivateSubscription(sessionId: string, _userData
 
     if (updateError) {
       console.error('Failed to update Stripe subscription:', updateError)
-      return { success: false, error: `Failed to activate subscription: ${updateError.message}` }
+      return { success: false, error: 'Subscription activation is still processing' }
     }
 
     return { success: true }
   } catch (error) {
     console.error('Stripe subscription verification error:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Verification failed' }
+    return { success: false, error: 'Subscription verification is temporarily unavailable' }
   }
 }

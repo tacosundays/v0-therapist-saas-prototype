@@ -111,6 +111,13 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', organizationId)
 
+  const requireDatabaseSuccess = (result: { error: unknown }, operation: string) => {
+    if (result.error) {
+      console.error(`Stripe webhook database failure during ${operation}:`, result.error)
+      throw new Error(`Database update failed during ${operation}`)
+    }
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -160,7 +167,8 @@ export async function POST(req: NextRequest) {
         const { organizationId, therapistId } = await resolveBillingOwner(subscription)
 
         if (organizationId) {
-          await updateOrganizationSubscription(organizationId, buildSubscriptionUpdate(subscription))
+          const result = await updateOrganizationSubscription(organizationId, buildSubscriptionUpdate(subscription))
+          requireDatabaseSuccess(result, event.type)
 
           await writeAuditLog({
             therapistId: therapistId || undefined,
@@ -185,7 +193,7 @@ export async function POST(req: NextRequest) {
         const { organizationId, therapistId } = await resolveBillingOwner(subscription)
 
         if (organizationId) {
-          await supabaseAdmin
+          const result = await supabaseAdmin
             .from('organizations')
             .update({
               subscription_status: 'canceled',
@@ -195,6 +203,7 @@ export async function POST(req: NextRequest) {
               current_period_end: null,
             })
             .eq('id', organizationId)
+          requireDatabaseSuccess(result, event.type)
 
           await writeAuditLog({
             therapistId: therapistId || undefined,
@@ -224,12 +233,13 @@ export async function POST(req: NextRequest) {
           const { organizationId, therapistId } = await resolveBillingOwner(subscription)
 
           if (organizationId) {
-            await supabaseAdmin
+            const result = await supabaseAdmin
               .from('organizations')
               .update({
                 subscription_status: 'past_due',
               })
               .eq('id', organizationId)
+            requireDatabaseSuccess(result, event.type)
 
             await writeAuditLog({
               therapistId: therapistId || undefined,
@@ -242,6 +252,41 @@ export async function POST(req: NextRequest) {
                 stripeInvoiceId: invoice.id,
                 stripeSubscriptionId: subscription.id,
                 status: 'past_due',
+                organizationId,
+              },
+            })
+          }
+        }
+        break
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as StripeInvoiceWithSubscription
+
+        if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(
+            typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
+          )
+          const { organizationId, therapistId } = await resolveBillingOwner(subscription)
+
+          if (organizationId) {
+            const result = await updateOrganizationSubscription(
+              organizationId,
+              buildSubscriptionUpdate(subscription),
+            )
+            requireDatabaseSuccess(result, event.type)
+
+            await writeAuditLog({
+              therapistId: therapistId || undefined,
+              actorRole: 'system',
+              action: 'subscription.changed',
+              resourceType: 'stripe_invoice',
+              resourceId: null,
+              details: {
+                eventType: event.type,
+                stripeInvoiceId: invoice.id,
+                stripeSubscriptionId: subscription.id,
+                status: subscription.status,
                 organizationId,
               },
             })

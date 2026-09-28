@@ -60,32 +60,42 @@ export default function BillingPage() {
   // Get current user on mount
   useEffect(() => {
     const fetchUser = async () => {
-      const supabase = getClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user?.id && user?.email) {
-        const { therapistId } = await getTherapistId()
+      try {
+        const supabase = getClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-        setUserData({ 
+        if (authError || !user?.id || !user.email) {
+          setCheckoutError("Your session could not be verified. Please sign in again.")
+          setIsLoading(false)
+          return
+        }
+
+        const { therapistId } = await getTherapistId()
+        setUserData({
           id: therapistId || user.id,
           email: user.email,
           fullName: user.user_metadata?.full_name || `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || undefined,
           practiceName: user.user_metadata?.practice_name || undefined
         })
 
-        // Fetch client count
         if (therapistId) {
-          const { count } = await supabase
+          const { count, error: countError } = await supabase
             .from("clients")
             .select("*", { count: "exact", head: true })
             .eq("therapist_id", therapistId)
-        
-          setClientCount(count || 0)
-        }
-      }
 
-      const availability = await getCheckoutAvailability()
-      setCheckoutAvailability(availability)
+          if (!countError) setClientCount(count || 0)
+        }
+
+        try {
+          setCheckoutAvailability(await getCheckoutAvailability())
+        } catch {
+          setCheckoutError("Plan checkout is temporarily unavailable. Please try again.")
+        }
+      } catch {
+        setCheckoutError("Billing could not be loaded. Please refresh and try again.")
+        setIsLoading(false)
+      }
     }
     fetchUser()
   }, [])
@@ -96,30 +106,27 @@ export default function BillingPage() {
       const success = searchParams.get('success')
       const sessionId = searchParams.get('session_id')
       
-      console.log('[v0] Billing: Checking checkout params', { success, sessionId, hasUserData: !!userData })
-      
       if (success === 'true' && sessionId && userData && !hasVerified.current) {
         hasVerified.current = true
-        
-        console.log('[v0] Billing: Verifying subscription with session', sessionId)
-        const result = await verifyAndActivateSubscription(sessionId, userData)
-        console.log('[v0] Billing: Verification result', result)
-        
-        if (result.success) {
-          setSuccessMessage("Your subscription has been activated successfully!")
-        } else {
-          // Show the actual error for debugging
-          console.error('[v0] Billing: Verification failed', result.error)
-          setSuccessMessage(`Payment received! ${result.error || 'Processing subscription...'}`)
+
+        try {
+          const result = await verifyAndActivateSubscription(sessionId, userData)
+
+          if (result.success) {
+            setSuccessMessage("Your subscription has been activated successfully!")
+          } else {
+            setCheckoutError("Your payment was received, but activation is still processing. Refresh shortly or contact support if it does not update.")
+          }
+
+          setSubscriptionData(await getSubscriptionStatus(userData))
+        } catch {
+          setCheckoutError("Your payment was received, but billing status could not be refreshed. Please try again shortly.")
+        } finally {
+          setIsLoading(false)
+          window.history.replaceState({}, '', '/dashboard/billing')
         }
-        
-        // Refresh subscription data regardless of result
-        const data = await getSubscriptionStatus(userData)
-        console.log('[v0] Billing: Subscription status after verify', data)
-        setSubscriptionData(data)
-        setIsLoading(false)
-        
-        // Clear URL params after processing
+      } else if (searchParams.get('canceled') === 'true') {
+        setCheckoutError("Checkout was canceled. No charge was made.")
         window.history.replaceState({}, '', '/dashboard/billing')
       }
     }
@@ -140,6 +147,7 @@ export default function BillingPage() {
       setSubscriptionData(data)
     } catch (error) {
       console.error("Error fetching subscription:", error)
+      setCheckoutError("Subscription status could not be loaded. Please refresh and try again.")
     } finally {
       setIsLoading(false)
     }
@@ -188,6 +196,7 @@ export default function BillingPage() {
       window.location.href = url
     } catch (error) {
       console.error("Error creating portal session:", error)
+      setCheckoutError("The Stripe billing portal could not be opened. Please try again.")
     } finally {
       setIsPortalLoading(false)
     }

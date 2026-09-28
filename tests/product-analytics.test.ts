@@ -50,6 +50,12 @@ test("analytics migration is server-only and explicitly constrains event payload
   assert.doesNotMatch(migration, /reflection_text|session_prep_notes|mood_checkins/)
 })
 
+test("shared analytics trigger only reads assignment status for assignment rows", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/034_fix_cross_table_analytics_trigger.sql", import.meta.url), "utf8")
+  assert.match(migration, /IF TG_TABLE_NAME = 'assignments' THEN\s+IF NEW\.status = 'assigned' THEN/)
+  assert.doesNotMatch(migration, /TG_TABLE_NAME = 'assignments' AND NEW\.status/)
+})
+
 test("client analytics storage failures remain best-effort and non-blocking", () => {
   const route = readFileSync(new URL("../app/api/analytics/events/route.ts", import.meta.url), "utf8")
   assert.match(route, /Event write failed/)

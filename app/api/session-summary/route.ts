@@ -243,11 +243,41 @@ export async function POST(request: Request) {
         )
       : []
 
+    const assignmentReflections = Array.isArray(assignments)
+      ? assignments.flatMap((assignment: {
+          id: string
+          title?: string | null
+          reflection?: string | null
+          completed_at?: string | null
+          started_at?: string | null
+          assigned_at?: string | null
+          created_at?: string | null
+        }) => {
+          const reflectionText = assignment.reflection?.trim()
+          const createdAt = assignment.completed_at || assignment.started_at || assignment.assigned_at || assignment.created_at
+
+          if (!reflectionText || !createdAt) return []
+
+          return [{
+            id: `assignment-${assignment.id}`,
+            title: `${assignment.title || "Homework"} reflection`,
+            reflection_text: reflectionText,
+            mood_rating: null,
+            created_at: createdAt,
+            source: "assignment",
+          }]
+        })
+      : []
+    const reflections = [
+      ...(Array.isArray(clientReflections) ? clientReflections : []),
+      ...assignmentReflections,
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
     const sourceCounts = {
       assignments: Array.isArray(assignments) ? assignments.length : 0,
       worksheetAssignments: Array.isArray(worksheetAssignments) ? worksheetAssignments.length : 0,
       worksheetResponses: Array.isArray(worksheetResponses) ? worksheetResponses.length : 0,
-      reflections: Array.isArray(clientReflections) ? clientReflections.length : 0,
+      reflections: reflections.length,
       moodCheckIns: Array.isArray(moodCheckIns) ? moodCheckIns.length : 0,
       couples: Array.isArray(couples) ? couples.length : 0,
       coupleCheckIns: Array.isArray(coupleCheckIns) ? coupleCheckIns.length : 0,
@@ -267,7 +297,7 @@ export async function POST(request: Request) {
       assignments,
       worksheetAssignments,
       worksheetResponses,
-      reflections: clientReflections,
+      reflections,
       moodCheckIns,
       couples,
       coupleCheckIns,

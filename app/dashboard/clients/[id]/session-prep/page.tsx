@@ -625,7 +625,26 @@ export default function SessionPrepPage() {
     return map
   }, [worksheetAssignments])
 
-  const journalReflectionCount = clientReflections.length
+  const assignmentReflections = useMemo<ClientReflection[]>(() => assignments.flatMap((assignment) => {
+    const reflectionText = assignment.reflection?.trim()
+    const createdAt = assignment.completed_at || assignment.started_at || assignment.assigned_at || assignment.created_at
+
+    if (!reflectionText || !createdAt) return []
+
+    return [{
+      id: `assignment-${assignment.id}`,
+      title: `${assignment.title} reflection`,
+      reflection_text: reflectionText,
+      mood_rating: null,
+      created_at: createdAt,
+    }]
+  }), [assignments])
+  const allClientReflections = useMemo(
+    () => [...clientReflections, ...assignmentReflections]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [assignmentReflections, clientReflections],
+  )
+  const reflectionCount = allClientReflections.length
   const now = new Date()
   const moodLast30Days = moodCheckIns.filter((checkIn) => (
     now.getTime() - new Date(checkIn.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
@@ -906,8 +925,8 @@ export default function SessionPrepPage() {
         ? recentCompletedAssignments.map((assignment) => `- ${assignment.title} (${formatDate(assignment.completedAt)})`)
         : ["- None"]),
       "Recent reflections:",
-      ...(clientReflections.length > 0
-        ? clientReflections.slice(0, 3).map((reflection) => `- ${reflection.title || "Untitled"}: ${reflection.reflection_text}`)
+      ...(allClientReflections.length > 0
+        ? allClientReflections.slice(0, 3).map((reflection) => `- ${reflection.title || "Untitled"}: ${reflection.reflection_text}`)
         : ["- None"]),
       "Recent activity:",
       ...(timeline.length > 0
@@ -1175,7 +1194,7 @@ export default function SessionPrepPage() {
     clientRecord?.invite_accepted_at,
     ...assignments.flatMap((assignment) => [assignment.assigned_at, assignment.started_at, assignment.completed_at]),
     ...worksheetAssignments.flatMap((assignment) => [assignment.assigned_at, assignment.started_at, assignment.completed_at]),
-    ...clientReflections.map((reflection) => reflection.created_at),
+    ...allClientReflections.map((reflection) => reflection.created_at),
     ...moodCheckIns.map((checkIn) => checkIn.created_at),
     ...progressNotes.map((progressNote) => progressNote.created_at),
     sessionPrepNote?.updated_at,
@@ -1190,18 +1209,18 @@ export default function SessionPrepPage() {
     : timeInTreatmentDays < 30
       ? `${timeInTreatmentDays} days`
       : `${Math.floor(timeInTreatmentDays / 30)} mo ${timeInTreatmentDays % 30} days`
-  const reflectionRate = totalAssignments > 0 ? Math.round((journalReflectionCount / totalAssignments) * 100) : null
+  const reflectionRate = totalAssignments > 0 ? Math.min(100, Math.round((reflectionCount / totalAssignments) * 100)) : null
   const engagementScore = Math.min(
     100,
     Math.round(
       (completionRate * 0.45)
-      + ((journalReflectionCount > 0 ? Math.min(journalReflectionCount, 5) / 5 : 0) * 25)
+      + ((reflectionCount > 0 ? Math.min(reflectionCount, 5) / 5 : 0) * 25)
       + ((moodCheckIns.length > 0 ? Math.min(moodCheckIns.length, 5) / 5 : 0) * 20)
       + ((daysSinceLastActivity !== null && daysSinceLastActivity <= 7 ? 1 : 0) * 10)
     )
   )
   const homeworkAvailable = totalAssignments > 0
-  const reflectionAvailable = clientReflections.length > 0 || assignments.some((assignment) => assignment.reflection)
+  const reflectionAvailable = reflectionCount > 0
   const moodTrendAvailable = moodCheckIns.length > 0
   const previousNotesAvailable = progressNotes.length > 0 || Boolean(note.trim())
   const homeworkNeedsReview = assignments.some((assignment) => assignment.reflection && (assignment.completed || assignment.status === "completed"))
@@ -1210,7 +1229,7 @@ export default function SessionPrepPage() {
   const attentionItems = [
     homeworkNeedsReview ? "Homework needs review" : null,
     moodTrend === "declining" ? "Mood declining" : null,
-    totalAssignments > 0 && journalReflectionCount === 0 ? "Reflection missing" : null,
+    totalAssignments > 0 && reflectionCount === 0 ? "Reflection missing" : null,
     daysSinceLastActivity !== null && daysSinceLastActivity >= 14 ? `Inactive ${daysSinceLastActivity} days` : null,
     assignedAssignments > 0 && startedAssignments === 0 && completedAssignments === 0 ? "Homework not started" : null,
   ].filter(Boolean) as string[]
@@ -1238,7 +1257,7 @@ export default function SessionPrepPage() {
       detail: worksheetResponses.some((response) => response.assignment_id === assignment.id) ? "Needs Review" : "Online worksheet",
     })),
   ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
-  const latestReflection = clientReflections[0] || null
+  const latestReflection = allClientReflections[0] || null
   const sessionNoteContext = useMemo(() => {
     const demoGoals = ((clientRecord as any)?.treatment_goals || []) as string[]
     const focus = Array.isArray((clientRecord as any)?.focus)
@@ -1261,7 +1280,7 @@ export default function SessionPrepPage() {
       ],
       interventions: ["CBT", "ACT", "Motivational Interviewing"],
       homework: homeworkProgressItems.slice(0, 4).map((item) => `${item.title}: ${item.status}`),
-      reflections: clientReflections.slice(0, 3).map((reflection) => `${reflection.title || "Reflection"}: ${reflection.reflection_text}`),
+      reflections: allClientReflections.slice(0, 3).map((reflection) => `${reflection.title || "Reflection"}: ${reflection.reflection_text}`),
       moodCheckIns: moodCheckIns.slice(0, 4).map((checkIn) => (
         `Mood ${checkIn.mood_rating}/10${checkIn.anxiety_rating !== null ? `, anxiety ${checkIn.anxiety_rating}/10` : ""}${checkIn.stress_rating !== null ? `, stress ${checkIn.stress_rating}/10` : ""}${checkIn.note ? `: ${checkIn.note}` : ""}`
       )),
@@ -1270,7 +1289,7 @@ export default function SessionPrepPage() {
         || latestSessionSummary?.summary_text
         || null,
     }
-  }, [clientRecord, clientReflections, homeworkProgressItems, latestSessionSummary, moodCheckIns])
+  }, [allClientReflections, clientRecord, homeworkProgressItems, latestSessionSummary, moodCheckIns])
   const filteredJourneyItems = journeyFilter === "all"
     ? timeline
     : timeline.filter((item) => item.type === journeyFilter)
@@ -1397,7 +1416,7 @@ export default function SessionPrepPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Homework Completion" value={totalAssignments > 0 ? `${completionRate}%` : "--"} detail={`${completedAssignments}/${totalAssignments} completed`} icon={CheckCircle2} tone="green" progress={completionRate} />
-        <MetricCard title="Reflection Rate" value={reflectionRate !== null ? `${reflectionRate}%` : "--"} detail={`${journalReflectionCount} reflections submitted`} icon={MessageSquare} tone="purple" progress={reflectionRate || 0} />
+        <MetricCard title="Reflection Rate" value={reflectionRate !== null ? `${reflectionRate}%` : "--"} detail={`${reflectionCount} reflections submitted`} icon={MessageSquare} tone="purple" progress={reflectionRate || 0} />
         <MetricCard title="Mood Trend" value={moodTrend} detail={mostRecentMood ? `Latest ${mostRecentMood.mood_rating}/10` : "No check-ins yet"} icon={moodTrend === "declining" ? TrendingDown : TrendingUp} tone={moodTrend === "declining" ? "red" : moodTrend === "improving" ? "green" : "amber"} />
         <MetricCard title="Days Since Activity" value={daysSinceLastActivity !== null ? String(daysSinceLastActivity) : "--"} detail={formatRelativeActivity(lastActivityAt)} icon={Clock} tone={daysSinceLastActivity !== null && daysSinceLastActivity >= 14 ? "red" : "slate"} />
       </div>
@@ -1639,7 +1658,7 @@ export default function SessionPrepPage() {
             client={clientRecord}
             assignments={assignments}
             worksheetAssignments={worksheetAssignments}
-            reflections={clientReflections}
+            reflections={allClientReflections}
             moodCheckIns={moodCheckIns}
             progressNotes={progressNotes}
             sessionSummaries={sessionSummaries}

@@ -93,3 +93,18 @@ test("session prep keeps hooks stable and provides a route error boundary", asyn
   assert.match(errorBoundary, /Session prep couldn’t load/)
   assert.match(errorBoundary, /reset/)
 })
+
+test("assignment reflections feed Session Prep metrics, preview, and AI context", async () => {
+  const [route, page] = await Promise.all([
+    readFile(new URL("../app/api/session-summary/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/dashboard/clients/[id]/session-prep/page.tsx", import.meta.url), "utf8"),
+  ])
+
+  assert.match(route, /const assignmentReflections =/)
+  assert.match(route, /reflections: reflections\.length/)
+  assert.match(route, /\n\s+reflections,\n/)
+  assert.match(page, /const allClientReflections =/)
+  assert.match(page, /const reflectionCount = allClientReflections\.length/)
+  assert.match(page, /const latestReflection = allClientReflections\[0\]/)
+  assert.doesNotMatch(page, /journalReflectionCount/)
+})

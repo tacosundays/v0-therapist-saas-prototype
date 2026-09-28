@@ -30,10 +30,11 @@ test("resume restores the saved step safely", () => {
 })
 
 test("dashboard guard, Settings resume, and real product actions are wired", async () => {
-  const [layout, settings, onboarding] = await Promise.all([
+  const [layout, settings, onboarding, provisioningRoute] = await Promise.all([
     readFile(new URL("../app/dashboard/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/dashboard/settings/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/provision-therapist/route.ts", import.meta.url), "utf8"),
   ])
 
   assert.match(layout, /shouldShowOnboarding/)
@@ -45,4 +46,9 @@ test("dashboard guard, Settings resume, and real product actions are wired", asy
   assert.match(onboarding, /dashboard\/library\?onboarding=1&clientId=/)
   assert.match(onboarding, /session-prep/)
   assert.match(onboarding, /onboarding_status/)
+  assert.match(onboarding, /\/api\/auth\/provision-therapist/)
+  assert.match(provisioningRoute, /auth\.getUser\(token\)/)
+  assert.match(provisioningRoute, /user\.user_metadata\?\.role !== "therapist"/)
+  assert.match(provisioningRoute, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.match(provisioningRoute, /auth_user_id: user\.id/)
 })

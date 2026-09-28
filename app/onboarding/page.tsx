@@ -78,8 +78,21 @@ export default function OnboardingPage() {
     setError(null)
     try {
       const supabase = getClient() as any
-      const { therapistId } = await getTherapistId()
-      if (!therapistId) throw new Error("We could not find your therapist account.")
+      let { therapistId } = await getTherapistId()
+      if (!therapistId) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) throw new Error("Please sign in again to finish setting up your account.")
+
+        const provisionResponse = await fetch("/api/auth/provision-therapist", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        const provisionResult = await provisionResponse.json().catch(() => null)
+        if (!provisionResponse.ok || !provisionResult?.therapistId) {
+          throw new Error(provisionResult?.error || "We could not finish setting up your therapist account.")
+        }
+        therapistId = provisionResult.therapistId
+      }
 
       const [{ data: therapistData, error: therapistError }, { data: clientData, error: clientError }] = await Promise.all([
         supabase

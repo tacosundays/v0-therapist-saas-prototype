@@ -241,9 +241,13 @@ export default function BillingPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="saas-page-header pl-14 md:pl-0">
-        <p className="saas-eyebrow mb-2">Subscription</p>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Billing</h1>
-        <p className="mt-2 text-sm text-slate-500">Manage your plan, usage, and Stripe billing portal.</p>
+        <div className="max-w-lg">
+          <p className="saas-eyebrow mb-2">Subscription</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Billing</h1>
+          <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+            Manage your plan, usage, and Stripe billing portal.
+          </p>
+        </div>
       </div>
 
       {/* Success Message */}

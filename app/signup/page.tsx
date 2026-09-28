@@ -40,22 +40,28 @@ export default function SignupPage() {
   useEffect(() => {
     const checkSession = async () => {
       if (isRedirecting.current) return
-      
-      const supabase = getClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session && !isRedirecting.current) {
-        isRedirecting.current = true
-        const userRole = session.user?.user_metadata?.role
-        if (userRole === "client") {
-          window.location.href = "/client-portal"
-        } else {
-          window.location.href = "/dashboard"
+
+      try {
+        const supabase = getClient()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
+
+        if (session && !isRedirecting.current) {
+          isRedirecting.current = true
+          const userRole = session.user?.user_metadata?.role
+          if (userRole === "client") {
+            window.location.href = "/client-portal"
+          } else {
+            window.location.href = "/dashboard"
+          }
+          return
         }
-        return
+      } catch (caught) {
+        console.error("Unable to verify signup session:", caught)
+        setError("We could not verify your session. Check your connection and try again.")
+      } finally {
+        if (!isRedirecting.current) setIsCheckingSession(false)
       }
-      
-      setIsCheckingSession(false)
     }
 
     checkSession()
@@ -85,6 +91,8 @@ export default function SignupPage() {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
+
+    try {
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters")
@@ -243,8 +251,6 @@ export default function SignupPage() {
       }
     }
 
-    setIsLoading(false)
-
     // If session exists (email confirmation disabled), redirect to appropriate page ONCE
     if (authData.session && !isRedirecting.current) {
       isRedirecting.current = true
@@ -259,6 +265,12 @@ export default function SignupPage() {
 
     // No session means email confirmation is required - show verification message
     setShowVerificationMessage(true)
+    } catch (caught) {
+      console.error("Signup request failed:", caught)
+      setError("Signup could not be completed. Check your connection and try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Show loading while checking session

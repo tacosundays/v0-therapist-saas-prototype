@@ -217,7 +217,7 @@ export default function BillingPage() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="saas-page-header pl-14 md:pl-0">
+        <div className="saas-page-header pl-14 md:pl-6">
           <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
           <div className="mt-3 h-8 w-40 animate-pulse rounded bg-slate-200" />
           <div className="mt-3 h-4 w-64 animate-pulse rounded bg-slate-100" />
@@ -240,7 +240,7 @@ export default function BillingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="saas-page-header pl-14 md:pl-0">
+      <div className="saas-page-header pl-14 md:pl-6">
         <div className="max-w-lg">
           <p className="saas-eyebrow mb-2">Subscription</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Billing</h1>

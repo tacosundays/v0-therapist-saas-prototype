@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!isPauboxConfigured()) {
-      return NextResponse.json({ error: "PAUBOX_API_KEY is not configured" }, { status: 500 })
+      return NextResponse.json({ error: "Invitation email is temporarily unavailable" }, { status: 503 })
     }
 
     if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
@@ -56,7 +56,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (therapistError) {
-      return NextResponse.json({ error: therapistError.message }, { status: 500 })
+      console.error("Invitation therapist lookup failed:", therapistError)
+      return NextResponse.json({ error: "Invitation email could not be prepared" }, { status: 500 })
     }
 
     if (!therapist) {
@@ -72,7 +73,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (clientError) {
-      return NextResponse.json({ error: clientError.message }, { status: 500 })
+      console.error("Invitation client lookup failed:", clientError)
+      return NextResponse.json({ error: "Invitation email could not be prepared" }, { status: 500 })
     }
 
     if (!client?.email) {
@@ -106,13 +108,15 @@ export async function POST(request: Request) {
       .is("user_id", null)
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      console.error("Invitation delivery status update failed:", updateError)
+      return NextResponse.json({ error: "Invitation was sent, but its status could not be saved" }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, id: delivery.id })
   } catch (error) {
+    console.error("Invitation email delivery failed:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to send invitation email" },
+      { error: "Invitation email could not be delivered. Copy the invite link and send it manually." },
       { status: 500 },
     )
   }

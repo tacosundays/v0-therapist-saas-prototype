@@ -50,60 +50,55 @@ export default function PortalPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       if (isRedirecting.current) return
-      
-      const supabase = getClient()
-      
-      // Get current user - require authentication
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        // Not authenticated, redirect to login
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          window.location.href = "/login"
+
+      try {
+        const supabase = getClient()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
+        if (!session) {
+          if (!isRedirecting.current) {
+            isRedirecting.current = true
+            window.location.href = "/login"
+          }
+          return
         }
-        return
-      }
-      
-      const user = session.user
-      
-      // Check user role - if therapist, redirect to dashboard
-      const userRole = user.user_metadata?.role
-      if (userRole === "therapist") {
-        if (!isRedirecting.current) {
-          isRedirecting.current = true
-          window.location.href = "/dashboard"
+
+        const user = session.user
+        const userRole = user.user_metadata?.role
+        if (userRole === "therapist") {
+          if (!isRedirecting.current) {
+            isRedirecting.current = true
+            window.location.href = "/dashboard"
+          }
+          return
         }
-        return
+
+        const { clientRecord: client } = await getClientRecord()
+        if (!client) {
+          setError("Your portal is not ready yet. Please contact your therapist to finish setup.")
+          return
+        }
+
+        setClientRecord(client)
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from("assignments")
+          .select("*")
+          .eq("client_id", client.id)
+          .order("created_at", { ascending: false })
+
+        if (assignmentsError) throw assignmentsError
+        setAssignments(assignmentsData || [])
+      } catch (caught) {
+        console.error("Unable to load client portal:", caught)
+        setError("The portal could not be loaded. Check your connection and try again.")
+      } finally {
+        if (!isRedirecting.current) setIsLoading(false)
       }
-
-      const { clientRecord: client } = await getClientRecord()
-
-
-      if (!client) {
-        setError("Your portal is not ready yet. Please contact your therapist to finish setup.")
-        setIsLoading(false)
-        return
-      }
-
-      setClientRecord(client)
-
-      // Fetch assignments for this client
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from("assignments")
-        .select("*")
-        .eq("client_id", client.id)
-        .order("created_at", { ascending: false })
-
-      if (assignmentsError) {
-        console.error("Error fetching assignments:", assignmentsError)
-      }
-
-      setAssignments(assignmentsData || [])
-      setIsLoading(false)
     }
 
     fetchData()
@@ -114,6 +109,7 @@ export default function PortalPage() {
 
     setIsSubmitting(true)
     setSubmitSuccess(false)
+    setActionError(null)
 
     const supabase = getClient() as any
     const completedAt = new Date().toISOString()
@@ -131,6 +127,7 @@ export default function PortalPage() {
 
     if (updateError) {
       console.error("Error updating assignment:", updateError)
+      setActionError("Your assignment could not be saved. Check your connection and try again.")
       setIsSubmitting(false)
       return
     }
@@ -159,6 +156,7 @@ export default function PortalPage() {
 
   const openAssignment = async (assignment: Assignment) => {
     setSelectedAssignment(assignment.id)
+    setActionError(null)
 
     if (assignment.completed || assignment.status === "started" || assignment.started_at) return
 
@@ -176,6 +174,7 @@ export default function PortalPage() {
 
     if (updateError) {
       console.error("Error marking assignment started:", updateError)
+      setActionError("Progress could not be saved. You can continue, then try again before submitting.")
       return
     }
 
@@ -253,6 +252,13 @@ export default function PortalPage() {
 
   return (
     <div className="space-y-8">
+      {actionError && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <div className="flex-1">{actionError}</div>
+          <Button variant="ghost" size="sm" onClick={() => setActionError(null)}>Dismiss</Button>
+        </div>
+      )}
       {/* Welcome */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}

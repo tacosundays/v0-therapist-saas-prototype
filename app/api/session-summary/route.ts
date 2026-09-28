@@ -11,20 +11,6 @@ function getBearerToken(request: Request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : null
 }
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === "object") {
-    const errorObject = error as { message?: string; details?: string; hint?: string; code?: string }
-    return [
-      errorObject.message,
-      errorObject.details ? `Details: ${errorObject.details}` : null,
-      errorObject.hint ? `Hint: ${errorObject.hint}` : null,
-      errorObject.code ? `Code: ${errorObject.code}` : null,
-    ].filter(Boolean).join(" ")
-  }
-  return "Unknown error"
-}
-
 function buildSummaryText(summary: SessionSummarySections) {
   return [
     `Client Overview\n${summary.clientOverview}`,
@@ -65,7 +51,7 @@ export async function POST(request: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!openAiApiKey) {
-      return NextResponse.json({ error: "OPENAI_API_KEY is not configured" }, { status: 500 })
+      return NextResponse.json({ error: "AI Session Prep is temporarily unavailable" }, { status: 503 })
     }
 
     if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
@@ -100,7 +86,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (therapistError) {
-      return NextResponse.json({ error: therapistError.message }, { status: 500 })
+      console.error("[v0] Session Summary: therapist lookup failed", therapistError)
+      return NextResponse.json({ error: "Session Prep could not be loaded" }, { status: 500 })
     }
 
     if (!therapist) {
@@ -116,7 +103,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (clientError) {
-      return NextResponse.json({ error: clientError.message }, { status: 500 })
+      console.error("[v0] Session Summary: client lookup failed", clientError)
+      return NextResponse.json({ error: "Session Prep could not be loaded" }, { status: 500 })
     }
 
     if (!client) {
@@ -359,8 +347,9 @@ export async function POST(request: Request) {
     const openAiResult = await openAiResponse.json().catch(() => null)
 
     if (!openAiResponse.ok) {
+      console.error("[v0] Session Summary: AI provider rejected request", openAiResponse.status)
       return NextResponse.json(
-        { error: openAiResult?.error?.message || "OpenAI session summary generation failed" },
+        { error: "AI Session Prep is temporarily unavailable. Please try again." },
         { status: 502 },
       )
     }
@@ -374,8 +363,8 @@ export async function POST(request: Request) {
     let parsedSummary: unknown
     try {
       parsedSummary = JSON.parse(content)
-    } catch (error) {
-      return NextResponse.json({ error: `OpenAI returned invalid JSON: ${getErrorMessage(error)}` }, { status: 502 })
+    } catch {
+      return NextResponse.json({ error: "AI Session Prep returned an invalid response. Please try again." }, { status: 502 })
     }
 
     const summary = normalizeSessionSummary(parsedSummary, sourceCounts)
@@ -395,14 +384,15 @@ export async function POST(request: Request) {
       .single()
 
     if (saveError) {
-      return NextResponse.json({ error: saveError.message }, { status: 500 })
+      console.error("[v0] Session Summary: save failed", saveError)
+      return NextResponse.json({ error: "Session Prep could not be saved. Please try again." }, { status: 500 })
     }
 
     return NextResponse.json({ summary: savedSummary })
   } catch (error) {
     console.error("[v0] Session Summary: failed to generate", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate session summary" },
+      { error: "AI Session Prep could not be generated. Please try again." },
       { status: 500 },
     )
   }

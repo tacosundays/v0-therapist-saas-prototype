@@ -61,7 +61,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (lookupError) {
-      return NextResponse.json({ error: lookupError.message }, { status: 500 })
+      console.error("Invitation lookup failed:", lookupError)
+      return NextResponse.json({ error: "Invitation could not be verified. Please try again." }, { status: 500 })
     }
 
     if (!client) {
@@ -84,13 +85,15 @@ export async function POST(request: Request) {
       .eq("id", clientId)
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      console.error("Invitation acceptance failed:", updateError)
+      return NextResponse.json({ error: "Invitation could not be accepted. Please try again." }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error("Invitation acceptance failed:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to accept invite" },
+      { error: "Invitation could not be accepted. Please try again." },
       { status: 500 }
     )
   }

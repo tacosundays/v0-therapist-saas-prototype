@@ -84,6 +84,43 @@ export async function getCheckoutAvailability() {
   )
 }
 
+function isMissingStripeResource(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'resource_missing'
+  )
+}
+
+async function getOrCreateStripeCustomer(
+  customerId: string | null,
+  organization: { id: string; name: string },
+  therapistId: string,
+  email: string,
+): Promise<string> {
+  if (customerId) {
+    try {
+      const customer = await stripe.customers.retrieve(customerId)
+      if (!customer.deleted) return customer.id
+    } catch (error) {
+      // Sandbox customer IDs do not exist after switching Stripe to live mode.
+      // Replace only that known condition and surface all other failures.
+      if (!isMissingStripeResource(error)) throw error
+    }
+  }
+
+  const customer = await stripe.customers.create({
+    email,
+    name: organization.name,
+    metadata: {
+      organization_id: organization.id,
+      billing_therapist_id: therapistId,
+    },
+  })
+  return customer.id
+}
+
 export async function startSubscriptionCheckout(productId: string, _userData: UserData) {
   try {
     const normalizedProductId = normalizeProductId(productId)
@@ -114,20 +151,15 @@ export async function startSubscriptionCheckout(productId: string, _userData: Us
       return { error: `Failed to load organization billing: ${organizationError?.message || 'not found'}` }
     }
 
-    let customerId = organization.stripe_customer_id
+    const savedCustomerId = organization.stripe_customer_id
+    const customerId = await getOrCreateStripeCustomer(
+      savedCustomerId,
+      organization,
+      tenant.therapistId,
+      user.email!,
+    )
 
-    // Create a Stripe customer if one doesn't exist
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: organization.name,
-        metadata: {
-          organization_id: tenant.organizationId,
-          billing_therapist_id: tenant.therapistId,
-        },
-      })
-      customerId = customer.id
-
+    if (customerId !== savedCustomerId) {
       await supabase
         .from('organizations')
         .update({ stripe_customer_id: customerId })

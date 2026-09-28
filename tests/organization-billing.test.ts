@@ -40,3 +40,10 @@ test("billing code does not log Stripe secrets or price configuration", () => {
   assert.doesNotMatch(actions, /\[v0\]/)
   assert.doesNotMatch(webhook, /\[v0\]/)
 })
+
+test("checkout replaces stale sandbox customer ids after switching Stripe live", () => {
+  assert.match(actions, /stripe\.customers\.retrieve\(customerId\)/)
+  assert.match(actions, /error\.code === 'resource_missing'/)
+  assert.match(actions, /customerId !== savedCustomerId/)
+  assert.match(actions, /from\('organizations'\)[\s\S]{0,120}update\(\{ stripe_customer_id: customerId \}\)/)
+})

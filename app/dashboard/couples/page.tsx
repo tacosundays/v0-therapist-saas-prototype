@@ -180,10 +180,7 @@ export default function CouplesPage() {
 
     try {
       const supabase = getClient() as any
-      const { therapistId: resolvedTherapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Couples: auth email:", userEmail)
-      console.log("[v0] Couples: therapist id found:", resolvedTherapistId ?? "none")
+      const { therapistId: resolvedTherapistId } = await getTherapistId()
 
       if (!resolvedTherapistId) {
         setError("No therapist account found for your email.")
@@ -200,7 +197,6 @@ export default function CouplesPage() {
 
       if (clientsResult.error) throwQueryError("clients query failed", clientsResult.error)
 
-      console.log("[v0] Couples: clients count:", clientsResult.data?.length ?? 0)
       setClients(clientsResult.data || [])
 
       const [couplesResult, checkInsResult, assignmentsResult, notesResult] = await Promise.all([

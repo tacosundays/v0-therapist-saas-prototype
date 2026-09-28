@@ -464,8 +464,6 @@ export default function SecurityPage() {
       try {
         const { therapistId, userEmail } = await getTherapistId()
 
-        console.log("[v0] Security: auth email:", userEmail)
-        console.log("[v0] Security: therapist id found:", therapistId ?? "none")
         setUserEmail(userEmail || null)
 
         if (!therapistId) {

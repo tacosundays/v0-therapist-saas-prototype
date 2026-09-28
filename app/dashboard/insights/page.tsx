@@ -209,10 +209,7 @@ export default function InsightsPage() {
         }
 
         const supabase = getClient()
-        const { therapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] Insights: auth email:", userEmail)
-        console.log("[v0] Insights: therapist id found:", therapistId ?? "none")
+        const { therapistId } = await getTherapistId()
 
         if (!therapistId) {
           setError("No therapist account found for your email.")
@@ -250,7 +247,6 @@ export default function InsightsPage() {
         setAssignments(assignmentsResult.data || [])
         setWorksheetAssignments(worksheetAssignmentsResult.data || [])
 
-        console.log("[v0] Insights: clients count:", clientsResult.data?.length ?? 0)
         console.log("[v0] Insights: assignments count:", assignmentsResult.data?.length ?? 0)
         console.log("[v0] Insights: worksheet assignments count:", worksheetAssignmentsResult.data?.length ?? 0)
       } catch (err) {

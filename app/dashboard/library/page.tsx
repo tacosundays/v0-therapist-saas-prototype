@@ -116,10 +116,7 @@ export default function LibraryPage() {
       let customContent: ContentItem[] = []
       let availableBuiltInContent = builtInContent || []
       if (user) {
-        const { therapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] Library: auth email:", userEmail)
-        console.log("[v0] Library: therapist id found:", therapistId ?? "none")
+        const { therapistId } = await getTherapistId()
 
         if (!therapistId) {
           setContentItems(builtInContent || [])

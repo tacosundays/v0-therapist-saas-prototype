@@ -65,10 +65,7 @@ export function AssignHomeworkModal({
       
       if (!user) return
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Assign homework: auth email:", userEmail)
-      console.log("[v0] Assign homework: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) return
 
@@ -83,7 +80,6 @@ export function AssignHomeworkModal({
         return
       }
 
-      console.log("[v0] Assign homework: clients count:", data?.length ?? 0)
       setClients(data || [])
     } catch (err) {
       console.error("Exception fetching clients:", err)
@@ -125,10 +121,7 @@ export function AssignHomeworkModal({
         return
       }
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Assign homework submit: auth email:", userEmail)
-      console.log("[v0] Assign homework submit: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         setError("No therapist account found for your email.")

@@ -165,10 +165,7 @@ export function GenerateWorksheetModal({
         return
       }
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Generate worksheet save: auth email:", userEmail)
-      console.log("[v0] Generate worksheet save: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         setError("No therapist account found for your email.")
@@ -231,10 +228,7 @@ export function GenerateWorksheetModal({
 
       if (!user) return
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Generate worksheet assign: auth email:", userEmail)
-      console.log("[v0] Generate worksheet assign: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) return
 
@@ -244,7 +238,6 @@ export function GenerateWorksheetModal({
         .eq("therapist_id", therapistId)
         .order("full_name")
 
-      console.log("[v0] Generate worksheet assign: clients count:", data?.length ?? 0)
       setClients(data || [])
     } catch (err) {
       console.error("Error fetching clients:", err)
@@ -268,10 +261,7 @@ export function GenerateWorksheetModal({
         return
       }
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Generate worksheet save+assign: auth email:", userEmail)
-      console.log("[v0] Generate worksheet save+assign: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         setError("No therapist account found for your email.")

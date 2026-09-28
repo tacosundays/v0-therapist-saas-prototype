@@ -90,10 +90,8 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         return
       }
 
-      const { clientRecord, userEmail } = await getClientRecord()
+      const { clientRecord } = await getClientRecord()
 
-      console.log("[v0] Worksheet autosave: auth email:", userEmail)
-      console.log("[v0] Worksheet autosave: client id found:", clientRecord?.id ?? "none")
 
       if (!clientRecord) {
         setSaveError(true)
@@ -303,10 +301,8 @@ export function WorksheetForm({ assignmentId, onComplete, onBack }: WorksheetFor
         return
       }
 
-      const { clientRecord, userEmail } = await getClientRecord()
+      const { clientRecord } = await getClientRecord()
 
-      console.log("[v0] Worksheet submit: auth email:", userEmail)
-      console.log("[v0] Worksheet submit: client id found:", clientRecord?.id ?? "none")
 
       if (!clientRecord) {
         setError("Unable to find your client record.")

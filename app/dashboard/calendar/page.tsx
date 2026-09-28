@@ -494,10 +494,7 @@ export default function CalendarPage() {
         }
 
         const supabase = getClient() as any
-        const { therapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] Calendar: auth email:", userEmail)
-        console.log("[v0] Calendar: therapist id found:", therapistId ?? "none")
+        const { therapistId } = await getTherapistId()
 
         if (!therapistId) {
           setError("No therapist account found for your email.")

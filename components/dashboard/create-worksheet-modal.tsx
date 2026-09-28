@@ -128,10 +128,7 @@ export function CreateWorksheetModal({ open, onOpenChange, onWorksheetCreated }:
         return
       }
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Create worksheet: auth email:", userEmail)
-      console.log("[v0] Create worksheet: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         setError("No therapist account found for your email.")

@@ -62,7 +62,6 @@ async function findTherapistByEmail(email: string): Promise<TherapistRecord | nu
 
   if (!normalizedEmail) return null
 
-  console.log("[v0] Therapist lookup auth email:", normalizedEmail)
 
   const { data: therapistRecord, error } = await supabase
     .from("therapists")
@@ -71,11 +70,9 @@ async function findTherapistByEmail(email: string): Promise<TherapistRecord | nu
     .maybeSingle()
 
   if (error) {
-    console.log("[v0] Therapist lookup error:", error.message)
     return null
   }
 
-  console.log("[v0] Therapist id found:", therapistRecord?.id ?? "none")
   return therapistRecord
 }
 
@@ -85,7 +82,6 @@ async function findClientByEmailOrUserId(userId: string, email: string): Promise
 
   if (!normalizedEmail) return null
 
-  console.log("[v0] Client lookup auth email:", normalizedEmail)
 
   const { data: clientMatches, error: clientLookupError } = await supabase
     .from("clients")
@@ -95,7 +91,6 @@ async function findClientByEmailOrUserId(userId: string, email: string): Promise
 
   if (!clientLookupError && clientMatches && clientMatches.length > 0) {
     const clientRecord = clientMatches[0] as ClientRecord
-    console.log("[v0] Client id found:", clientRecord.id)
 
     if (!clientRecord.user_id) {
       const { error: updateError } = await supabase
@@ -108,9 +103,7 @@ async function findClientByEmailOrUserId(userId: string, email: string): Promise
         .eq("id", clientRecord.id)
 
       if (updateError) {
-        console.log("[v0] Failed to link user_id to client:", updateError.message)
       } else {
-        console.log("[v0] Successfully linked user_id to client record")
       }
     }
 
@@ -118,8 +111,6 @@ async function findClientByEmailOrUserId(userId: string, email: string): Promise
   }
 
   if (clientLookupError) {
-    console.log("[v0] Client lookup by user_id/email error:", clientLookupError.message)
-    console.log("[v0] Falling back to client lookup by email only")
   }
 
   const { data: emailClientRecord, error: emailLookupError } = await supabase
@@ -129,11 +120,9 @@ async function findClientByEmailOrUserId(userId: string, email: string): Promise
     .maybeSingle()
 
   if (emailLookupError) {
-    console.log("[v0] Client lookup by email error:", emailLookupError.message)
     return null
   }
 
-  console.log("[v0] Client id found:", emailClientRecord?.id ?? "none")
   return emailClientRecord as ClientRecord | null
 }
 
@@ -186,11 +175,8 @@ export async function checkUserRole(): Promise<UserRoleResult> {
 
   console.log("[v0] ========== ACCOUNT TYPE DEBUG ==========")
   console.log("[v0] Authenticated user id:", userId)
-  console.log("[v0] auth.user.email:", userEmail)
-  console.log("[v0] Normalized email used for matching:", normalizedEmail)
 
   if (!normalizedEmail) {
-    console.log("[v0] No email on auth user - cannot match account")
     console.log("[v0] ========================================")
     return {
       isAuthenticated: true,
@@ -225,10 +211,8 @@ export async function checkUserRole(): Promise<UserRoleResult> {
 
   // 2. Check clients by user_id OR email (case-insensitive)
   const clientRecord = await findClientByEmailOrUserId(userId, normalizedEmail)
-  console.log("[v0] Client record found:", !!clientRecord)
 
   if (clientRecord) {
-    console.log("[v0] Final redirect destination: /client-portal (client)")
     console.log("[v0] ========================================")
     return {
       isAuthenticated: true,
@@ -244,8 +228,6 @@ export async function checkUserRole(): Promise<UserRoleResult> {
 
   // 4. No match in either table - report the exact email searched.
   console.log("[v0] No therapist record found: true")
-  console.log("[v0] No client record found: true")
-  console.log("[v0] No matching record found for email:", normalizedEmail)
   console.log("[v0] Final redirect destination: none (unknown role)")
   console.log("[v0] ========================================")
   return {
@@ -286,10 +268,8 @@ export async function getTherapistId(): Promise<{
   const normalizedEmail = normalizeEmail(userEmail)
 
   console.log("[v0] getTherapistId: auth.user.id:", userId)
-  console.log("[v0] getTherapistId: auth.user.email:", userEmail)
 
   if (!normalizedEmail) {
-    console.log("[v0] getTherapistId: no email on auth user")
     return { therapistId: null, userId, userEmail }
   }
 
@@ -312,7 +292,6 @@ export async function getClientRecord(): Promise<{
   }
 
   const normalizedEmail = normalizeEmail(user.email)
-  console.log("[v0] getClientRecord: auth.user.email:", user.email)
 
   if (!normalizedEmail) {
     return { clientRecord: null, userId: user.id, userEmail: user.email }

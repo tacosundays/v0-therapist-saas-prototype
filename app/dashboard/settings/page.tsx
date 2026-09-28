@@ -118,9 +118,6 @@ export default function SettingsPage() {
         const supabase = getClient()
         const { therapistId: resolvedTherapistId, userEmail } = await getTherapistId()
 
-        console.log("[v0] Settings: auth email:", userEmail)
-        console.log("[v0] Settings: therapist id found:", resolvedTherapistId ?? "none")
-
         if (!resolvedTherapistId) {
           setError("No therapist account found for your email.")
           return

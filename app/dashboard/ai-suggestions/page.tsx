@@ -47,10 +47,7 @@ export default function AISuggestionsPage() {
 
       try {
         const supabase = getClient()
-        const { therapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] AI Suggestions: auth email:", userEmail)
-        console.log("[v0] AI Suggestions: therapist id found:", therapistId ?? "none")
+        const { therapistId } = await getTherapistId()
 
         if (!therapistId) {
           setError("No therapist account found for your email.")
@@ -70,7 +67,6 @@ export default function AISuggestionsPage() {
           return
         }
 
-        console.log("[v0] AI Suggestions: clients count:", clientsData?.length ?? 0)
         setClients(clientsData || [])
 
         const { data: assignmentsData, error: assignmentsError } = await supabase

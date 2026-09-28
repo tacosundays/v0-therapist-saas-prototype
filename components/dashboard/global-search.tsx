@@ -239,10 +239,7 @@ export function GlobalSearch() {
 
       try {
         const supabase = getClient() as any
-        const { therapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] Global search: auth email:", userEmail)
-        console.log("[v0] Global search: therapist id found:", therapistId ?? "none")
+        const { therapistId } = await getTherapistId()
 
         if (!therapistId) {
           setResults(pageResults)

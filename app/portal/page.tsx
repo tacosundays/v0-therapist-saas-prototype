@@ -80,10 +80,8 @@ export default function PortalPage() {
         return
       }
 
-      const { clientRecord: client, userEmail } = await getClientRecord()
+      const { clientRecord: client } = await getClientRecord()
 
-      console.log("[v0] Legacy portal: auth email:", userEmail)
-      console.log("[v0] Legacy portal: client id found:", client?.id ?? "none")
 
       if (!client) {
         setError("Your portal is not ready yet. Please contact your therapist to finish setup.")

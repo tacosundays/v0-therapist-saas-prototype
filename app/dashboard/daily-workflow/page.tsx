@@ -203,10 +203,7 @@ export default function DailyWorkflowPage() {
       }
 
       const supabase = getClient() as any
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Daily Workflow: auth email:", userEmail)
-      console.log("[v0] Daily Workflow: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         setError("No therapist account found for your email.")

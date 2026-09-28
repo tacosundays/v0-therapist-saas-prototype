@@ -68,10 +68,7 @@ export function AssignWorksheetModal({
 
       if (!user) return
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Assign worksheet: auth email:", userEmail)
-      console.log("[v0] Assign worksheet: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) return
 
@@ -82,7 +79,6 @@ export function AssignWorksheetModal({
         .eq("therapist_id", therapistId)
         .order("full_name")
 
-      console.log("[v0] Assign worksheet: clients count:", clientsData?.length ?? 0)
       setClients(clientsData || [])
 
       // Fetch worksheet templates
@@ -131,10 +127,7 @@ export function AssignWorksheetModal({
         return
       }
 
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Assign worksheet submit: auth email:", userEmail)
-      console.log("[v0] Assign worksheet submit: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         setError("No therapist account found for your email.")

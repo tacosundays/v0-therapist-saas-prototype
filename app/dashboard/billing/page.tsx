@@ -64,10 +64,7 @@ export default function BillingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user?.id && user?.email) {
-        const { therapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] Billing: auth email:", userEmail)
-        console.log("[v0] Billing: therapist id found:", therapistId ?? "none")
+        const { therapistId } = await getTherapistId()
 
         setUserData({ 
           id: therapistId || user.id,
@@ -83,7 +80,6 @@ export default function BillingPage() {
             .select("*", { count: "exact", head: true })
             .eq("therapist_id", therapistId)
         
-          console.log("[v0] Billing: clients count:", count || 0)
           setClientCount(count || 0)
         }
       }

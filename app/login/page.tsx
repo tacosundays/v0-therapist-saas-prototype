@@ -194,7 +194,6 @@ export default function LoginPage() {
         email: data.user?.email,
       })
       console.log("[v0] Login: Sign in success, user id:", data.user?.id)
-      console.log("[v0] Login: User email:", data.user?.email)
       console.log("[v0] Login: User role from metadata:", data.user?.user_metadata?.role)
 
       // Resolve account type first. This keeps client login away from therapist-only

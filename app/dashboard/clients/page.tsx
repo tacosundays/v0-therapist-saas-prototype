@@ -129,10 +129,7 @@ export default function ClientsPage() {
       }
 
       // Resolve therapist id by email (therapists.id may != auth.user.id)
-      const { therapistId, userEmail } = await getTherapistId()
-
-      console.log("[v0] Clients page: auth email:", userEmail)
-      console.log("[v0] Clients page: therapist id found:", therapistId ?? "none")
+      const { therapistId } = await getTherapistId()
 
       if (!therapistId) {
         console.log("[v0] Clients page: no therapist record resolved for this account")
@@ -141,7 +138,6 @@ export default function ClientsPage() {
         return
       }
 
-      console.log("[v0] Clients page: loading clients for therapist.id:", therapistId)
 
       // Fetch clients for this therapist
       const { data: clientsData, error: clientsError } = await supabase
@@ -155,8 +151,6 @@ export default function ClientsPage() {
         return
       }
 
-      console.log("[v0] Clients page: clients count:", clientsData?.length ?? 0)
-      console.log("[v0] Clients page: client emails:", ((clientsData || []) as Client[]).map(c => c.email))
 
       // Fetch assignments for this therapist
       const { data: assignmentsData, error: assignmentsError } = await supabase

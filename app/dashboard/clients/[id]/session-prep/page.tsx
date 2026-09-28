@@ -430,10 +430,7 @@ export default function SessionPrepPage() {
         }
 
         const supabase = getClient() as any
-        const { therapistId: resolvedTherapistId, userEmail } = await getTherapistId()
-
-        console.log("[v0] Session Prep: auth email:", userEmail)
-        console.log("[v0] Session Prep: therapist id found:", resolvedTherapistId ?? "none")
+        const { therapistId: resolvedTherapistId } = await getTherapistId()
 
         if (!resolvedTherapistId) {
           setError("No therapist account found for your email.")

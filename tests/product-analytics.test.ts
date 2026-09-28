@@ -54,6 +54,9 @@ test("shared analytics trigger only reads assignment status for assignment rows"
   const migration = readFileSync(new URL("../supabase/migrations/034_fix_cross_table_analytics_trigger.sql", import.meta.url), "utf8")
   assert.match(migration, /IF TG_TABLE_NAME = 'assignments' THEN\s+IF NEW\.status = 'assigned' THEN/)
   assert.doesNotMatch(migration, /TG_TABLE_NAME = 'assignments' AND NEW\.status/)
+  assert.match(migration, /ELSIF TG_TABLE_NAME = 'clients' THEN[\s\S]*IF TG_OP = 'INSERT' THEN/)
+  assert.doesNotMatch(migration, /TG_TABLE_NAME = 'clients' AND TG_OP/)
+  assert.match(migration, /ELSIF TG_TABLE_NAME = 'worksheet_templates' THEN\s+IF NEW\.source_type = 'ai' THEN/)
 })
 
 test("client analytics storage failures remain best-effort and non-blocking", () => {

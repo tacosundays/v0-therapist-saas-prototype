@@ -15,22 +15,32 @@ BEGIN
   IF TG_TABLE_NAME = 'therapists' THEN
     analytics_therapist_id := NEW.id;
     analytics_event_name := 'therapist_signup';
-  ELSIF TG_TABLE_NAME = 'clients' AND TG_OP = 'INSERT' THEN
+  ELSIF TG_TABLE_NAME = 'clients' THEN
     analytics_therapist_id := NEW.therapist_id;
-    analytics_event_name := 'first_client_created';
-  ELSIF TG_TABLE_NAME = 'clients' AND TG_OP = 'UPDATE'
-    AND OLD.invite_accepted_at IS NULL AND NEW.invite_accepted_at IS NOT NULL THEN
-    analytics_therapist_id := NEW.therapist_id;
-    analytics_event_name := 'first_client_invitation_accepted';
+    IF TG_OP = 'INSERT' THEN
+      analytics_event_name := 'first_client_created';
+    ELSIF TG_OP = 'UPDATE' THEN
+      IF OLD.invite_accepted_at IS NULL AND NEW.invite_accepted_at IS NOT NULL THEN
+        analytics_event_name := 'first_client_invitation_accepted';
+      ELSE
+        RETURN NEW;
+      END IF;
+    ELSE
+      RETURN NEW;
+    END IF;
   ELSIF TG_TABLE_NAME = 'assignments' THEN
     analytics_therapist_id := NEW.therapist_id;
     analytics_event_name := 'first_assignment_created';
   ELSIF TG_TABLE_NAME = 'worksheet_assignments' THEN
     analytics_therapist_id := NEW.therapist_id;
     analytics_event_name := 'first_assignment_sent';
-  ELSIF TG_TABLE_NAME = 'worksheet_templates' AND NEW.source_type = 'ai' THEN
-    analytics_therapist_id := NEW.therapist_id;
-    analytics_event_name := 'worksheet_generated';
+  ELSIF TG_TABLE_NAME = 'worksheet_templates' THEN
+    IF NEW.source_type = 'ai' THEN
+      analytics_therapist_id := NEW.therapist_id;
+      analytics_event_name := 'worksheet_generated';
+    ELSE
+      RETURN NEW;
+    END IF;
   ELSIF TG_TABLE_NAME = 'session_summaries' THEN
     analytics_therapist_id := NEW.therapist_id;
     analytics_event_name := 'ai_session_prep_completed';

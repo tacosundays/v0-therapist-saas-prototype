@@ -1,12 +1,12 @@
 import Link from "next/link"
 import { SessionStepsLogo } from "@/components/brand/sessionsteps-logo"
-import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/contact"
+import { SUPPORT_EMAIL_HREF } from "@/lib/contact"
 
 export function Footer() {
   return (
     <footer className="py-12 px-4 sm:px-6 lg:px-8 border-t border-border">
       <div className="max-w-7xl mx-auto">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
           <div className="sm:col-span-2 lg:col-span-1">
             <Link href="/" className="mb-4 inline-flex" aria-label="SessionSteps home">
               <SessionStepsLogo wordmarkClassName="text-lg" />
@@ -35,11 +35,6 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Log in
-                </Link>
-              </li>
-              <li>
                 <Link href="/demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   View demo
                 </Link>
@@ -48,20 +43,13 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-foreground mb-4">For users</h4>
+            <h4 className="font-semibold text-foreground mb-4">Access</h4>
             <ul className="space-y-2">
               <li><Link href="/signup" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Start free trial</Link></li>
               <li><Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Therapist login</Link></li>
               <li><Link href="/client-portal" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Client Portal</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold text-foreground mb-4">Support</h4>
-            <ul className="space-y-2">
               <li><Link href="/dashboard/help" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Help &amp; Getting Started</Link></li>
               <li><a href={SUPPORT_EMAIL_HREF} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact Support</a></li>
-              <li><a href={SUPPORT_EMAIL_HREF} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{SUPPORT_EMAIL}</a></li>
             </ul>
           </div>
 
@@ -83,11 +71,6 @@ export function Footer() {
                   Data retention
                 </Link>
               </li>
-              <li>
-                <Link href="/ai-and-emergency-use" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  AI &amp; emergency use
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -98,6 +81,7 @@ export function Footer() {
               <li><Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link></li>
               <li><Link href="/baa" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Business Associate Agreement</Link></li>
               <li><Link href="/acceptable-use" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Acceptable Use</Link></li>
+              <li><Link href="/ai-and-emergency-use" className="text-sm text-muted-foreground hover:text-foreground transition-colors">AI &amp; emergency use</Link></li>
               <li><Link href="/cookies" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Cookie Notice</Link></li>
               <li><Link href="/accessibility" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Accessibility</Link></li>
             </ul>

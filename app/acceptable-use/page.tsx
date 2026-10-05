@@ -1,0 +1,10 @@
+import type { Metadata } from "next"
+import { PublicPolicyPage } from "@/components/legal/public-policy-page"
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/contact"
+export const metadata: Metadata = { title: "Acceptable Use Policy | SessionSteps" }
+export default function AcceptableUsePage() { return <PublicPolicyPage eyebrow="Legal" title="Acceptable Use Policy" description="Rules that protect SessionSteps customers, clients, and systems.">
+  <section><h2>Use SessionSteps lawfully</h2><p>You may use SessionSteps only for lawful, authorized professional purposes and in compliance with privacy, healthcare, employment, intellectual-property, and communications laws.</p></section>
+  <section><h2>Prohibited activity</h2><ul><li>Accessing accounts, workspaces, client records, or systems without authorization.</li><li>Sharing credentials, bypassing access controls, probing vulnerabilities without written permission, or disrupting the service.</li><li>Uploading malware, unlawful or infringing content, or content you lack authority to process.</li><li>Harassment, discrimination, exploitation, fraud, impersonation, spam, or deceptive communications.</li><li>Using SessionSteps for emergency dispatch, continuous patient monitoring, or illegal surveillance.</li><li>Using AI output as the sole basis for diagnosis, treatment, safety, eligibility, or other consequential decisions.</li><li>Reverse engineering, scraping, reselling, or automated use except as expressly authorized.</li></ul></section>
+  <section><h2>PHI and sensitive information</h2><p>PHI may be used only by eligible customers with an effective BAA and only in approved features and integrations. Do not place PHI in support email, feedback forms, payment descriptions, or other fields not intended for clinical content.</p></section>
+  <section><h2>Enforcement</h2><p>We may investigate, limit, suspend, or terminate use that threatens users, violates this policy, or creates legal or security risk. We will use reasonable efforts to provide notice when circumstances permit. Report concerns to <a href={SUPPORT_EMAIL_HREF}>{SUPPORT_EMAIL}</a>.</p></section>
+  </PublicPolicyPage> }

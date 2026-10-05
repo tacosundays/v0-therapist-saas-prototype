@@ -1,0 +1,10 @@
+export const SUPPORT_EMAIL = "support@sessionsteps.com"
+export const SUPPORT_EMAIL_HREF = `mailto:${SUPPORT_EMAIL}`
+export const PRIVACY_EMAIL = "privacy@sessionsteps.com"
+export const PRIVACY_EMAIL_HREF = `mailto:${PRIVACY_EMAIL}`
+export const SECURITY_EMAIL = "security@sessionsteps.com"
+export const SECURITY_EMAIL_HREF = `mailto:${SECURITY_EMAIL}`
+export const LEGAL_EMAIL = "legal@sessionsteps.com"
+export const LEGAL_EMAIL_HREF = `mailto:${LEGAL_EMAIL}`
+export const BILLING_EMAIL = "billing@sessionsteps.com"
+export const BILLING_EMAIL_HREF = `mailto:${BILLING_EMAIL}`

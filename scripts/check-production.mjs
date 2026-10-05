@@ -1,5 +1,23 @@
 const origin = process.env.SESSIONSTEPS_MONITOR_ORIGIN || "https://sessionsteps.com"
-const paths = ["/", "/demo/therapist", "/privacy", "/terms", "/security", "/api/health"]
+const paths = [
+  "/",
+  "/pricing",
+  "/demo/therapist",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/privacy",
+  "/terms",
+  "/security",
+  "/baa",
+  "/acceptable-use",
+  "/data-retention",
+  "/subprocessors",
+  "/cookies",
+  "/accessibility",
+  "/ai-and-emergency-use",
+  "/api/health",
+]
 
 const failures = []
 

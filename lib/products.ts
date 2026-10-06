@@ -28,6 +28,7 @@ export const PRODUCTS: Product[] = [
       "Progress tracking",
       "Email support",
       "Basic analytics",
+      "BAA available for eligible customers",
     ],
   },
   {
@@ -47,6 +48,7 @@ export const PRODUCTS: Product[] = [
       "Priority support",
       "Advanced analytics",
       "Client satisfaction tracking",
+      "BAA available for eligible customers",
     ],
   },
   {
@@ -66,7 +68,7 @@ export const PRODUCTS: Product[] = [
       "Practice-wide analytics",
       "Custom branding",
       "Dedicated success manager",
-      "HIPAA BAA included",
+      "BAA available for eligible customers",
     ],
   },
 ]

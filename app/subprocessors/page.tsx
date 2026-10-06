@@ -8,7 +8,7 @@ const processors = [
   ["OpenAI", "AI-assisted features invoked by authorized users", "United States"],
   ["Stripe", "Subscriptions, payments, invoicing, and fraud prevention", "United States / global infrastructure"],
   ["Google Workspace", "Company email and support communications", "United States / global infrastructure"],
-  ["Amazon Web Services or Resend", "Transactional email delivery; only the provider configured for the deployment is used", "United States / global infrastructure"],
+  ["Paubox", "Transactional email delivery", "United States"],
 ]
 export default function SubprocessorsPage() { return <PublicPolicyPage eyebrow="Privacy" title="Subprocessor List" description="Third parties SessionSteps uses to provide, secure, support, and bill for the service.">
   <section><h2>Current providers</h2><div className="overflow-x-auto"><table className="w-full min-w-[620px] border-collapse text-left"><thead><tr className="border-b"><th className="p-3 text-foreground">Provider</th><th className="p-3 text-foreground">Purpose</th><th className="p-3 text-foreground">Location</th></tr></thead><tbody>{processors.map(([name,purpose,location]) => <tr className="border-b" key={name}><td className="p-3 font-medium text-foreground">{name}</td><td className="p-3">{purpose}</td><td className="p-3">{location}</td></tr>)}</tbody></table></div></section>

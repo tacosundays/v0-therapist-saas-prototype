@@ -10,7 +10,6 @@ export function GET(request: NextRequest) {
     {
       status: readiness.ready ? "ok" : "degraded",
       service: "sessionsteps",
-      checks: readiness.checks,
       timestamp: new Date().toISOString(),
     },
     {

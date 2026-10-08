@@ -16,6 +16,9 @@ const paths = [
   "/cookies",
   "/accessibility",
   "/ai-and-emergency-use",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/icon.svg",
   "/api/health",
 ]
 
@@ -50,6 +53,7 @@ for (const path of paths) {
       const requiredHeaders = {
         "x-content-type-options": "nosniff",
         "x-frame-options": "DENY",
+        "cross-origin-opener-policy": "same-origin",
       }
       for (const [name, expected] of Object.entries(requiredHeaders)) {
         if (response.headers.get(name) !== expected) {
@@ -58,6 +62,10 @@ for (const path of paths) {
       }
       if (!response.headers.get("strict-transport-security")) {
         failures.push(`${path}: missing strict-transport-security header`)
+      }
+      const csp = response.headers.get("content-security-policy") || ""
+      if (!csp.includes("frame-ancestors 'none'") || !csp.includes("object-src 'none'")) {
+        failures.push(`${path}: missing required content-security-policy directives`)
       }
     }
 

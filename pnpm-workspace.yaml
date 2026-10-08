@@ -1,3 +1,8 @@
 allowBuilds:
   sharp: true
   unrs-resolver: true
+overrides:
+  baseline-browser-mapping: 2.11.27
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@3.0.211'
+  - ai@6.0.302

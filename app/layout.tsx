@@ -3,25 +3,27 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SessionSteps - Keep therapy working between sessions',
+  metadataBase: new URL('https://sessionsteps.com'),
+  title: {
+    default: 'SessionSteps - Keep therapy working between sessions',
+    template: '%s | SessionSteps',
+  },
   description: 'The clinical continuity platform for behavioral health—connecting session intelligence, between-session engagement, and longitudinal outcomes.',
-  generator: 'v0.app',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    url: '/',
+    siteName: 'SessionSteps',
+    title: 'SessionSteps - Keep therapy working between sessions',
+    description: 'Secure clinical continuity software for behavioral health providers.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'SessionSteps - Keep therapy working between sessions',
+    description: 'Secure clinical continuity software for behavioral health providers.',
+  },
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
   },
 }
 

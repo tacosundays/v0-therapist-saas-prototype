@@ -60,7 +60,6 @@ export const PRODUCTS: Product[] = [
     clientLimit: null,
     therapistLimit: 5,
     priceEnvVar: "STRIPE_GROUP_PRICE_ID",
-    contactSalesIfMissingPrice: true,
     features: [
       "Unlimited clients",
       "Everything in Growing, plus:",

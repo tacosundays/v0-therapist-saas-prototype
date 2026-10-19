@@ -69,7 +69,7 @@ test("primary surfaces use the SessionSteps brand", () => {
   const mark = readFileSync("components/brand-mark.tsx", "utf8")
   const hero = readFileSync("components/landing/hero.tsx", "utf8")
   assert.match(mark, /SessionSteps logo/)
-  assert.match(hero, /Clinical continuity for behavioral health/)
+  assert.match(hero, /Built by therapists for therapists/)
   assert.match(hero, /longitudinal outcomes/)
 })
 

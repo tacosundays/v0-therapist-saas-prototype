@@ -71,7 +71,7 @@ export function Hero() {
               className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#635BFF]/15 bg-white/80 px-4 py-2 text-sm font-semibold text-[#635BFF] shadow-sm backdrop-blur"
             >
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#18B7A0]" />
-              Clinical continuity for behavioral health
+              Built by therapists for therapists
             </motion.div>
 
             <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-[#0F172A] sm:text-5xl lg:text-6xl">

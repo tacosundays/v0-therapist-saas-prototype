@@ -85,7 +85,7 @@ const retentionRows = [
 const documentation = [
   ["Privacy Policy", "Workspace-facing privacy documentation placeholder."],
   ["Terms of Service", "Administrative placeholder for contractual terms."],
-  ["Business Associate Agreement", "BAA workflow placeholder; do not claim availability until approved."],
+  ["Business Associate Agreement", "Standard BAA available to eligible healthcare customers; it must be accepted by an authorized representative before PHI is used in SessionSteps."],
   ["Security Whitepaper", "Plain-language security posture overview placeholder."],
   ["Subprocessor List", "Vendor and subprocessors documentation placeholder."],
   ["Release Notes", "Operational change history placeholder."],

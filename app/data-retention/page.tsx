@@ -1,11 +1,24 @@
 import type { Metadata } from "next"
 import { PublicPolicyPage } from "@/components/legal/public-policy-page"
 import { PRIVACY_EMAIL, PRIVACY_EMAIL_HREF } from "@/lib/contact"
+
 export const metadata: Metadata = { title: "Data Retention and Deletion | SessionSteps" }
-export default function DataRetentionPage() { return <PublicPolicyPage eyebrow="Privacy" title="Data Retention and Deletion Policy" description="How long SessionSteps keeps information and how authorized customers can request export or deletion.">
-  <section><h2>Active accounts</h2><p>Account information and customer content are retained while the account is active and as needed to provide the service. Healthcare customers determine their clinical record-retention obligations and should establish their own retention and export procedures.</p></section>
-  <section><h2>After cancellation or termination</h2><p>Authorized account owners should export needed information before access ends. We may maintain a limited recovery period described in the applicable order or account notice, after which customer content is deleted or de-identified from active systems unless law, a legal hold, dispute, security investigation, or written agreement requires retention.</p></section>
-  <section><h2>Backups and technical records</h2><p>Deleted information may remain temporarily in encrypted backups until those backups are overwritten under normal rotation. Backup data is isolated from ordinary product access and retained only for continuity, security, or legal obligations. Security and audit records may be retained longer when needed to investigate access, protect the service, or demonstrate compliance.</p></section>
-  <section><h2>Financial and legal records</h2><p>Invoices, transaction records, contracts, consent records, and required business records may be retained for the period required by tax, accounting, contract, and other law. These records are not used to restore deleted clinical content.</p></section>
-  <section><h2>Requests</h2><p>An authorized account owner may request export, correction, or deletion through the product or at <a href={PRIVACY_EMAIL_HREF}>{PRIVACY_EMAIL}</a>. We verify identity and authority before acting and will acknowledge the request with the applicable scope and timeline. A client should generally direct requests to their healthcare practice, which controls the record.</p></section>
-  </PublicPolicyPage> }
+
+export default function DataRetentionPage() {
+  return (
+    <PublicPolicyPage
+      eyebrow="Privacy"
+      title="Data Retention and Deletion Policy"
+      description="How SessionSteps retains, exports, deletes, and de-identifies information."
+      lastUpdated="October 20, 2026"
+    >
+      <section><h2>1. Scope and roles</h2><p>This policy supplements the Privacy Policy, Terms of Service, and any Business Associate Agreement. For customer content, the subscribing healthcare practice generally determines why and how long records must be retained, while SessionSteps processes that information on its instructions.</p></section>
+      <section><h2>2. Active accounts</h2><p>Account information and customer content are retained while an account is active and as needed to provide, secure, support, and improve the service. Healthcare customers are responsible for establishing retention schedules that satisfy clinical, licensing, payer, and legal-record obligations.</p></section>
+      <section><h2>3. Cancellation and termination</h2><p>Authorized account owners should export required information before access ends. Following cancellation or termination, SessionSteps may maintain a limited recovery period described in the applicable order, account notice, or agreement. After that period, customer content is deleted or de-identified from active systems unless retention is required by law, legal hold, dispute, security investigation, payment obligation, or written agreement.</p></section>
+      <section><h2>4. Backups and continuity copies</h2><p>Deleted information may remain temporarily in protected backups until those backups are overwritten through normal rotation. Backup copies are not available for ordinary product use and are retained only for continuity, security, recovery, or legal obligations. If restored after a disruption, deletion instructions are reapplied where practicable.</p></section>
+      <section><h2>5. Logs, billing, and legal records</h2><p>Security, authentication, and audit records may be retained longer when reasonably needed to investigate activity, prevent abuse, demonstrate compliance, or protect the service. Invoices, transaction records, contracts, authorizations, consent records, and required business records may be kept for tax, accounting, contractual, or legal purposes. These records are not used to recreate deleted clinical content.</p></section>
+      <section><h2>6. De-identified and aggregated information</h2><p>SessionSteps may retain information that has been de-identified or aggregated so that it no longer identifies a person, subject to applicable law and contractual restrictions. We do not attempt to re-identify information treated as de-identified.</p></section>
+      <section><h2>7. Requests and exports</h2><p>An authorized account owner may request an export, correction, or deletion through available product controls or at <a href={PRIVACY_EMAIL_HREF}>{PRIVACY_EMAIL}</a>. We verify identity and authority before acting and will explain the applicable scope and timing. A client should generally direct a records or privacy request to their healthcare practice, which controls the record.</p></section>
+    </PublicPolicyPage>
+  )
+}

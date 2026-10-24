@@ -5,6 +5,7 @@ import { useEffect } from "react"
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { reportClientError } from "@/lib/client-error-monitoring"
 
 export default function SessionPrepError({
   error,
@@ -14,7 +15,7 @@ export default function SessionPrepError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error("[v0] Session Prep: uncaught rendering error", error)
+    reportClientError("session-prep", error)
   }, [error])
 
   return (

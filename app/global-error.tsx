@@ -1,6 +1,11 @@
 "use client"
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import { useEffect } from "react"
+import { reportClientError } from "@/lib/client-error-monitoring"
+
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => { reportClientError("global", error) }, [error])
+
   return (
     <html><body className="bg-slate-50">
       <main className="flex min-h-screen items-center justify-center p-6 text-center">

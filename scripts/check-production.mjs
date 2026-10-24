@@ -77,10 +77,41 @@ for (const path of paths) {
   }
 }
 
+{
+  const path = "/api/monitoring/errors"
+  const startedAt = Date.now()
+  try {
+    const response = await fetch(`${origin}${path}`, {
+      method: "POST",
+      headers: {
+        "User-Agent": "SessionSteps-Production-Monitor/1.0",
+        "Content-Type": "application/json",
+        Origin: origin,
+      },
+      body: JSON.stringify({ scope: "invalid", errorName: "Error" }),
+      signal: AbortSignal.timeout(15_000),
+    })
+    const elapsed = Date.now() - startedAt
+    if (response.status !== 400) {
+      failures.push(`${path}: expected HTTP 400, got ${response.status}`)
+      console.error(`FAIL ${path} expected HTTP 400, got ${response.status} ${elapsed}ms`)
+    } else if (!(response.headers.get("cache-control") || "").includes("no-store")) {
+      failures.push(`${path}: missing no-store cache control`)
+      console.error(`FAIL ${path} missing no-store cache control ${elapsed}ms`)
+    } else {
+      console.log(`OK   ${path} rejected invalid report HTTP ${response.status} ${elapsed}ms`)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    failures.push(`${path}: ${message}`)
+    console.error(`FAIL ${path} ${message}`)
+  }
+}
+
 if (failures.length > 0) {
   console.error(`\n${failures.length} production check(s) failed:`)
   for (const failure of failures) console.error(`- ${failure}`)
   process.exit(1)
 }
 
-console.log(`\nAll ${paths.length} production checks passed.`)
+console.log(`\nAll ${paths.length + 1} production checks passed.`)

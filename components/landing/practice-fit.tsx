@@ -23,7 +23,7 @@ const practiceFitItems = [
 
 export function PracticeFit() {
   return (
-    <section id="practice-fit" className="pt-8 pb-16 px-4 sm:px-6 lg:px-8 sm:pt-10 sm:pb-24">
+    <section id="practice-fit" className="pt-8 pb-8 px-4 sm:px-6 lg:px-8 sm:pt-10 sm:pb-10">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

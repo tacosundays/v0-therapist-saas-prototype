@@ -14,6 +14,9 @@ export function Footer() {
             <p className="text-sm text-muted-foreground max-w-xs">
               Helping therapists assign homework, collect reflections, and review client progress between sessions.
             </p>
+            <p className="mt-3 text-sm font-medium text-foreground">
+              Proudly built in Jacksonville, Florida
+            </p>
           </div>
 
           <div>

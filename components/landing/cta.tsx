@@ -7,7 +7,7 @@ import Link from "next/link"
 
 export function CTA() {
   return (
-    <section className="py-16 px-4 sm:px-6 lg:px-8 sm:py-24">
+    <section className="pt-8 pb-16 px-4 sm:px-6 lg:px-8 sm:pt-10 sm:pb-24">
       <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

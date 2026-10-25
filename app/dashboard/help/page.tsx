@@ -17,7 +17,7 @@ export default function HelpPage() {
     <div className="space-y-8">
       <div className="rounded-3xl bg-slate-950 px-6 py-10 text-white sm:px-10">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Help center</p>
-        <h1 className="mt-3 text-3xl font-bold">What would you like to do?</h1>
+        <h1 className="mt-3 text-3xl font-bold text-white">What would you like to do?</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Short, practical walkthroughs for the workflows therapists use most.</p>
         <div className="relative mt-6 max-w-xl">
           <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
